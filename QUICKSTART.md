@@ -20,11 +20,12 @@
 Mở **PowerShell** (gõ "powershell" vào Start menu), gõ lệnh sau rồi Enter:
 
 ```powershell
-cd "F:\OneDrive\onyx\Translate Book"
+cd "<PROJECT_ROOT>"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r scripts\requirements.txt
+pip install -r requirements.txt
 ```
+> Thay `<PROJECT_ROOT>` bằng đường dẫn thực tế (VD: `F:\OneDrive\onyx\Translate Book`).
 
 > Nếu lỗi "running scripts is disabled", gõ:
 > `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
@@ -59,7 +60,7 @@ mineru-models-download
 
 Nếu tool không tìm thấy file, copy thủ công:
 
-1. Mở thư mục `F:\OneDrive\onyx\Translate Book\input\`
+1. Mở thư mục `<PROJECT_ROOT>\input\`
 2. Copy file sách (.pdf, .epub, .srt, .docx) vào đó
 3. Quay lại tool, chọn lại **`1`**
 
