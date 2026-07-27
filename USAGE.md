@@ -1,7 +1,7 @@
 # USAGE — Hướng dẫn sử dụng dự án (thực hành)
 
 > Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./PROCESS.md) để hiểu chi tiết từng bước.
-> Phiên bản: v3.1 — Cập nhật 2026-07-27
+> Phiên bản: v3.2 — Cập nhật 2026-07-27
 
 ---
 
@@ -17,7 +17,7 @@
 8. [Troubleshooting nhanh](#8-troubleshooting-nhanh)
 9. [Tam ngữ (Chinese → Pinyin → Vietnamese)](#9-tam-ngữ-chinese--pinyin--vietnamese)
 10. [Workflow mới: Agent-first](#10-workflow-mới-agent-first-khuyến-nghị)
-10. [Interactive mode chi tiết](#10-interactive-mode-chi-tiết)
+11. [Interactive mode chi tiết](#11-interactive-mode-chi-tiết)
 
 ---
 
@@ -658,7 +658,7 @@ python scripts\add_pinyin.py `
 > Workflow này dùng pipeline scripts mới, Agent tự đọc chunk JSON + glossary và dịch trực tiếp.
 > Không cần copy-paste thủ công từng chunk, không cần tạo file Markdown riêng.
 
-### 9.1. Pipeline toàn bộ
+### 10.1. Pipeline toàn bộ
 
 ```powershell
 cd "F:\OneDrive\onyx\Translate Book"
@@ -680,7 +680,7 @@ python scripts\translate_full_pipeline.py `
 # → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
 ```
 
-### 9.2. Interactive mode (KHUYẾN NGHỊ) — Tự động lặp
+### 10.2. Interactive mode (KHUYẾN NGHỊ) — Tự động lặp
 
 > **Giảm thao tác**: một lệnh duy nhất, tự động prompt → đợi dịch → save → commit → next.
 
@@ -706,7 +706,7 @@ python scripts\translate_helper.py --interactive --from 10 `
 #   ---EXIT---   Thoát
 ```
 
-### 9.3. Dịch thủ công từng chunk (nếu không dùng interactive)
+### 10.3. Dịch thủ công từng chunk (nếu không dùng interactive)
 
 ```powershell
 # Xem chunk nào chưa dịch
@@ -736,7 +736,7 @@ python scripts\translate_helper.py `
     --progress-dir "working\progress\$slug"
 ```
 
-### 9.6. QA và Merge
+### 10.6. QA và Merge
 
 ```powershell
 # QA tất cả chunk đã dịch
@@ -769,7 +769,25 @@ python scripts\merge_chunks.py `
     --skip-missing
 ```
 
-### 9.4. Glossary flow hoàn chỉnh
+#### Validation & error handling
+
+`merge_chunks.py` tự động kiểm tra trước khi gộp:
+
+| Kiểm tra | Mô tả | Hành vi mặc định |
+|----------|-------|-----------------|
+| **Thiếu chunk** | Chunk_id không liên tục (vd: có 0,1,3 thiếu 2) | **Báo lỗi và dừng** — yêu cầu dịch hết hoặc dùng flag |
+| **Dịch rỗng** | chunk tồn tại nhưng `translated_text` trống | **Báo lỗi và dừng** |
+| **File lỗi** | JSON không parse được hoặc thiếu chunk_id | **Bỏ qua file**, báo danh sách file lỗi |
+
+**Các flag xử lý:**
+
+- `--allow-partial`: Thay chunk thiếu bằng `[CHƯA DỊCH - Chunk N]` placeholder
+- `--skip-missing`: Bỏ qua chunk thiếu (file output ngắn hơn dự kiến)
+- Không dùng flag nào: **exit code 1** nếu thiếu chunk
+
+Nếu cả `--allow-partial` và `--skip-missing` đều không dùng, script **không ghi file** khi phát hiện thiếu chunk, tránh output không hoàn chỉnh.
+
+### 10.4. Glossary flow hoàn chỉnh
 
 > **Luồng xử lý glossary**: `generate_glossary.py` → Agent tạo CSV → user review → dùng trong translate → QA check.
 
@@ -830,7 +848,7 @@ python scripts\glossary_qa.py `
 
 ---
 
-### 9.5. Chunking riêng (nếu muốn tùy chỉnh)
+### 10.5. Chunking riêng (nếu muốn tùy chỉnh)
 
 ```powershell
 # Smart chunking (mặc định)
@@ -870,11 +888,11 @@ python scripts\chunk_text.py `
 
 ---
 
-## 10. Interactive mode chi tiết
+## 11. Interactive mode chi tiết
 
 > **Một lệnh duy nhất** cho toàn bộ quá trình dịch: tự động tìm chunk, in prompt, đợi dịch, lưu, commit.
 
-### 10.1. Cách dùng
+### 11.1. Cách dùng
 
 ```powershell
 python scripts\translate_helper.py --interactive `
@@ -885,7 +903,7 @@ python scripts\translate_helper.py --interactive `
     --auto-commit
 ```
 
-### 10.2. Luồng hoạt động
+### 11.2. Luồng hoạt động
 
 ```
 1. Tìm chunk tiếp theo chưa dịch trong working/progress/{slug}/
@@ -898,7 +916,7 @@ python scripts\translate_helper.py --interactive `
 8. Quay lại bước 1 cho chunk tiếp theo
 ```
 
-### 10.3. Commands trong interactive mode
+### 11.3. Commands trong interactive mode
 
 | Command | Hành động |
 |---------|-----------|
@@ -907,7 +925,7 @@ python scripts\translate_helper.py --interactive `
 | `---BACK---` | Quay lại chunk trước |
 | `---EXIT---` | Thoát interactive mode |
 
-### 10.4. Flags
+### 11.4. Flags
 
 | Flag | Mô tả |
 |------|-------|
@@ -917,7 +935,7 @@ python scripts\translate_helper.py --interactive `
 | `--chunks-dir {path}` | Thư mục chunk gốc |
 | `--progress-dir {path}` | Thư mục lưu tiến trình |
 
-### 10.5. Yêu cầu
+### 11.5. Yêu cầu
 
 - Python 3.10+
 - `pyperclip` (optional): `pip install pyperclip` để tự động copy prompt vào clipboard

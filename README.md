@@ -120,6 +120,28 @@ Translate Book\
 
 ---
 
+## 📝 Ví dụ output tam ngữ
+
+> Khi dịch sách tiếng Trung với `--trilingual`, Agent output 3-line blocks:
+
+```
+今天天气很好。
+jīn tiān tiān qì hěn hǎo。
+Hôm nay thời tiết rất đẹp。
+
+我们去公园散步。
+wǒ men qù gōng yuán sàn bù。
+Chúng tôi đi dạo trong công viên。
+
+我明天也要去。
+wǒ míng tiān yě yào qù。
+Ngày mai tôi cũng sẽ đi。
+```
+
+Dùng `scripts/merge_chunks.py --format trilingual` để gộp → `output/{book}_trilingual.md`.
+
+---
+
 ## 🛠 Công cụ chính
 
 | Công cụ | Vai trò | Ghi chú |
