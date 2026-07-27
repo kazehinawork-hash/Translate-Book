@@ -9,6 +9,16 @@ Ví dụ:
         --progress-dir "working\progress\mybook" ^
         --book-name "mybook" ^
         --force
+
+    python scripts/merge_chunks.py ^
+        --progress-dir "working\progress\mybook" ^
+        --book-name "mybook" ^
+        --allow-partial
+
+    python scripts/merge_chunks.py ^
+        --progress-dir "working\progress\mybook" ^
+        --book-name "mybook" ^
+        --skip-missing
 """
 
 import argparse
@@ -21,32 +31,37 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import setup_encoding, PROJECT_ROOT
 
 
+TERMINAL_WIDTH = 66
+
+
 def doc_chunk_json(file_path: Path) -> dict | None:
     for enc in ('utf-8-sig', 'utf-8'):
         try:
             data = json.loads(file_path.read_text(encoding=enc))
             if 'chunk_id' not in data:
-                print(f"  \u26a0\ufe0f B\u1ecf qua {file_path.name}: thi\u1ebfu chunk_id", file=sys.stderr)
                 return None
             return data
         except (json.JSONDecodeError, UnicodeDecodeError):
             continue
-    print(f"  \u26a0\ufe0f Kh\u00f4ng \u0111\u1ecdc \u0111\u01b0\u1ee3c {file_path.name}", file=sys.stderr)
     return None
 
 
 def lay_chunk_id(file_path: Path) -> int:
-    """Extract chunk_id from filename (chunk_001.json -> 1) or file content."""
     for enc in ('utf-8-sig', 'utf-8'):
         try:
             data = json.loads(file_path.read_text(encoding=enc))
             return int(data.get('chunk_id', 999999))
         except (json.JSONDecodeError, ValueError, KeyError):
             continue
-    # Fallback: extract from filename
     stem = file_path.stem
     nums = [int(s) for s in stem.split('_') if s.isdigit()] or [999999]
     return nums[0]
+
+
+def print_header(title: str, char: str = '\u2550'):
+    print(f"\n{char * TERMINAL_WIDTH}")
+    print(f"  {title}")
+    print(f"{char * TERMINAL_WIDTH}")
 
 
 def main():
@@ -64,11 +79,20 @@ def main():
                         help='Ghi \u0111\u00e8 m\u00e0 kh\u00f4ng h\u1ecfi confirm')
     parser.add_argument('--output-dir', type=Path,
                         help='Th\u01b0 m\u1ee5c output (m\u1eb7c \u0111\u1ecbnh: output/)')
+    parser.add_argument('--allow-partial', action='store_true',
+                        help='Cho ph\u00e9p merge khi thi\u1ebfu chunk (ch\u00e8n placeholder [CH\u01afA D\u1ecaCH])')
+    parser.add_argument('--skip-missing', action='store_true',
+                        help='B\u1ecf qua chunk thi\u1ebfu (kh\u00f4ng ch\u00e8n placeholder)')
 
     args = parser.parse_args()
 
     if not args.progress_dir.exists():
         print(f"[L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y th\u01b0 m\u1ee5c: {args.progress_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.allow_partial and args.skip_missing:
+        print("[L\u1ed6I] Kh\u00f4ng th\u1ec3 d\u00f9ng c\u1ea3 --allow-partial v\u00e0 --skip-missing c\u00f9ng l\u00fac",
+              file=sys.stderr)
         sys.exit(1)
 
     output_dir = args.output_dir or (PROJECT_ROOT / 'output')
@@ -84,6 +108,7 @@ def main():
 
     start_time = time.time()
 
+    # Read all chunk files
     json_files = sorted(
         [f for f in args.progress_dir.glob('*.json') if f.is_file()],
         key=lay_chunk_id,
@@ -93,44 +118,106 @@ def main():
         print(f"[L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y file JSON n\u00e0o trong {args.progress_dir}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\u0110\u1ecdc {len(json_files)} file chunk t\u1eeb {args.progress_dir}")
-
-    chunks = []
-    skipped = 0
+    # Parse all chunks
+    chunk_map = {}
+    invalid = []
     for fpath in json_files:
         data = doc_chunk_json(fpath)
         if data is None:
-            skipped += 1
+            invalid.append(fpath.name)
             continue
-        translated = data.get('translated_text', '').strip()
-        if not translated:
-            print(f"  \u26a0\ufe0f Chunk {data.get('chunk_id', '?')} ch\u01b0a c\u00f3 translated_text, b\u1ecf qua")
-            skipped += 1
+        cid = int(data.get('chunk_id', -1))
+        if cid < 0:
+            invalid.append(fpath.name)
             continue
-        chunks.append(data)
+        chunk_map[cid] = data
 
-    if not chunks:
-        print("[L\u1ed6I] Kh\u00f4ng c\u00f3 chunk n\u00e0o c\u00f3 d\u1eef li\u1ec7u d\u1ecbch", file=sys.stderr)
-        sys.exit(1)
+    # Determine total_chunks
+    total_chunks = max(
+        max((d.get('total_chunks', 0) for d in chunk_map.values()), default=0),
+        max(chunk_map.keys(), default=0) + 1,
+    )
 
-    chunks.sort(key=lambda c: int(c.get('chunk_id', 999999)))
+    # Validate chunk coverage
+    expected_ids = set(range(total_chunks))
+    present_ids = set(chunk_map.keys())
+    missing_ids = sorted(expected_ids - present_ids)
 
+    # Check for empty translations
+    empty_ids = []
+    for cid in list(chunk_map.keys()):
+        text = chunk_map[cid].get('translated_text', '').strip()
+        if not text:
+            empty_ids.append(cid)
+
+    # Validation report
+    print_header(f"MERGE VALIDATION")
+    print(f"  Total expected chunks: {total_chunks}")
+    print(f"  Chunks found: {len(chunk_map)}")
+    if invalid:
+        print(f"  Invalid files: {len(invalid)} ({', '.join(invalid[:5])}{'...' if len(invalid) > 5 else ''})")
+    missing_all = sorted(set(missing_ids + empty_ids))
+
+    if missing_all:
+        print(f"  Missing/empty chunks: {len(missing_all)}")
+        for cid in missing_ids:
+            print(f"    \u274c Chunk {cid}: MISSING")
+        for cid in empty_ids:
+            if cid not in missing_ids:
+                print(f"    \u274c Chunk {cid}: EMPTY translation")
+
+        if args.skip_missing:
+            print(f"\n  \u23ed --skip-missing: b\u1ecf qua {len(missing_all)} chunk thi\u1ebfu/r\u1ed7ng")
+        elif args.allow_partial:
+            print(f"\n  \u23ed --allow-partial: ch\u00e8n placeholder cho {len(missing_all)} chunk thi\u1ebfu/r\u1ed7ng")
+        else:
+            print(f"\n  [L\u1ed6I] Ph\u00e1t hi\u1ec7n chunk thi\u1ebfu/r\u1ed7ng.")
+            print(f"  D\u00f9ng --allow-partial \u0111\u1ec3 ch\u00e8n placeholder, --skip-missing \u0111\u1ec3 b\u1ecf qua,")
+            print(f"  ho\u1eb7c ho\u00e0n th\u00e0nh c\u00e1c chunk thi\u1ebfu tr\u01b0\u1edbc khi merge.")
+            sys.exit(1)
+
+    # Merge
     segments = []
-    total_words = 0
-    for c in chunks:
-        t = c.get('translated_text', '').strip()
-        segments.append(t)
-        total_words += len(t.split())
+    merged_count = 0
+    total_words_source = 0
+    total_words_translated = 0
+
+    for cid in range(total_chunks):
+        if cid in chunk_map and chunk_map[cid].get('translated_text', '').strip():
+            data = chunk_map[cid]
+            t = data['translated_text'].strip()
+            segments.append(t)
+            merged_count += 1
+            total_words_source += data.get('word_count_source', 0) or len(data.get('source_text', '').split())
+            total_words_translated += data.get('word_count_translated', 0) or len(t.split())
+        elif args.allow_partial:
+            segments.append(f"[CH\u01afA D\u1ecaCH - Chunk {cid}]")
+        elif args.skip_missing:
+            pass  # skip entirely
 
     merged = '\n\n'.join(segments)
     output_file.write_text(merged, encoding='utf-8')
 
     elapsed = time.time() - start_time
 
-    print(f"\n\u2705 Ho\u00e0n th\u00e0nh: {output_file}")
-    print(f"  T\u1ed5ng s\u1ed1 chunk \u0111\u00e3 merge: {len(chunks)}" + (f" (b\u1ecf qua {skipped})" if skipped else ""))
-    print(f"  T\u1ed5ng s\u1ed1 t\u1eeb: ~{total_words}")
-    print(f"  Th\u1eddi gian: {elapsed:.2f}s")
+    # Final statistics
+    print_header(f"MERGE COMPLETE")
+    print(f"  Book: {args.book_name}")
+    print(f"  Total chunks: {total_chunks}")
+    print(f"  Merged: {merged_count}")
+    if missing_all:
+        print(f"  Missing: {len(missing_all)} (chunk {', '.join(str(x) for x in missing_all[:10])}"
+              f"{'...' if len(missing_all) > 10 else ''})")
+    print(f"  Total words (source): ~{total_words_source:,}")
+    print(f"  Total words (translated): ~{total_words_translated:,}")
+    print(f"  Output: {output_file}")
+    print(f"  Time: {elapsed:.2f}s")
+    print(f"{chr(0x2550) * TERMINAL_WIDTH}")
+
+    if missing_all and args.allow_partial:
+        print(f"\n  \u26a0\ufe0f {len(missing_all)} placeholder(s) inserted for missing chunks.")
+    elif missing_all and args.skip_missing:
+        print(f"\n  \u26a0\ufe0f {len(missing_all)} missing chunk(s) silently skipped.")
 
 
 if __name__ == '__main__':

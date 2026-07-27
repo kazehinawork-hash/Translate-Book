@@ -16,6 +16,7 @@
 7. [Git workflow hàng ngày](#7-git-workflow-hàng-ngày)
 8. [Troubleshooting nhanh](#8-troubleshooting-nhanh)
 9. [Workflow mới: Agent-first](#9-workflow-mới-agent-first-khuyến-nghị)
+10. [Interactive mode chi tiết](#10-interactive-mode-chi-tiết)
 
 ---
 
@@ -42,12 +43,15 @@ $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
 ### 1.2. Tạo virtual env + cài packages
 
 ```powershell
-cd "F:\OneDrive\onyx\Translate Book"
+cd "<PROJECT_ROOT>"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
-pip install -r scripts\requirements.txt
+pip install -r requirements.txt
 ```
+
+> **Lưu ý**: Thay `<PROJECT_ROOT>` bằng đường dẫn thực tế (VD: `F:\OneDrive\onyx\Translate Book`).
+> Trên macOS/Linux: `cd /path/to/Translate Book && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`.
 
 Sau này mỗi lần mở PowerShell mới:
 ```powershell
@@ -87,11 +91,11 @@ git commit -m "Initial commit: project structure and docs"
 ### Bước 1: Chuẩn bị (2 phút)
 
 ```powershell
-cd "F:\OneDrive\onyx\Translate Book"
+cd "<PROJECT_ROOT>"
 .\.venv\Scripts\Activate.ps1
 
 # Đặt biến dùng xuyên suốt
-$root = "F:\OneDrive\onyx\Translate Book"
+$root = "<PROJECT_ROOT>"
 $slug = "pragmatic-programmer"
 
 # Copy file gốc vào input\
@@ -612,7 +616,33 @@ python scripts\translate_full_pipeline.py `
 # → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
 ```
 
-### 9.2. Dịch từng chunk với translate_helper.py
+### 9.2. Interactive mode (KHUYẾN NGHỊ) — Tự động lặp
+
+> **Giảm thao tác**: một lệnh duy nhất, tự động prompt → đợi dịch → save → commit → next.
+
+```powershell
+# Bắt đầu interactive mode (tự động tìm chunk chưa dịch)
+python scripts\translate_helper.py --interactive `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug" `
+    --glossary "glossary\$slug.csv" `
+    --source-lang English --target-lang Vietnamese `
+    --auto-commit
+
+# Bắt đầu từ chunk 10
+python scripts\translate_helper.py --interactive --from 10 `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug" `
+    --glossary "glossary\$slug.csv"
+
+# Trong interactive mode, các lệnh sau dùng được khi paste:
+#   ---END---    Lưu và sang chunk tiếp
+#   ---SKIP---   Bỏ qua chunk này
+#   ---BACK---   Quay lại chunk trước
+#   ---EXIT---   Thoát
+```
+
+### 9.3. Dịch thủ công từng chunk (nếu không dùng interactive)
 
 ```powershell
 # Xem chunk nào chưa dịch
@@ -630,12 +660,11 @@ python scripts\translate_helper.py `
     --target-lang Vietnamese
 
 # Copy prompt từ terminal → paste cho Agent → Agent trả bản dịch
-# Sau đó lưu bản dịch:
+# Sau đó lưu bản dịch (dùng ---END--- để kết thúc):
 python scripts\translate_helper.py `
-    --save 0 `
+    --save 0 --auto-commit `
     --progress-dir "working\progress\$slug" `
     --chunks-dir "working\chunks\$slug"
-# (paste bản dịch, Ctrl+Z, Enter)
 
 # Kiểm tra tiến trình
 python scripts\translate_helper.py `
@@ -643,7 +672,7 @@ python scripts\translate_helper.py `
     --progress-dir "working\progress\$slug"
 ```
 
-### 9.3. QA và Merge
+### 9.6. QA và Merge
 
 ```powershell
 # QA tất cả chunk đã dịch
@@ -657,14 +686,87 @@ python scripts\translate_full_pipeline.py `
     --from-step 6 `
     --force
 
-# Hoặc gộp riêng:
+# Merge với validation (kiểm tra chunk thiếu trước khi gộp)
 python scripts\merge_chunks.py `
     --progress-dir "working\progress\$slug" `
     --book-name $slug `
     --force
+
+# Merge cho phép thiếu chunk (chèn placeholder [CHƯA DỊCH])
+python scripts\merge_chunks.py `
+    --progress-dir "working\progress\$slug" `
+    --book-name $slug `
+    --allow-partial
+
+# Merge bỏ qua chunk thiếu
+python scripts\merge_chunks.py `
+    --progress-dir "working\progress\$slug" `
+    --book-name $slug `
+    --skip-missing
 ```
 
-### 9.4. Chunking riêng (nếu muốn tùy chỉnh)
+### 9.4. Glossary flow hoàn chỉnh
+
+> **Luồng xử lý glossary**: `generate_glossary.py` → Agent tạo CSV → user review → dùng trong translate → QA check.
+
+#### Bước A: Tạo prompt cho Agent
+
+```powershell
+python scripts\generate_glossary.py `
+    --source "working\extracted\$slug\raw.md" `
+    --book-name $slug
+```
+→ File prompt tại `working/glossary_prompt_{slug}.txt`
+
+#### Bước B: Agent đọc prompt → tạo CSV
+
+```
+Đọc file glossary_prompt_{slug}.txt, yêu cầu Agent tạo file CSV.
+Lưu kết quả vào glossary/{slug}.csv
+```
+
+#### Bước C: Kiểm tra CSV format
+
+Script `glossary_qa.py` và `translate_helper.py` expect CSV có cột:
+```csv
+source,target,notes
+"Machine Learning","Học máy","ML term"
+"Harry Potter","Harry Potter","main character"
+"Hogwarts","Hogwarts","fictional school"
+```
+
+- `source`: Thuật ngữ gốc (bắt buộc)
+- `target`: Bản dịch (bỏ trống nếu chưa biết, Agent sẽ điền sau)
+- `notes`: Ngữ cảnh ngắn (tùy chọn)
+
+#### Bước D: Dùng glossary khi dịch
+
+```powershell
+# translate_helper tự động đọc glossary khi --glossary được cung cấp
+python scripts\translate_helper.py --interactive --glossary "glossary\$slug.csv" ...
+```
+
+#### Bước E: QA kiểm tra glossary consistency
+
+```powershell
+# Sau khi dịch, QA tự động kiểm tra thuật ngữ
+python scripts\glossary_qa.py `
+    --source "working\chunks\$slug\chunk-000.json" `
+    --translation "working\progress\$slug\chunk_000.json" `
+    --glossary "glossary\$slug.csv" `
+    --lang en
+```
+
+#### Bước F: Merge vào genre glossary (tùy chọn)
+
+```powershell
+# Khi thuật ngữ phổ biến, copy vào glossary/genres/{genre}.csv
+# để dùng lại cho các cuốn sách cùng thể loại
+```
+
+---
+
+### 9.5. Chunking riêng (nếu muốn tùy chỉnh)
 
 ```powershell
 # Smart chunking (mặc định)
@@ -701,6 +803,60 @@ python scripts\chunk_text.py `
     --overlap-chars 200 `
     --respect-headings
 ```
+
+---
+
+## 10. Interactive mode chi tiết
+
+> **Một lệnh duy nhất** cho toàn bộ quá trình dịch: tự động tìm chunk, in prompt, đợi dịch, lưu, commit.
+
+### 10.1. Cách dùng
+
+```powershell
+python scripts\translate_helper.py --interactive `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug" `
+    --glossary "glossary\$slug.csv" `
+    --source-lang English --target-lang Vietnamese `
+    --auto-commit
+```
+
+### 10.2. Luồng hoạt động
+
+```
+1. Tìm chunk tiếp theo chưa dịch trong working/progress/{slug}/
+2. Đọc chunk JSON + glossary CSV
+3. In prompt ra terminal (và copy vào clipboard nếu có pyperclip)
+4. Hiển thị tiến trình: [█████░░░░░░░] 33%
+5. Đợi user paste bản dịch
+6. Lưu vào working/progress/{slug}/chunk_{id}.json
+7. Nếu --auto-commit: git add + git commit
+8. Quay lại bước 1 cho chunk tiếp theo
+```
+
+### 10.3. Commands trong interactive mode
+
+| Command | Hành động |
+|---------|-----------|
+| `---END---` (dòng mới) | Kết thúc nhập bản dịch, lưu và sang chunk tiếp |
+| `---SKIP---` | Bỏ qua chunk hiện tại |
+| `---BACK---` | Quay lại chunk trước |
+| `---EXIT---` | Thoát interactive mode |
+
+### 10.4. Flags
+
+| Flag | Mô tả |
+|------|-------|
+| `--from {id}` | Bắt đầu từ chunk_id cụ thể |
+| `--auto-commit` | Tự động git commit sau mỗi chunk |
+| `--glossary {path}` | File glossary CSV (nếu có) |
+| `--chunks-dir {path}` | Thư mục chunk gốc |
+| `--progress-dir {path}` | Thư mục lưu tiến trình |
+
+### 10.5. Yêu cầu
+
+- Python 3.10+
+- `pyperclip` (optional): `pip install pyperclip` để tự động copy prompt vào clipboard
 
 ---
 
