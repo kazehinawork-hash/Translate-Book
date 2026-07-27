@@ -21,30 +21,32 @@ Không cần nhớ lệnh, không cần biết PowerShell. Đọc **[QUICKSTART.
 
 ---
 
-## 🛠 Cách dùng cho người quen tech
+## 🛠 Cách dùng cho người quen tech (Workflow mới)
 
-Nếu bạn quen command line, dùng trực tiếp các script:
+Nếu bạn quen command line, dùng pipeline scripts mới:
 
 ```powershell
-# 1. Setup
-cd "F:\OneDrive\onyx\Translate Book"
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r scripts\requirements.txt
-git init && git add PLAN.md PROCESS.md README.md USAGE.md QUICKSTART.md .gitignore glossary\ prompts\ scripts\requirements.txt && git commit -m "Initial commit"
+# Pipeline đầy đủ (tự động extract → chunk → glossary prompt)
+python scripts\translate_full_pipeline.py --book "MyBook" --input "input/mybook.pdf" --source-lang English
 
-# 2. Trích xuất (PDF EN)
-python scripts\mineru_extract.py --input input\<file>.pdf --output working\extracted\<slug>\raw.md --lang en
+# Sau đó Agent dịch từng chunk:
+python scripts\translate_helper.py --next --chunks-dir "working\chunks\mybook" --progress-dir "working\progress\mybook"
+python scripts\translate_helper.py --prepare 0 --chunks-dir "working\chunks\mybook" --glossary "glossary\mybook.csv"
+python scripts\translate_helper.py --save 0 --progress-dir "working\progress\mybook" --chunks-dir "working\chunks\mybook"
 
-# 3. Chia chunk
-python scripts\chunk_text.py --input working\extracted\<slug>\raw.md --output-dir working\chunks\<slug> --lang en --min-chars 3000 --max-chars 8000 --overlap-chars 200 --respect-headings
+# QA và Merge tự động:
+python scripts\translate_full_pipeline.py --book "MyBook" --from-step 5
+```
 
-# 4. Dịch từng chunk (paste vào chat AI, save vào output\<slug>\)
-# 5. QA
-python scripts\glossary_qa.py --source working\chunks\<slug>\chunk-001.md --translation output\<slug>\chunk-001.md --glossary glossary\<slug>.csv --lang en --report working\qa\<slug>\chunk-001-qa.md
+**Workflow tổng quan:**
 
-# 6. Git commit
-git add output/<slug>/chunk-001.md glossary/<slug>.* && git commit -m "feat(<slug>): chunk 001"
+```
+Bước 1: Extract   → scripts/extract_pdf.py (hoặc extract_epub.py, extract_srt.py)
+Bước 2: Chunk     → scripts/chunk_text.py (smart chunking, JSON output)
+Bước 3: Gen Glossary → scripts/generate_glossary.py (tạo prompt → Agent tạo CSV)
+Bước 4: Translate → Agent đọc từng chunk + glossary → working/progress/
+Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
+Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}_translated.md)
 ```
 
 Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
@@ -57,22 +59,28 @@ Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
 
 ---
 
-## 🗂 Cấu trúc thư mục (rút gọn)
+## 🗂 Cấu trúc thư mục
 
 ```
 Translate Book\
-├── input\          # File gốc (không commit git)
-├── output\         # Bản dịch Markdown hoàn chỉnh
-├── working\        # File trung gian (xem policy git bên dưới)
-│   ├── extracted\  # Markdown sạch từ MinerU (KHÔNG commit)
-│   ├── chunks\     # Văn bản đã chia chunk (KHÔNG commit)
-│   ├── progress\   # Theo dõi tiến độ (CÓ commit - tài sản tích lũy)
-│   ├── summary\    # Tóm tắt nội dung (CÓ commit - tài sản tích lũy)
-│   └── qa\         # Báo cáo QA (KHÔNG commit)
-├── glossary\       # Thuật ngữ (Markdown + CSV, có cả theo thể loại)
-├── prompts\        # Prompt mẫu cho AI
-├── scripts\        # Script Python hỗ trợ
-└── .venv\          # Virtual environment (không commit git)
+├── input\              # File gốc (KHÔNG commit)
+├── output\             # Bản dịch hoàn chỉnh
+├── working\
+│   ├── extracted\      # Markdown gốc sau extract (KHÔNG commit)
+│   ├── chunks\         # Chunk JSON (KHÔNG commit)
+│   ├── progress\       # Chunk đã dịch (CÓ commit - tài sản tích lũy)
+│   ├── summary\        # Tóm tắt (CÓ commit)
+│   └── qa\             # Báo cáo QA (KHÔNG commit)
+├── glossary\
+│   └── genres\         # Glossary theo thể loại
+├── prompts\            # Prompt mẫu cho Agent dịch
+├── scripts\            # Python scripts
+├── .gitignore
+├── README.md
+├── USAGE.md
+├── QUICKSTART.md
+├── PLAN.md
+└── PROCESS.md
 ```
 
 ---
@@ -86,6 +94,11 @@ Translate Book\
 | **OpenCC** | Chuẩn hóa Phồn ↔ Giản thể | Deterministic, chính xác |
 | **pysrt** | Xử lý SRT giữ timestamp/index | |
 | **PaddleOCR** | OCR backup | Khi MinerU không đủ |
+| **chunk_text.py** | Chunking với 4 strategy (smart/paragraph/line/fixed) | JSON output + neighbor context |
+| **generate_glossary.py** | Tạo prompt để Agent sinh glossary CSV | Không gọi API |
+| **translate_helper.py** | Hỗ trợ Agent dịch (prepare/save/status/next) | |
+| **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
+| **translate_full_pipeline.py** | Orchestrator chạy pipeline | Từng bước hoặc auto |
 | **git** | Version control | OneDrive không thay thế được |
 
 ---
