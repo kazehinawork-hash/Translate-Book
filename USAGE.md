@@ -1,7 +1,7 @@
 # USAGE — Hướng dẫn sử dụng dự án (thực hành)
 
 > Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./PROCESS.md) để hiểu chi tiết từng bước.
-> Phiên bản: v3.0 — Cập nhật 2026-07-27
+> Phiên bản: v3.1 — Cập nhật 2026-07-27
 
 ---
 
@@ -15,7 +15,8 @@
 6. [Cập nhật glossary](#6-cập-nhật-glossary)
 7. [Git workflow hàng ngày](#7-git-workflow-hàng-ngày)
 8. [Troubleshooting nhanh](#8-troubleshooting-nhanh)
-9. [Workflow mới: Agent-first](#9-workflow-mới-agent-first-khuyến-nghị)
+9. [Tam ngữ (Chinese → Pinyin → Vietnamese)](#9-tam-ngữ-chinese--pinyin--vietnamese)
+10. [Workflow mới: Agent-first](#10-workflow-mới-agent-first-khuyến-nghị)
 10. [Interactive mode chi tiết](#10-interactive-mode-chi-tiết)
 
 ---
@@ -589,7 +590,70 @@ Chi tiết hơn → [PROCESS.md §11](./PROCESS.md#11-xử-lý-sự-cố-thườ
 
 ---
 
-## 9. Workflow mới: Agent-first (khuyến nghị)
+## 9. Tam ngữ (Chinese → Pinyin → Vietnamese)
+
+> Workflow dành cho sách tiếng Trung, muốn output 3 dòng: Hán tự + Pinyin + Dịch.
+
+### 9.1. Backfill pinyin cho chunk đã dịch
+
+```powershell
+# Đã dịch xong bản thường (bilingual), muốn thêm pinyin
+python scripts\generate_trilingual.py `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug"
+
+# Xem trước (không ghi)
+python scripts\generate_trilingual.py `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug" `
+    --dry-run
+```
+
+### 9.2. Dịch trực tiếp với tam ngữ (khuyến nghị)
+
+Dùng `--trilingual` trong translate_helper.py — Agent output 3 dòng/block:
+
+```powershell
+# Prepare prompt tam ngữ
+python scripts\translate_helper.py `
+    --prepare 0 `
+    --chunks-dir "working\chunks\$slug" `
+    --glossary "glossary\$slug.csv" `
+    --trilingual
+
+# Interactive mode tam ngữ
+python scripts\translate_helper.py `
+    --interactive `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug" `
+    --glossary "glossary\$slug.csv" `
+    --trilingual `
+    --auto-commit
+```
+
+### 9.3. Merge tam ngữ
+
+```powershell
+python scripts\merge_chunks.py `
+    --progress-dir "working\progress\$slug" `
+    --book-name $slug `
+    --format trilingual `
+    --force
+# → Output: output/{slug}_trilingual.md
+```
+
+### 9.4. Sinh pinyin từ file gốc (standalone)
+
+```powershell
+python scripts\add_pinyin.py `
+    --input "working\extracted\$slug\raw.md" `
+    --output "working\pinyin\$slug.json"
+# → JSON array: [{original, pinyin, paragraph_index}, ...]
+```
+
+---
+
+## 10. Workflow mới: Agent-first (khuyến nghị)
 
 > Workflow này dùng pipeline scripts mới, Agent tự đọc chunk JSON + glossary và dịch trực tiếp.
 > Không cần copy-paste thủ công từng chunk, không cần tạo file Markdown riêng.

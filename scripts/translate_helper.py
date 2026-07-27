@@ -66,13 +66,66 @@ def doc_glossary(csv_path: Path) -> str:
     return ''
 
 
-def build_prompt(chunk_data: dict, glossary_text: str, source_lang: str, target_lang: str) -> str:
+def build_prompt(chunk_data: dict, glossary_text: str, source_lang: str, target_lang: str, trilingual: bool = False) -> str:
     chunk_id = chunk_data.get('chunk_id', '?')
     total = chunk_data.get('total_chunks', '?')
     chapter = chunk_data.get('chapter', '')
     text = chunk_data.get('text', '')
     prev_ctx = chunk_data.get('prev_context', '')
     next_ctx = chunk_data.get('next_context', '')
+
+    if trilingual:
+        return f"""# TRILINGUAL TRANSLATION INSTRUCTIONS ({source_lang} \u2192 Pinyin \u2192 {target_lang})
+
+You are a professional translator. Your task is to produce a **trilingual output** for the chunk below.
+
+## FORMAT
+Output each sentence as a **3-line block**, with blocks separated by a blank line:
+
+```
+{source_lang} sentence 1.
+pinyin of sentence 1.
+{target_lang} translation of sentence 1.
+
+{source_lang} sentence 2.
+pinyin of sentence 2.
+{target_lang} translation of sentence 2.
+```
+
+## EXAMPLE (Chinese \u2192 Pinyin \u2192 Vietnamese)
+Input: "今天天气很好。我们去公园散步。"
+
+Output:
+```
+今天天气很好。
+jīn tiān tiān qì hěn hǎo。
+Hôm nay thời tiết rất đẹp。
+
+我们去公园散步。
+wǒ men qù gōng yuán sàn bù。
+Chúng tôi đi dạo trong công viên。
+```
+
+## RULES
+1. Preserve ALL formatting: paragraphs, headings, lists, emphasis, line breaks
+2. Keep proper nouns, brand names in original unless they have widely accepted Vietnamese translations
+3. Use the GLOSSARY below \u2014 NEVER deviate from these translations
+4. Do NOT add explanations, notes, or translator comments
+5. Do NOT translate content inside code blocks, URLs, or placeholder tags
+6. Maintain the original tone and style
+7. Output ONLY the trilingual blocks \u2014 no extra text before or after
+
+## GLOSSARY
+{glossary_text if glossary_text else '(No glossary provided)'}
+
+## PREVIOUS CHUNK CONTEXT (for reference only, do not re-translate)
+{prev_ctx if prev_ctx else '(First chunk - no previous context)'}
+
+## CHUNK TO TRANSLATE (Chunk {chunk_id}/{total}, {chapter})
+{text}
+
+## NEXT CHUNK CONTEXT (for reference only, do not re-translate)
+{next_ctx if next_ctx else '(Last chunk - no next context)'}"""
 
     return f"""# TRANSLATION INSTRUCTIONS
 
@@ -200,7 +253,7 @@ def mode_prepare(args):
         sys.exit(1)
 
     glossary_text = doc_glossary(args.glossary) if args.glossary else ''
-    prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang)
+    prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang, args.trilingual)
     print(prompt)
 
 
@@ -221,11 +274,58 @@ def mode_prepare_batch(args):
             print(f"CHUNK {cid}: File not found, skipping")
             continue
 
-        prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang)
+        prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang, args.trilingual)
         print(f"\n{'=' * TERMINAL_WIDTH}")
         print(f"CHUNK {cid}/{data.get('total_chunks', '?')} - {data.get('chapter', '')}")
         print('=' * TERMINAL_WIDTH)
         print(prompt)
+
+
+def parse_trilingual_output(text: str) -> dict:
+    """Parse trilingual Agent output into {original_text, pinyin_text, translated_text}.
+
+    Expected format:
+        Chinese line 1.
+        pinyin line 1.
+        Vietnamese line 1.
+
+        Chinese line 2.
+        pinyin line 2.
+        Vietnamese line 2.
+    """
+    lines = [l.rstrip('\n\r') for l in text.splitlines()]
+    blocks = []
+    current_block = []
+    for line in lines:
+        if line.strip() == '':
+            if len(current_block) == 3:
+                blocks.append(current_block)
+            current_block = []
+        else:
+            current_block.append(line)
+    if len(current_block) == 3:
+        blocks.append(current_block)
+
+    if not blocks:
+        return {
+            'original_text': '',
+            'pinyin_text': '',
+            'translated_text': text.strip(),
+        }
+
+    originals = []
+    pinyins = []
+    translateds = []
+    for block in blocks:
+        originals.append(block[0])
+        pinyins.append(block[1])
+        translateds.append(block[2])
+
+    return {
+        'original_text': '\n'.join(originals),
+        'pinyin_text': '\n'.join(pinyins),
+        'translated_text': '\n'.join(translateds),
+    }
 
 
 def save_translation(chunk_id: int, translated_text: str, args, source_data: dict | None = None) -> Path:
@@ -248,16 +348,25 @@ def save_translation(chunk_id: int, translated_text: str, args, source_data: dic
             }
 
     now = datetime.now().isoformat(timespec='seconds')
+    translated_clean = translated_text.strip()
+
     progress_data = {
         'chunk_id': src.get('chunk_id', chunk_id),
         'total_chunks': src.get('total_chunks', 0),
         'chapter': src.get('chapter', ''),
         'source_text': src.get('source_text', ''),
-        'translated_text': translated_text.strip(),
+        'translated_text': translated_clean,
         'translated_at': now,
         'word_count_source': src.get('word_count_source', 0),
-        'word_count_translated': len(translated_text.split()),
+        'word_count_translated': len(translated_clean.split()),
     }
+
+    if args.trilingual:
+        parsed = parse_trilingual_output(translated_clean)
+        progress_data['mode'] = 'trilingual'
+        progress_data['original_text'] = parsed['original_text']
+        progress_data['pinyin_text'] = parsed['pinyin_text']
+        progress_data['translated_text'] = parsed['translated_text']
 
     out_file = progress_dir / f"chunk_{chunk_id:03d}.json"
     out_file.write_text(json.dumps(progress_data, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -445,7 +554,7 @@ def mode_interactive(args):
         print(f"{chr(0x2550) * TERMINAL_WIDTH}")
 
         # Build and display prompt
-        prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang)
+        prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang, args.trilingual)
         print(f"\n[TRANSLATION PROMPT - copy this into Agent]")
         print(f"{chr(0x2500) * TERMINAL_WIDTH}")
         print(prompt)
@@ -538,6 +647,8 @@ def main():
                         help='Ng\u00f4n ng\u1eef \u0111\u00edch (m\u1eb7c \u0111\u1ecbnh: Vietnamese)')
     parser.add_argument('--auto-commit', action='store_true',
                         help='T\u1ef1 \u0111\u1ed9ng git commit sau m\u1ed7i chunk')
+    parser.add_argument('--trilingual', action='store_true',
+                        help='Ch\u1ebf \u0111\u1ed9 tam ng\u1eef (Chinese/Pinyin/Vietnamese)')
 
     # Modes
     parser.add_argument('--prepare', type=int,
