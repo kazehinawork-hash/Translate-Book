@@ -79,6 +79,8 @@ def main():
                         help='Ghi \u0111\u00e8 m\u00e0 kh\u00f4ng h\u1ecfi confirm')
     parser.add_argument('--output-dir', type=Path,
                         help='Th\u01b0 m\u1ee5c output (m\u1eb7c \u0111\u1ecbnh: output/)')
+    parser.add_argument('--format', type=str, choices=['bilingual', 'trilingual'], default='bilingual',
+                        help='\u0110\u1ecbnh d\u1ea1ng output (m\u1eb7c \u0111\u1ecbnh: bilingual)')
     parser.add_argument('--allow-partial', action='store_true',
                         help='Cho ph\u00e9p merge khi thi\u1ebfu chunk (ch\u00e8n placeholder [CH\u01afA D\u1ecaCH])')
     parser.add_argument('--skip-missing', action='store_true',
@@ -97,7 +99,8 @@ def main():
 
     output_dir = args.output_dir or (PROJECT_ROOT / 'output')
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"{args.book_name}_translated.md"
+    suffix = "_trilingual" if fmt == 'trilingual' else "_translated"
+    output_file = output_dir / f"{args.book_name}{suffix}.md"
 
     if output_file.exists() and not args.force:
         print(f"File \u0111\u00e3 t\u1ed3n t\u1ea1i: {output_file}")
@@ -182,10 +185,34 @@ def main():
     total_words_source = 0
     total_words_translated = 0
 
+    fmt = args.format
+
     for cid in range(total_chunks):
         if cid in chunk_map and chunk_map[cid].get('translated_text', '').strip():
             data = chunk_map[cid]
-            t = data['translated_text'].strip()
+            if fmt == 'trilingual':
+                orig = data.get('original_text', '').strip()
+                pin = data.get('pinyin_text', '').strip()
+                trans = data['translated_text'].strip()
+
+                # Align by splitting into lines
+                orig_lines = [l for l in orig.splitlines() if l.strip()]
+                pin_lines = [l for l in pin.splitlines() if l.strip()]
+                trans_lines = [l for l in trans.splitlines() if l.strip()]
+
+                max_lines = max(len(orig_lines), len(pin_lines), len(trans_lines))
+                if len(orig_lines) != len(pin_lines) or len(orig_lines) != len(trans_lines):
+                    print(f"  \u26a0\ufe0f Chunk {cid}: line count mismatch (orig={len(orig_lines)}, pinyin={len(pin_lines)}, vi={len(trans_lines)}), padding to {max_lines}")
+
+                block_parts = []
+                for i in range(max_lines):
+                    o = orig_lines[i] if i < len(orig_lines) else ''
+                    p = pin_lines[i] if i < len(pin_lines) else ''
+                    v = trans_lines[i] if i < len(trans_lines) else ''
+                    block_parts.append(f"{o}\n{p}\n{v}")
+                t = '\n\n'.join(block_parts)
+            else:
+                t = data['translated_text'].strip()
             segments.append(t)
             merged_count += 1
             total_words_source += data.get('word_count_source', 0) or len(data.get('source_text', '').split())

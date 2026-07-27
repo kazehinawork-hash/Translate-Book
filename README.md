@@ -134,6 +134,8 @@ Translate Book\
 | **translate_helper.py** | Hỗ trợ Agent dịch (interactive/prepare/save/status/next/auto-commit) | Interactive mode tự động lặp |
 | **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
 | **translate_full_pipeline.py** | Orchestrator chạy pipeline | Từng bước hoặc auto |
+| **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
+| **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |
 | **git** | Version control | OneDrive không thay thế được |
 
 ---
