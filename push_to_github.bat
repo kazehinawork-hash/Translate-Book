@@ -11,74 +11,75 @@ echo.
 REM Check if git is installed
 where git >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] Git khong tim thay. Cai dat tai: https://git-scm.com/download/win
+    echo [ERROR] Git not found. Install from: https://git-scm.com/download/win
     pause
     exit /b 1
 )
 
 REM Initialize git repo if not exists
 if not exist ".git" (
-    echo [1/6] Khoi tao git repository...
+    echo [1/6] Initializing git repository...
     git init
     if %errorlevel% neq 0 (
-        echo [ERROR] Khong the khoi tao git repo
+        echo [ERROR] Failed to initialize git repo
         pause
         exit /b 1
     )
 ) else (
-    echo [1/6] Git repository da ton tai
+    echo [1/6] Git repository already exists
 )
 
 REM Configure user (only if not set)
 git config user.name >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [2/6] Cau hinh git user...
-    set /p GIT_NAME="Nhap ten cua ban (git user.name): "
-    set /p GIT_EMAIL="Nhap email cua ban (git user.email): "
+    echo [2/6] Configuring git user...
+    set /p GIT_NAME="Enter your name (git user.name): "
+    set /p GIT_EMAIL="Enter your email (git user.email): "
     git config user.name "%GIT_NAME%"
     git config user.email "%GIT_EMAIL%"
 ) else (
-    echo [2/6] Git user da cau hinh: %git config user.name%
+    for /f "delims=" %%a in ('git config user.name') do set GIT_USER=%%a
+    echo [2/6] Git user configured: %GIT_USER%
 )
 
 REM Add remote origin
-echo [3/6] Kiem tra remote origin...
+echo [3/6] Checking remote origin...
 git remote get-url origin >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Them remote origin...
+    echo Adding remote origin...
     git remote add origin https://github.com/kazehinawork-hash/Translate-Book.git
 ) else (
-    echo Remote origin da ton tai
+    echo Remote origin already exists
     git remote set-url origin https://github.com/kazehinawork-hash/Translate-Book.git
 )
 
 REM Add files (respecting .gitignore)
-echo [4/6] Them file vao git (tuan thu .gitignore)...
+echo [4/6] Adding files to git (respects .gitignore)...
 git add .
 
 REM Commit
-echo [5/6] Commit thay doi...
+echo [5/6] Committing changes...
 git commit -m "feat: initial commit - Translate Book project structure"
 if %errorlevel% neq 0 (
-    echo [INFO] Khong co thay doi moi de commit (co the da commit truoc do)
+    echo [INFO] No new changes to commit (may have been committed already)
 )
 
 REM Push to GitHub
-echo [6/6] Push len GitHub...
+echo [6/6] Pushing to GitHub...
 git branch -M main
 git push -u origin main
 
 echo.
 echo ==========================================
 if %errorlevel% equ 0 (
-    echo [SUCCESS] Da push thanh cong len GitHub!
+    echo [SUCCESS] Pushed to GitHub successfully!
     echo Repo: https://github.com/kazehinawork-hash/Translate-Book
 ) else (
-    echo [ERROR] Push that bai. Kiem tra:
-    echo   - Co internet khong
-    echo   - Repo tren GitHub da ton tai chua
-    echo   - Co quyen push khong (token/SSH key)
-    echo   - Co can login GitHub CLI khong: gh auth login
+    echo [ERROR] Push failed. Check:
+    echo   - Internet connection
+    echo   - GitHub repository exists
+    echo   - Push permissions (token/SSH key)
+    echo   - Login with GitHub CLI: gh auth login
 )
 echo ==========================================
 echo.

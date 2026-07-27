@@ -31,6 +31,13 @@ from _common import setup_encoding  # noqa: E402
 # Heading Markdown (rank 1-6)
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
 
+# Markdown table: line starting with |
+TABLE_LINE_RE = re.compile(r'^\|', re.MULTILINE)
+
+# LaTeX formula (display $$...$$ or inline $...$)
+LATEX_DISPLAY_RE = re.compile(r'\$\$.*?\$\$', re.DOTALL)
+LATEX_INLINE_RE = re.compile(r'(?<!\$)\$(?!\$).*?(?<!\$)\$(?!\$)')
+
 # Manual marker
 MANUAL_BREAK = '<!-- CHUNK_BREAK -->'
 
@@ -53,6 +60,38 @@ def tach_theo_marker(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def phat_hien_bang(text: str) -> list[tuple[int, int]]:
+    """Phát hiện block table markdown. Trả về [(start_line, end_line)] (0-indexed).
+
+    Table block: dòng bắt đầu bằng | liên tục, có thể có header separator |---|.
+    """
+    lines = text.splitlines()
+    blocks = []
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if TABLE_LINE_RE.match(line):
+            # Found potential table start
+            start = i
+            while i < len(lines) and TABLE_LINE_RE.match(lines[i].strip()):
+                i += 1
+            end = i  # exclusive
+            # Only keep if >= 2 lines (header + separator, or header + data)
+            if end - start >= 2:
+                blocks.append((start, end))
+        else:
+            i += 1
+    return blocks
+
+
+def tim_vi_tri_bang(lines: list[str], pos: int) -> tuple[int, int] | None:
+    """Nếu pos nằm trong block table, trả về (start, end). Nếu không → None."""
+    for start, end in phat_hien_bang('\n'.join(lines)):
+        if start <= pos < end:
+            return (start, end)
+    return None
+
+
 def tach_theo_heading(text: str) -> list[tuple[str, str]]:
     """Tách theo heading. Trả về [(heading, body)]."""
     result = []
@@ -73,9 +112,51 @@ def tach_theo_heading(text: str) -> list[tuple[str, str]]:
 
 
 def tach_theo_doan(text: str) -> list[str]:
-    """Tách theo đoạn văn (1 hoặc nhiều dòng trống = ranh giới đoạn)."""
+    """Tách theo đoạn văn (1 hoặc nhiều dòng trống = ranh giới đoạn).
+
+    Bảo vệ block table markdown — KHÔNG tách giữa table.
+    """
+    lines = text.splitlines()
+    table_blocks = phat_hien_bang(text)
+    table_lines = set()
+    for start, end in table_blocks:
+        for i in range(start, end):
+            table_lines.add(i)
+
+    # Split by blank line, but merge back if inside table
     paragraphs = re.split(r'\n\s*\n', text)
-    return [p.strip() for p in paragraphs if p.strip()]
+
+    # Re-check: if a paragraph is a partial table, merge with neighbors
+    result = []
+    i = 0
+    while i < len(paragraphs):
+        p = paragraphs[i].strip()
+        # Check if this paragraph contains table lines that are split
+        p_lines = p.splitlines()
+        has_table_start = any(TABLE_LINE_RE.match(l.strip()) for l in p_lines)
+        has_table_end = any(TABLE_LINE_RE.match(l.strip()) for l in p_lines)
+
+        # If this looks like a partial table (starts or ends with |),
+        # try to merge with adjacent paragraphs
+        if has_table_start or has_table_end:
+            merged = p
+            # Look ahead for continuation
+            while i + 1 < len(paragraphs):
+                next_p = paragraphs[i + 1].strip()
+                next_lines = next_p.splitlines()
+                next_starts_table = any(TABLE_LINE_RE.match(l.strip()) for l in next_lines)
+                # Merge if next paragraph starts with | (table continuation)
+                if next_starts_table:
+                    merged += '\n\n' + next_p
+                    i += 1
+                else:
+                    break
+            result.append(merged)
+        else:
+            result.append(p)
+        i += 1
+
+    return [p for p in result if p]
 
 
 def cat_overlap_an_toan(text: str, target_chars: int, lang: str = 'en') -> str:
