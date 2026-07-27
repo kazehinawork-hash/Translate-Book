@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# File gốc - có thể có bản quyền, không cần version control
+input/
+
+# Working - CHỈ exclude 3 thư mục file to/tái tạo được
+# working/summary/ và working/progress/ là tài sản tích lũy, COMMIT vào git
+working/extracted/
+working/chunks/
+working/qa/
+# Riêng working/<slug>/ cấp con cũng loại (tránh sót)
+working/extracted/*
+working/chunks/*
+working/qa/*
+
+# Logs
+*.log
+logs/
+
+# MinerU
+.magic_pdf/
+minerU_cache/
+models/
+*.pdf.cache
+
+# Test files
+test_*/
+tmp/
+temp/

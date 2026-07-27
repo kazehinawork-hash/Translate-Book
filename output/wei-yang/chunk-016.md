@@ -1,0 +1,9 @@
+Thưa các quý cô, thực ra mỗi chúng ta giống như một chiếc xe, và tư tưởng chúng ta là bốn bánh xe. Con đường đời gập ghềnh hơn nhiều so với những xa lộ thẳng tắp, bằng phẳng, chướng ngại gặp phải cũng nhiều hơn. Nếu chúng ta gắn cho mình những chiếc lốp "cứng nhắc", thì hành trình của ta e rằng sẽ chẳng vui vẻ suôn sẻ. Ngược lại, nếu ta hấp thụ những thất bại này thì sao? Câu trả lời rất đơn giản: mọi khó khăn và mâu thuẫn sẽ biến mất, ta sẽ không bị lo âu quấy nhiễu.
+
+Tất nhiên, ở đây tôi phải làm rõ một điểm. Tôi khuyên các quý cô thích nghi với những sự thật không thể tránh khỏi, khuyên các quý cô không chống lại tai họa gặp phải, điều đó không có nghĩa tôi là người theo thuyết định mệnh, cũng không có nghĩa tôi muốn các quý cô lúc nào cũng chọn lùi bước và từ bỏ khi gặp thất bại. Thực ra, tôi càng muốn thấy những người phụ nữ kiên cường, hy vọng các quý cô dũng cảm đối mặt với tất cả. Bất cứ khi nào còn dù chỉ một tia hy vọng, chúng ta cũng phải nỗ lực phấn đấu.
+
+Nhưng khi những việc nằm ngoài sức người xảy ra, như người thân ra đi, tổn thất do thiên tai gây ra, chúng ta nên chọn thích nghi. Những việc này không thể tránh khỏi, cũng không thể thay đổi. Nghĩa là dù chúng ta có cố gắng thế nào, cũng không thể làm cho sự việc tự nó xoay chuyển. Vì vậy, chúng ta nên không do dự mà chọn thích nghi.
+
+Cuối cùng, tôi tìm thêm một luận cứ kinh điển cho quan điểm của mình. Ngay từ 399 năm trước khi Chúa Jesus ra đời, đã có một câu nói rất kinh điển được lưu truyền ở châu Âu: "Hãy vui vẻ nhẹ nhàng chấp nhận những việc nhất định phải xảy ra."
+
+Hỡi các quý cô, điều chúng ta có thể học là: hoàn cảnh tự nó không quyết định chúng ta vui hay buồn. Chính thái độ của chúng ta với hoàn cảnh mới quyết định cảm xúc. Mỗi người đều có khả năng vượt qua tai họa, chỉ cần biết khai thác sức mạnh tiềm ẩn trong mình.
