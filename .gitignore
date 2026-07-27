@@ -40,6 +40,13 @@ working/extracted/*
 working/chunks/*
 working/qa/*
 
+# Generated glossary prompts
+working/glossary_prompt*.txt
+
+# Test files
+test_*
+test_input.md
+
 # Logs
 *.log
 logs/

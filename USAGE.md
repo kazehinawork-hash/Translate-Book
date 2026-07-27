@@ -1,7 +1,7 @@
 # USAGE — Hướng dẫn sử dụng dự án (thực hành)
 
 > Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./PROCESS.md) để hiểu chi tiết từng bước.
-> Phiên bản: v2.1 — Cập nhật 2026-07-19
+> Phiên bản: v3.0 — Cập nhật 2026-07-27
 
 ---
 
@@ -15,6 +15,7 @@
 6. [Cập nhật glossary](#6-cập-nhật-glossary)
 7. [Git workflow hàng ngày](#7-git-workflow-hàng-ngày)
 8. [Troubleshooting nhanh](#8-troubleshooting-nhanh)
+9. [Workflow mới: Agent-first](#9-workflow-mới-agent-first-khuyến-nghị)
 
 ---
 
@@ -581,6 +582,125 @@ git status
 | Chunk cuối quá nhỏ (cảnh báo) | Input ngắn hoặc ranh giới lệch | Có thể bỏ qua hoặc merge thủ công |
 
 Chi tiết hơn → [PROCESS.md §11](./PROCESS.md#11-xử-lý-sự-cố-thường-gặp).
+
+---
+
+## 9. Workflow mới: Agent-first (khuyến nghị)
+
+> Workflow này dùng pipeline scripts mới, Agent tự đọc chunk JSON + glossary và dịch trực tiếp.
+> Không cần copy-paste thủ công từng chunk, không cần tạo file Markdown riêng.
+
+### 9.1. Pipeline toàn bộ
+
+```powershell
+cd "F:\OneDrive\onyx\Translate Book"
+.\.venv\Scripts\Activate.ps1
+
+$book = "my-book"
+$slug = "my-book"
+
+# Bước 1-2: Extract + Chunk (tự động)
+python scripts\translate_full_pipeline.py `
+    --book $book `
+    --input "input\my-book.pdf" `
+    --source-lang English
+
+# Bước 3: Tạo glossary prompt
+python scripts\translate_full_pipeline.py `
+    --book $book `
+    --from-step 3
+# → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
+```
+
+### 9.2. Dịch từng chunk với translate_helper.py
+
+```powershell
+# Xem chunk nào chưa dịch
+python scripts\translate_helper.py `
+    --next `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug"
+
+# Chuẩn bị prompt cho chunk 0 (in ra terminal)
+python scripts\translate_helper.py `
+    --prepare 0 `
+    --chunks-dir "working\chunks\$slug" `
+    --glossary "glossary\$slug.csv" `
+    --source-lang English `
+    --target-lang Vietnamese
+
+# Copy prompt từ terminal → paste cho Agent → Agent trả bản dịch
+# Sau đó lưu bản dịch:
+python scripts\translate_helper.py `
+    --save 0 `
+    --progress-dir "working\progress\$slug" `
+    --chunks-dir "working\chunks\$slug"
+# (paste bản dịch, Ctrl+Z, Enter)
+
+# Kiểm tra tiến trình
+python scripts\translate_helper.py `
+    --status `
+    --progress-dir "working\progress\$slug"
+```
+
+### 9.3. QA và Merge
+
+```powershell
+# QA tất cả chunk đã dịch
+python scripts\translate_full_pipeline.py `
+    --book $book `
+    --from-step 5
+
+# Merge thành file hoàn chỉnh
+python scripts\translate_full_pipeline.py `
+    --book $book `
+    --from-step 6 `
+    --force
+
+# Hoặc gộp riêng:
+python scripts\merge_chunks.py `
+    --progress-dir "working\progress\$slug" `
+    --book-name $slug `
+    --force
+```
+
+### 9.4. Chunking riêng (nếu muốn tùy chỉnh)
+
+```powershell
+# Smart chunking (mặc định)
+python scripts\chunk_text.py `
+    --input "working\extracted\$slug\raw.md" `
+    --output-dir "working\chunks\$slug" `
+    --strategy smart `
+    --lang en `
+    --max-chars 2000 `
+    --min-chars 500
+
+# Paragraph chunking
+python scripts\chunk_text.py `
+    --input "working\extracted\$slug\raw.md" `
+    --output-dir "working\chunks\$slug" `
+    --strategy paragraph `
+    --lang en
+
+# Line chunking (cho phụ đề/thơ)
+python scripts\chunk_text.py `
+    --input "working\extracted\$slug\raw.md" `
+    --output-dir "working\chunks\$slug" `
+    --strategy line `
+    --lang en
+
+# Fixed chunking (giữ nguyên behavior cũ)
+python scripts\chunk_text.py `
+    --input "working\extracted\$slug\raw.md" `
+    --output-dir "working\chunks\$slug" `
+    --strategy fixed `
+    --lang en `
+    --min-chars 3000 `
+    --max-chars 8000 `
+    --overlap-chars 200 `
+    --respect-headings
+```
 
 ---
 
