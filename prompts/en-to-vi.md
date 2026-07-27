@@ -36,6 +36,9 @@ Nếu gặp thuật ngữ chưa có trong glossary, đánh dấu:
    - Ví dụ: "API (giao diện lập trình ứng dụng)"
 4. **Đoạn thoại**: giữ sắc thái (hài hước, nghiêm túc, giận dữ...)
 5. **Format Markdown**: giữ nguyên heading, list, table, code block
+6. **CODE BLOCK KHÔNG DỊCH**: phần bên trong ``` (code fence) phải giữ NGUYÊN, không dịch, không giải thích. Chỉ dịch text ngoài code block
+7. **TABLE giữ nguyên cấu trúc**: hàng cột, delimiter `|`, header separator `|---|` — giữ nguyên, chỉ dịch nội dung ô. KHÔNG gộp hàng, KHÔNG thêm/xóa cột
+8. **FORMULA giữ nguyên**: LaTeX inline `$...$` và display `$$...$$` giữ nguyên, không dịch, không chuyển đổi. Chỉ dịch text xung quanh
 6. **Văn phong nhất quán**: paste 1-2 đoạn đã dịch gần nhất để AI bám sát
 7. **Đừng dịch từng từ một**: dịch cả câu, cả đoạn cho tự nhiên
 8. **GIỮ CẤU TRÚC ĐOẠN VĂN**: mỗi đoạn gốc (paragraph) tạo đúng 1 đoạn dịch — KHÔNG gộp nhiều đoạn thành 1, KHÔNG tách 1 đoạn thành nhiều. Tỷ lệ 1:1 đoạn để đảm bảo bản dịch có thể ghép song song với bản gốc

@@ -72,6 +72,9 @@ Tiếng Việt
 3. Gặp thuật ngữ nghi là mới, chưa có trong glossary: đánh dấu [TERM-NEW: <chữ Hán>] ngay trong bản dịch
 4. Không dịch: tên riêng nước ngoài đã quen thuộc (vd: New York, Einstein), thuật ngữ IT phổ biến (API, backend)
 5. Giữ format Markdown gốc (heading, bold, list, code block)
+6. **CODE BLOCK KHÔNG DỊCH**: phần bên trong ``` (code fence) phải giữ NGUYÊN, không dịch, không giải thích. Chỉ dịch text ngoài code block
+7. **TABLE giữ nguyên cấu trúc**: hàng cột, delimiter `|`, header separator `|---|` — giữ nguyên, chỉ dịch nội dung ô. KHÔNG gộp hàng, KHÔNG thêm/xóa cột
+8. **FORMULA giữ nguyên**: LaTeX inline `$...$` và display `$$...$$` giữ nguyên, không dịch, không chuyển đổi. Chỉ dịch text xung quanh
 6. Giữ cấu trúc đoạn văn, không gộp/tách câu tùy tiện
 7. Với đoạn thoại: dịch tự nhiên như người Việt nói, không dịch sát từng chữ
 8. **GIỮ CẤU TRÚC ĐOẠN VĂN**: mỗi đoạn gốc (paragraph) tạo đúng 1 đoạn dịch — KHÔNG gộp nhiều đoạn thành 1, KHÔNG tách 1 đoạn thành nhiều. Tỷ lệ 1:1 đoạn để đảm bảo bản dịch có thể ghép song song với bản gốc
