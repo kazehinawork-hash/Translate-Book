@@ -23,19 +23,39 @@ Không cần nhớ lệnh, không cần biết PowerShell. Đọc **[QUICKSTART.
 
 ## 🛠 Cách dùng cho người quen tech (Workflow mới)
 
-Nếu bạn quen command line, dùng pipeline scripts mới:
+### Setup
 
-```powershell
+```bash
+cd <PROJECT_ROOT>
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Interactive mode (KHUYẾN NGHỊ) — tự động lặp
+
+```bash
+# Một lệnh duy nhất: prompt → đợi dịch → save → commit → next
+python scripts/translate_helper.py --interactive \
+    --chunks-dir "working/chunks/mybook" \
+    --progress-dir "working/progress/mybook" \
+    --glossary "glossary/mybook.csv" \
+    --source-lang English --target-lang Vietnamese \
+    --auto-commit
+```
+
+### Hoặc dùng pipeline scripts riêng:
+
+```bash
 # Pipeline đầy đủ (tự động extract → chunk → glossary prompt)
-python scripts\translate_full_pipeline.py --book "MyBook" --input "input/mybook.pdf" --source-lang English
+python scripts/translate_full_pipeline.py --book "MyBook" --input "input/mybook.pdf" --source-lang English
 
-# Sau đó Agent dịch từng chunk:
-python scripts\translate_helper.py --next --chunks-dir "working\chunks\mybook" --progress-dir "working\progress\mybook"
-python scripts\translate_helper.py --prepare 0 --chunks-dir "working\chunks\mybook" --glossary "glossary\mybook.csv"
-python scripts\translate_helper.py --save 0 --progress-dir "working\progress\mybook" --chunks-dir "working\chunks\mybook"
+# Agent dịch từng chunk:
+python scripts/translate_helper.py --interactive --chunks-dir "working/chunks/mybook" --progress-dir "working/progress/mybook" --glossary "glossary/mybook.csv"
 
 # QA và Merge tự động:
-python scripts\translate_full_pipeline.py --book "MyBook" --from-step 5
+python scripts/translate_full_pipeline.py --book "MyBook" --from-step 5
 ```
 
 **Workflow tổng quan:**
@@ -50,6 +70,21 @@ Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}_transl
 ```
 
 Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
+
+---
+
+## ✅ Thành tựu — 4 cuốn sách đã dịch hoàn thành
+
+| STT | Slug | Tên sách (tạm dịch) | Ngôn ngữ gốc | Định dạng |
+|-----|------|---------------------|:------------:|:---------:|
+| 1 | `the-alchemist` | *The Alchemist* (Nhà giả kim) — Paulo Coelho | EN | PDF |
+| 2 | `nu-zi` | *Nữ tử* (女子) | ZH | EPUB |
+| 3 | `wei-yang` | *Vi dương* (微阳) | ZH | EPUB |
+| 4 | `you-feng-gu` | *Hữu phụng cốc* (有凤谷) | ZH | EPUB |
+
+Mỗi cuốn đều có bản dịch Markdown + EPUB hoàn chỉnh trong [`output/`](./output/), kèm glossary riêng và báo cáo QA.
+
+---
 
 ## 📚 Tài liệu
 
@@ -96,7 +131,7 @@ Translate Book\
 | **PaddleOCR** | OCR backup | Khi MinerU không đủ |
 | **chunk_text.py** | Chunking với 4 strategy (smart/paragraph/line/fixed) | JSON output + neighbor context |
 | **generate_glossary.py** | Tạo prompt để Agent sinh glossary CSV | Không gọi API |
-| **translate_helper.py** | Hỗ trợ Agent dịch (prepare/save/status/next) | |
+| **translate_helper.py** | Hỗ trợ Agent dịch (interactive/prepare/save/status/next/auto-commit) | Interactive mode tự động lặp |
 | **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
 | **translate_full_pipeline.py** | Orchestrator chạy pipeline | Từng bước hoặc auto |
 | **git** | Version control | OneDrive không thay thế được |
