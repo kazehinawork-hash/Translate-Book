@@ -16,8 +16,8 @@ Không cần nhớ lệnh, không cần biết PowerShell. Đọc **[QUICKSTART.
 
 - **[QUICKSTART.md](./QUICKSTART.md)** — Hướng dẫn 1 trang cho non-tech (3 bước)
 - **[USAGE.md](./USAGE.md)** — Hướng dẫn sử dụng thực hành (copy-paste commands, 4 workflow: PDF EN, EPUB ZH, SRT, scan)
-- **[PLAN.md](./PLAN.md)** — Kế hoạch tổng thể, pipeline, công cụ, lộ trình
-- **[PROCESS.md](./PROCESS.md)** — Quy trình chi tiết từng bước, mẫu chat, xử lý sự cố
+- **[docs/archive/PLAN.md](./docs/archive/PLAN.md)** — Kế hoạch tổng thể, pipeline, công cụ, lộ trình (lưu trữ)
+- **[docs/archive/PROCESS.md](./docs/archive/PROCESS.md)** — Quy trình chi tiết từng bước, mẫu chat, xử lý sự cố (lưu trữ)
 
 ---
 
@@ -49,14 +49,16 @@ python scripts/translate_helper.py --interactive \
 
 ```bash
 # Pipeline đầy đủ (tự động extract → chunk → glossary prompt)
-python scripts/translate_full_pipeline.py --book "MyBook" --input "input/mybook.pdf" --source-lang English
+python scripts/run_pipeline.py --book "MyBook" --input "input/mybook.pdf" --source-lang English
 
 # Agent dịch từng chunk:
 python scripts/translate_helper.py --interactive --chunks-dir "working/chunks/mybook" --progress-dir "working/progress/mybook" --glossary "glossary/mybook.csv"
 
 # QA và Merge tự động:
-python scripts/translate_full_pipeline.py --book "MyBook" --from-step 5
+python scripts/run_pipeline.py --book "MyBook" --from-step 5
 ```
+
+> `translate_full_pipeline.py` hiện là wrapper tương thích ngược, vẫn dùng được nhưng có cảnh báo. Dùng `run_pipeline.py` cho trải nghiệm tốt nhất.
 
 **Workflow tổng quan:**
 
@@ -89,8 +91,8 @@ Mỗi cuốn đều có bản dịch Markdown + EPUB hoàn chỉnh trong [`outpu
 ## 📚 Tài liệu
 
 - **[USAGE.md](./USAGE.md)** — Hướng dẫn sử dụng thực hành (copy-paste commands, 4 workflow: PDF EN, EPUB ZH, SRT, scan)
-- **[PLAN.md](./PLAN.md)** — Kế hoạch tổng thể, pipeline, công cụ, lộ trình
-- **[PROCESS.md](./PROCESS.md)** — Quy trình chi tiết từng bước, mẫu chat, xử lý sự cố
+- **[docs/archive/PLAN.md](./docs/archive/PLAN.md)** — Kế hoạch tổng thể, pipeline, công cụ, lộ trình (lưu trữ)
+- **[docs/archive/PROCESS.md](./docs/archive/PROCESS.md)** — Quy trình chi tiết từng bước, mẫu chat, xử lý sự cố (lưu trữ)
 
 ---
 
@@ -114,8 +116,11 @@ Translate Book\
 ├── README.md
 ├── USAGE.md
 ├── QUICKSTART.md
-├── PLAN.md
-└── PROCESS.md
+├── docs/
+│   └── archive/
+│       ├── PLAN.md
+│       └── PROCESS.md
+└── ...
 ```
 
 ---
@@ -155,7 +160,8 @@ Dùng `scripts/merge_chunks.py --format trilingual` để gộp → `output/{boo
 | **generate_glossary.py** | Tạo prompt để Agent sinh glossary CSV | Không gọi API |
 | **translate_helper.py** | Hỗ trợ Agent dịch (interactive/prepare/save/status/next/auto-commit) | Interactive mode tự động lặp |
 | **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
-| **translate_full_pipeline.py** | Orchestrator chạy pipeline | Từng bước hoặc auto |
+| **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Đã thay thế translate_full_pipeline.py |
+| **translate_full_pipeline.py** | Wrapper tương thích ngược | Cảnh báo deprecated, dùng run_pipeline.py thay thế |
 | **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
 | **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |
 | **git** | Version control | OneDrive không thay thế được |
