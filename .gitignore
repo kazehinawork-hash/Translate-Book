@@ -54,6 +54,10 @@ minerU_cache/
 models/
 *.pdf.cache
 
+# Test files
+test_*
+!tests/test_*
+
 tmp/
 temp/
 
