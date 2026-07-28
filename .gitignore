@@ -46,6 +46,7 @@ working/glossary_prompt*.txt
 # Test files
 test_*
 test_input.md
+!tests/test_*
 
 # Logs
 *.log
