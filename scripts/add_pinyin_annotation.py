@@ -25,28 +25,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import setup_encoding  # noqa: E402
 
 try:
-    from pypinyin import pinyin, Style
-    HAS_PYPINYIN = True
-except ImportError:
-    HAS_PYPINYIN = False
-
-try:
     from rich.console import Console
     console = Console()
 except ImportError:
     console = None
 
+from pinyin_utils import text_to_pinyin, has_han, HAS_PYPINYIN
 
 HAN_REGEX = re.compile(r'[㐀-鿿豈-﫿]+')
 BRACKET_HAN_REGEX = re.compile(r'\[([㐀-鿿豈-﫿]+)\]')
-
-
-def text_to_pinyin(text: str) -> str:
-    """Chuyển Hán tự → Pinyin có dấu."""
-    if not HAS_PYPINYIN:
-        return text
-    py_list = pinyin(text, style=Style.TONE)
-    return ' '.join([p[0] for p in py_list])
 
 
 def add_pinyin_all(text: str) -> str:

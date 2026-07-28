@@ -99,7 +99,7 @@ def main():
 
     output_dir = args.output_dir or (PROJECT_ROOT / 'output')
     output_dir.mkdir(parents=True, exist_ok=True)
-    suffix = "_trilingual" if fmt == 'trilingual' else "_translated"
+    suffix = "_trilingual" if args.format == 'trilingual' else "_translated"
     output_file = output_dir / f"{args.book_name}{suffix}.md"
 
     if output_file.exists() and not args.force:
