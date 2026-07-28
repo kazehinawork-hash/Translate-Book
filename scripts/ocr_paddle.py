@@ -51,6 +51,28 @@ LANG_MAP = {
 }
 
 
+def detect_paddle_gpu() -> tuple[bool, str]:
+    """Kiểm tra PaddlePaddle có hỗ trợ GPU không.
+    
+    Returns:
+        tuple: (has_gpu, reason)
+    """
+    try:
+        import paddle
+        cuda_compiled = paddle.device.is_compiled_with_cuda()
+        device_count = paddle.device.cuda.device_count()
+        if cuda_compiled and device_count > 0:
+            return True, ""
+        elif cuda_compiled and device_count == 0:
+            return False, "paddle được build với CUDA nhưng không có GPU khả dụng"
+        else:
+            return False, "paddle bản CPU-only (không compiled với CUDA)"
+    except ImportError:
+        return False, "chưa cài paddlepaddle"
+    except Exception as e:
+        return False, f"lỗi khi kiểm tra paddle GPU: {e}"
+
+
 def ocr_anh(ocr_engine, image_path: Path, lang: str) -> str:
     """OCR 1 ảnh, trả về text Markdown."""
     result = ocr_engine.ocr(str(image_path), cls=True)
@@ -107,7 +129,9 @@ def main():
     parser.add_argument('--lang', type=str, default='ch_sim+en',
                         help='Ngôn ngữ (vd: ch_sim+en, en, ch_sim, vi). Mặc định: ch_sim+en')
     parser.add_argument('--dpi', type=int, default=200, help='DPI khi convert PDF sang ảnh (mặc định 200)')
-    parser.add_argument('--use-gpu', dest='use_gpu', action='store_true', help='Dùng GPU (mặc định: CPU)')
+    # === NEW: --device flag thay thế --use-gpu ===
+    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'gpu', 'cpu'],
+                        help='Thiết bị chạy: auto (tự phát hiện), gpu, cpu (mặc định: auto)')
 
     args = parser.parse_args()
 
@@ -123,7 +147,31 @@ def main():
 
     print(f"Đọc: {args.input}")
     print(f"Ngôn ngữ: {args.lang}")
-    print(f"Sử dụng {'GPU' if args.use_gpu else 'CPU'}")
+
+    # === NEW: Xác định device (GPU/CPU) cho PaddleOCR ===
+    if args.device == 'auto':
+        has_gpu, reason = detect_paddle_gpu()
+        use_gpu = has_gpu
+        if not has_gpu:
+            print(f"Dùng CPU ({reason})")
+        else:
+            print("Dùng GPU (CUDA)")
+    elif args.device == 'gpu':
+        has_gpu, reason = detect_paddle_gpu()
+        if not has_gpu:
+            print(f"[CẢNH BÁO] Bạn ép --device gpu nhưng {reason}.", file=sys.stderr)
+            print("        Tự động rơi về CPU.", file=sys.stderr)
+            use_gpu = False
+        else:
+            use_gpu = True
+            print("Dùng GPU (CUDA)")
+    else:
+        use_gpu = False
+        has_gpu, reason = detect_paddle_gpu()
+        if has_gpu:
+            print("Dùng CPU (GPU khả dụng nhưng bị ép dùng CPU)")
+        else:
+            print(f"Dùng CPU ({reason})")
 
     # Map ngôn ngữ user-friendly → code PaddleOCR chấp nhận
     PADDLE_LANG_MAP = {
@@ -149,7 +197,7 @@ def main():
     ocr_engine = PaddleOCR(
         use_angle_cls=use_angle_cls,
         lang=paddle_lang,
-        use_gpu=args.use_gpu,
+        use_gpu=use_gpu,
         show_log=False,
     )
     print("✓ PaddleOCR đã khởi tạo")
@@ -179,20 +227,17 @@ def main():
                 all_text.append(f"\n## Trang {i}\n\n{text}\n")
 
             noi_dung = '\n---\n'.join(all_text)
+        elif args.input.suffix.lower() in {'.png', '.jpg', '.jpeg', '.bmp', '.tiff'}:
+            noi_dung = ocr_anh(ocr_engine, args.input, args.lang)
+        elif args.input.suffix.lower() in {'.docx', '.doc'}:
+            print("[CẢNH BÁO] DOCX: PaddleOCR chỉ OCR ảnh, không trích text. Dùng python-docx trước.")
+            sys.exit(1)
+        else:
+            print(f"[LỖI] Định dạng không hỗ trợ: {args.input.suffix}", file=sys.stderr)
+            sys.exit(1)
     finally:
         # LUÔN LUÔN cleanup temp dir, kể cả khi crash
-        try:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except Exception:
-            pass
-    elif args.input.suffix.lower() in {'.png', '.jpg', '.jpeg', '.bmp', '.tiff'}:
-        noi_dung = ocr_anh(ocr_engine, args.input, args.lang)
-    elif args.input.suffix.lower() in {'.docx', '.doc'}:
-        print("[CẢNH BÁO] DOCX: PaddleOCR chỉ OCR ảnh, không trích text. Dùng python-docx trước.")
-        sys.exit(1)
-    else:
-        print(f"[LỖI] Định dạng không hỗ trợ: {args.input.suffix}", file=sys.stderr)
-        sys.exit(1)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     args.output.write_text(noi_dung, encoding='utf-8')
     print(f"\n✓ Đã ghi: {args.output}")
