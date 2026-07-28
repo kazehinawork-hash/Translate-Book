@@ -8,6 +8,7 @@ Import:
     from pinyin_utils import text_to_pinyin, has_han, HAS_PYPINYIN
 """
 
+import functools
 import re
 
 try:
@@ -26,6 +27,7 @@ def has_han(text: str) -> bool:
     return bool(HAN_RE.search(text))
 
 
+@functools.lru_cache(maxsize=256)
 def text_to_pinyin(text: str) -> str:
     """Hán tự → Pinyin có dấu thanh. Giữ nguyên ký tự không phải Hán (số, dấu câu).
 
