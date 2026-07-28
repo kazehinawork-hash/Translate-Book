@@ -57,6 +57,8 @@ models/
 # Test files
 test_*
 !tests/test_*
+!tests/test_epub_data/
+!tests/test_epub_data/*.md
 
 tmp/
 temp/

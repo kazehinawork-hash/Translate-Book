@@ -196,7 +196,13 @@ def main():
                     o = orig_lines[i] if i < len(orig_lines) else ''
                     p = pin_lines[i] if i < len(pin_lines) else ''
                     v = trans_lines[i] if i < len(trans_lines) else ''
-                    block_parts.append(f"{o}\n{p}\n{v}")
+                    block_parts.append(
+                        f'<div class="tri-block">\n'
+                        f'<p class="src-zh">{o}</p>\n'
+                        f'<p class="pinyin">{p}</p>\n'
+                        f'<p class="vi">{v}</p>\n'
+                        f'</div>'
+                    )
                 t = '\n\n'.join(block_parts)
             else:
                 t = data['translated_text'].strip()

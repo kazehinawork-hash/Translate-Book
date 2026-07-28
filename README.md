@@ -33,6 +33,9 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+**Yêu cầu ngoài:** Cài [pandoc](https://pandoc.org/installing.html) (dùng để tạo EPUB tự động).
+Không bắt buộc nếu bạn không cần EPUB — script vẫn chạy bình thường, file .md vẫn được tạo.
+
 ### Interactive mode (KHUYẾN NGHỊ) — tự động lặp
 
 ```bash
@@ -68,7 +71,9 @@ python scripts/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang
 
 # Kết quả:
 #   - Sách ZH → output/ten-sach/ten-sach-vi.md (tam ngữ: gốc/pinyin/dịch)
+#              → output/ten-sach/ten-sach-vi.epub (tự động, nếu có pandoc)
 #   - Sách EN → output/ten-sach/ten-sach-vi.md (song ngữ EN+VI căn chỉnh đoạn)
+#              → output/ten-sach/ten-sach-vi.epub (tự động, nếu có pandoc)
 ```
 
 **Workflow tổng quan:**
@@ -80,6 +85,7 @@ Bước 3: Gen Glossary → scripts/generate_glossary.py (tạo prompt → Agent
 Bước 4: Translate → Agent đọc từng chunk + glossary → working/progress/
 Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
 Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md)
+Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub)
 ```
 
 Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
@@ -155,6 +161,7 @@ Ngày mai tôi cũng sẽ đi。
 ```
 
 Dùng `scripts/merge_chunks.py --format trilingual` để gộp → `output/{book}_trilingual.md`.
+Pipeline tự động chuyển sang `.epub` (có cấu trúc HTML + CSS riêng cho từng dòng) nếu có pandoc.
 
 ---
 
@@ -172,6 +179,7 @@ Dùng `scripts/merge_chunks.py --format trilingual` để gộp → `output/{boo
 | **translate_helper.py** | Hỗ trợ Agent dịch (interactive/prepare/save/status/next/auto-commit) | Interactive mode tự động lặp |
 | **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
 | **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Đã thay thế translate_full_pipeline.py |
+| **pandoc** | Chuyển .md → .epub với CSS tùy chỉnh | Cài từ https://pandoc.org/installing.html |
 | **translate_full_pipeline.py** | Wrapper tương thích ngược | Cảnh báo deprecated, dùng run_pipeline.py thay thế |
 | **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
 | **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |

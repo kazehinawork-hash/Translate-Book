@@ -1,0 +1,49 @@
+/* ── Khối tam ngữ (ZH/Pinyin/VI) ── */
+.tri-block {
+    margin-bottom: 1.2em;
+}
+.tri-block .src-zh {
+    font-size: 0.9em;
+    color: #555555;
+    font-style: italic;
+    margin: 0;
+}
+.tri-block .pinyin {
+    font-size: 0.8em;
+    color: #999999;
+    font-style: italic;
+    margin: 0;
+}
+.tri-block .vi {
+    font-size: 1em;
+    font-weight: 500;
+    margin: 0.2em 0 0 0;
+}
+
+/* ── Khối song ngữ (EN/VI) ── */
+.bi-block {
+    margin-bottom: 1.2em;
+}
+.bi-block .src-en {
+    font-size: 0.9em;
+    color: #555555;
+    font-style: italic;
+    margin: 0 0 0.3em 0;
+}
+.bi-block .pinyin {
+    font-size: 0.8em;
+    color: #999999;
+    font-style: italic;
+    margin: 0 0 0.3em 0;
+}
+.bi-block .vi {
+    font-size: 1em;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* ── Nội dung khác ── */
+body {
+    font-family: serif;
+    line-height: 1.6;
+}

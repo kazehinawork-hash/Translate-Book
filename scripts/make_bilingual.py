@@ -494,15 +494,20 @@ def format_bilingual_block(
             lines.append("")
             vi_handled = True
         else:
-            # Text paragraph
+            # Text paragraph: wrap in HTML for styled EPUB
+            lines.append('<div class="bi-block">')
             if status == 'check':
-                lines.append("[ALIGN-CHECK]")
-            lines.append(f"**{src}**")
+                lines.append(f'<p class="src-en">[ALIGN-CHECK] {src}</p>')
+            else:
+                lines.append(f'<p class="src-en">{src}</p>')
             if lang == 'zh' and has_han(src):
                 py = text_to_pinyin(src)
                 if py:
-                    lines.append(f"*{py}*")
+                    lines.append(f'<p class="pinyin">{py}</p>')
+            lines.append(f'<p class="vi">{vi if vi is not None else ""}</p>')
+            lines.append('</div>')
             lines.append("")
+            vi_handled = True
 
     if vi is not None and not vi_handled:
         lines.append(vi)
