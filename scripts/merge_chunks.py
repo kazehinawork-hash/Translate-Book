@@ -33,6 +33,90 @@ from _common import setup_encoding, PROJECT_ROOT
 
 TERMINAL_WIDTH = 66
 
+# ─── Public API ──────────────────────────────────────────────────────────────
+
+MergeResult = dict  # {segments: list[str], merged_count: int, ...}
+
+
+def merge_texts(
+    total_chunks: int,
+    chunk_map: dict[int, dict],
+    fmt: str,
+    allow_partial: bool,
+    skip_missing: bool,
+) -> MergeResult:
+    """Gộp chunks thành 1 string, tự động chèn heading ## chapter.
+
+    Trả về dict với keys: segments, merged, merged_count, total_words_source,
+    total_words_translated.
+    """
+    segments: list[str] = []
+    merged_count = 0
+    total_words_source = 0
+    total_words_translated = 0
+    last_chapter: str | None = None
+
+    for cid in range(total_chunks):
+        if cid in chunk_map and chunk_map[cid].get('translated_text', '').strip():
+            data = chunk_map[cid]
+            chapter = (data.get('chapter') or '').strip()
+
+            # Chèn heading ## chapter nếu chapter thay đổi
+            heading = ''
+            if chapter and chapter != last_chapter:
+                if last_chapter is not None:
+                    heading = '<div style="page-break-before: always;"></div>\n\n'
+                heading += f'## {chapter}\n\n'
+                last_chapter = chapter
+
+            if fmt == 'trilingual':
+                orig = data.get('original_text', '').strip()
+                pin = data.get('pinyin_text', '').strip()
+                trans = data['translated_text'].strip()
+
+                orig_lines = [l for l in orig.splitlines() if l.strip()]
+                pin_lines = [l for l in pin.splitlines() if l.strip()]
+                trans_lines = [l for l in trans.splitlines() if l.strip()]
+
+                max_lines = max(len(orig_lines), len(pin_lines), len(trans_lines))
+                if len(orig_lines) != len(pin_lines) or len(orig_lines) != len(trans_lines):
+                    print(f'  \u26a0\ufe0f Chunk {cid}: line count mismatch (orig={len(orig_lines)}, pinyin={len(pin_lines)}, vi={len(trans_lines)}), padding to {max_lines}')
+
+                block_parts = []
+                for i in range(max_lines):
+                    o = orig_lines[i] if i < len(orig_lines) else ''
+                    p = pin_lines[i] if i < len(pin_lines) else ''
+                    v = trans_lines[i] if i < len(trans_lines) else ''
+                    block_parts.append(
+                        f'<div class="tri-block">\n'
+                        f'<p class="src-zh">{o}</p>\n'
+                        f'<p class="pinyin">{p}</p>\n'
+                        f'<p class="vi">{v}</p>\n'
+                        f'</div>'
+                    )
+                t = '\n\n'.join(block_parts)
+                t = heading + t
+            else:
+                t = heading + data['translated_text'].strip()
+
+            segments.append(t)
+            merged_count += 1
+            total_words_source += data.get('word_count_source', 0) or len(data.get('source_text', '').split())
+            total_words_translated += data.get('word_count_translated', 0) or len(t.split())
+        elif allow_partial:
+            segments.append(f'[CH\u01afA D\u1ecaCH - Chunk {cid}]')
+        elif skip_missing:
+            pass
+
+    merged = '\n\n'.join(segments)
+    return {
+        'segments': segments,
+        'merged': merged,
+        'merged_count': merged_count,
+        'total_words_source': total_words_source,
+        'total_words_translated': total_words_translated,
+    }
+
 
 def doc_chunk_json(file_path: Path) -> dict | None:
     for enc in ('utf-8-sig', 'utf-8'):
@@ -167,56 +251,11 @@ def main():
             sys.exit(1)
 
     # Merge
-    segments = []
-    merged_count = 0
-    total_words_source = 0
-    total_words_translated = 0
-
-    fmt = args.format
-
-    for cid in range(total_chunks):
-        if cid in chunk_map and chunk_map[cid].get('translated_text', '').strip():
-            data = chunk_map[cid]
-            if fmt == 'trilingual':
-                orig = data.get('original_text', '').strip()
-                pin = data.get('pinyin_text', '').strip()
-                trans = data['translated_text'].strip()
-
-                # Align by splitting into lines
-                orig_lines = [l for l in orig.splitlines() if l.strip()]
-                pin_lines = [l for l in pin.splitlines() if l.strip()]
-                trans_lines = [l for l in trans.splitlines() if l.strip()]
-
-                max_lines = max(len(orig_lines), len(pin_lines), len(trans_lines))
-                if len(orig_lines) != len(pin_lines) or len(orig_lines) != len(trans_lines):
-                    print(f"  \u26a0\ufe0f Chunk {cid}: line count mismatch (orig={len(orig_lines)}, pinyin={len(pin_lines)}, vi={len(trans_lines)}), padding to {max_lines}")
-
-                block_parts = []
-                for i in range(max_lines):
-                    o = orig_lines[i] if i < len(orig_lines) else ''
-                    p = pin_lines[i] if i < len(pin_lines) else ''
-                    v = trans_lines[i] if i < len(trans_lines) else ''
-                    block_parts.append(
-                        f'<div class="tri-block">\n'
-                        f'<p class="src-zh">{o}</p>\n'
-                        f'<p class="pinyin">{p}</p>\n'
-                        f'<p class="vi">{v}</p>\n'
-                        f'</div>'
-                    )
-                t = '\n\n'.join(block_parts)
-            else:
-                t = data['translated_text'].strip()
-            segments.append(t)
-            merged_count += 1
-            total_words_source += data.get('word_count_source', 0) or len(data.get('source_text', '').split())
-            total_words_translated += data.get('word_count_translated', 0) or len(t.split())
-        elif args.allow_partial:
-            segments.append(f"[CH\u01afA D\u1ecaCH - Chunk {cid}]")
-        elif args.skip_missing:
-            pass  # skip entirely
-
-    merged = '\n\n'.join(segments)
-    output_file.write_text(merged, encoding='utf-8')
+    result = merge_texts(
+        total_chunks, chunk_map, args.format,
+        args.allow_partial, args.skip_missing,
+    )
+    output_file.write_text(result['merged'], encoding='utf-8')
 
     elapsed = time.time() - start_time
 
@@ -224,12 +263,12 @@ def main():
     print_header(f"MERGE COMPLETE")
     print(f"  Book: {args.book_name}")
     print(f"  Total chunks: {total_chunks}")
-    print(f"  Merged: {merged_count}")
+    print(f"  Merged: {result['merged_count']}")
     if missing_all:
         print(f"  Missing: {len(missing_all)} (chunk {', '.join(str(x) for x in missing_all[:10])}"
               f"{'...' if len(missing_all) > 10 else ''})")
-    print(f"  Total words (source): ~{total_words_source:,}")
-    print(f"  Total words (translated): ~{total_words_translated:,}")
+    print(f"  Total words (source): ~{result['total_words_source']:,}")
+    print(f"  Total words (translated): ~{result['total_words_translated']:,}")
     print(f"  Output: {output_file}")
     print(f"  Time: {elapsed:.2f}s")
     print(f"{chr(0x2550) * TERMINAL_WIDTH}")
