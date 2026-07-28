@@ -162,6 +162,9 @@ def main():
     parser.add_argument('--no-include-metadata', dest='include_metadata', action='store_false',
                         help='Không thêm metadata ở đầu file')
     parser.set_defaults(include_metadata=True)
+    # === NEW: Bỏ qua check DRM ===
+    parser.add_argument('--skip-drm-check', action='store_true',
+                        help='Bỏ qua kiểm tra DRM (dùng khi false positive)')
 
     args = parser.parse_args()
 
@@ -169,12 +172,13 @@ def main():
         print(f"[LỖI] File không tồn tại: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    has_drm, reason = kiem_tra_drm(args.input)
-    if has_drm:
-        print(f"[LỖI] EPUB có DRM (bản quyền số): {reason}", file=sys.stderr)
-        print("Bạn cần loại bỏ DRM trước khi trích xuất.", file=sys.stderr)
-        print("Gợi ý: Dùng DeDRM tools (https://github.com/noDRM/DeDRM_tools)", file=sys.stderr)
-        sys.exit(1)
+    if not args.skip_drm_check:
+        has_drm, reason = kiem_tra_drm(args.input)
+        if has_drm:
+            print(f"[LỖI] EPUB có DRM (bản quyền số): {reason}", file=sys.stderr)
+            print("Bạn cần loại bỏ DRM trước khi trích xuất.", file=sys.stderr)
+            print("Gợi ý: Dùng DeDRM tools (https://github.com/noDRM/DeDRM_tools)", file=sys.stderr)
+            sys.exit(1)
 
     print(f"Đọc: {args.input}")
     chapters, metadata = lay_text_sach(args.input)
