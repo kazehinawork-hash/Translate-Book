@@ -10,7 +10,7 @@ Pipeline:
    6. Glossary    - Tạo prompt glossary → Agent review + tạo CSV
    7. Translate   - Dịch từng chunk (Agent + translate_helper.py)
    8. QA          - Kiểm tra chất lượng (glossary_qa.py)
-   9. Merge       - Gộp chunk → file hoàn chỉnh
+   9. Merge       - Gộp chunk → file hoàn chỉnh + tạo EPUB tự động
 
 Dùng --from-step để chạy lại từ bước bất kỳ.
 --auto bỏ qua các bước cần can thiệp thủ công (glossary, translate).
@@ -36,6 +36,7 @@ Ví dụ:
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -407,15 +408,17 @@ def main():
                         help='T\u00ean s\u00e1ch (d\u00f9ng cho slug v\u00e0 output)')
     parser.add_argument('--slug', type=str, help='Slug (m\u1eb7c \u0111\u1ecbnh: t\u1eeb --book)')
     parser.add_argument('--lang', type=str, default='auto', help='Ng\u00f4n ng\u1eef (en/zh/auto)')
-    parser.add_argument('--from-step', type=int, default=1, choices=range(1, 10),
-                        help='B\u1eaft \u0111\u1ea7u t\u1eeb b\u01b0\u1edbc n\u00e0o (1-9, m\u1eb7c \u0111\u1ecbnh: 1)')
-    parser.add_argument('--to-step', type=int, default=9, choices=range(1, 10),
-                        help='K\u1ebft th\u00fac \u1edf b\u01b0\u1edbc n\u00e0o (1-9, m\u1eb7c \u0111\u1ecbnh: 9)')
+    parser.add_argument('--from-step', type=int, default=1, choices=range(1, 11),
+                        help='B\u1eaft \u0111\u1ea7u t\u1eeb b\u01b0\u1edbc n\u00e0o (1-10, m\u1eb7c \u0111\u1ecbnh: 1)')
+    parser.add_argument('--to-step', type=int, default=10, choices=range(1, 11),
+                        help='K\u1ebft th\u00fac \u1edf b\u01b0\u1edbc n\u00e0o (1-10, m\u1eb7c \u0111\u1ecbnh: 10)')
     parser.add_argument('--auto', action='store_true',
                         help='Ch\u1ebf \u0111\u1ed9 auto: ch\u1ec9 ch\u1ea1y script t\u1ef1 \u0111\u1ed9ng, b\u1ecf qua b\u01b0\u1edbc c\u1ea7n Agent')
     parser.add_argument('--skip-qc', action='store_true', help='B\u1ecf qua QC sau tr\u00edch xu\u1ea5t')
     parser.add_argument('--force', action='store_true',
                         help='Ghi \u0111\u00e8 m\u00e0 kh\u00f4ng h\u1ecfi (cho merge)')
+    parser.add_argument('--author', type=str, default='',
+                        help='T\u00e1c gi\u1ea3 (metadata cho EPUB)')
 
     args = parser.parse_args()
     slug = args.slug or args.book.lower().replace(' ', '-')
@@ -494,6 +497,28 @@ def main():
         step_merge(slug, args.force, ngon_ngu)
     else:
         print(f"  \u23ed B\u1ecf qua b\u01b0\u1edbc 9 (Merge)")
+
+    # === STEP 10: EPUB ===
+    if args.from_step <= 10 and args.to_step >= 10:
+        final_md = PROJECT_ROOT / 'output' / slug / f'{slug}-vi.md'
+        if final_md.exists():
+            print(f"\n{'='*60}")
+            print(f"  B\u01b0\u1edbc 10: T\u1ea1o EPUB t\u1eeb {final_md.name}")
+            pandoc_path = shutil.which('pandoc')
+            if pandoc_path:
+                epub_args = [
+                    '--title', args.book,
+                ]
+                if args.author:
+                    epub_args.extend(['--author', args.author])
+                run_script('make_epub.py', [str(final_md)] + epub_args, '10. Make EPUB')
+            else:
+                print(f"  \u26a0\ufe0f B\u1ecf qua EPUB: pandoc ch\u01b0a c\u00e0i \u0111\u1eb7t.")
+                print(f"    C\u00e0i pandoc t\u1ea1i https://pandoc.org/installing.html")
+        else:
+            print(f"  \u23ed B\u1ecf qua b\u01b0\u1edbc 10 (EPUB): ch\u01b0a c\u00f3 file .md cu\u1ed1i c\u00f9ng")
+    else:
+        print(f"  \u23ed B\u1ecf qua b\u01b0\u1edbc 10 (EPUB)")
 
     print(f"\n{'#'*60}")
     print(f"# PIPELINE HO\u00c0N TH\u00c0NH: {args.book}")
