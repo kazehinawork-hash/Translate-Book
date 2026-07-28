@@ -146,22 +146,32 @@ def merge_batches(args):
         else:
             chua_thay.append(sub.index)
 
-    # NEW: Xử lý dòng chưa dịch theo flag --allow-partial
+    # === NEW: Validate số dòng dịch trước khi merge ===
     if chua_thay:
-        print(f"  ⚠️ Chưa dịch: {len(chua_thay)} dòng (index: {', '.join(map(str, chua_thay[:10]))}{'...' if len(chua_thay) > 10 else ''})")
-        print(f"  → Có thể do batch-XXX.vi.md bị thiếu hoặc chưa paste đủ")
+        tong_so = len(subs)
+        ti_le_thieu = len(chua_thay) / tong_so * 100
+        
+        print(f"\n⚠️  Chưa dịch: {len(chua_thay)}/{tong_so} dòng ({ti_le_thieu:.1f}%)")
+        
+        # In ra 10 index đầu tiên bị thiếu
+        preview = chua_thay[:10]
+        print(f"   Các dòng thiếu (10 đầu): {preview}{'...' if len(chua_thay) > 10 else ''}")
+        
         if not args.allow_partial:
-            print("[LỖI] Còn dòng chưa dịch. Dùng --allow-partial nếu muốn tiếp tục.", file=sys.stderr)
+            print("\n[LỖI] Bản dịch KHÔNG đầy đủ. Merge bị hủy.")
+            print("Gợi ý:")
+            print("  - Dịch tiếp các dòng còn thiếu, HOẶC")
+            print("  - Dùng --allow-partial để chấp nhận merge với dòng thiếu")
             sys.exit(1)
+        
+        # Có --allow-partial, hỏi xác nhận nếu thiếu quá 20%
+        if ti_le_thieu > 20:
+            ans = input(f"\nThiếu {ti_le_thieu:.1f}% dòng. Vẫn merge? (y/N): ").strip().lower()
+            if ans != 'y':
+                print("Hủy bỏ merge.")
+                sys.exit(0)
         else:
-            print("  → Hỏi xác nhận: ", end='')
-            try:
-                resp = input("Tiếp tục merge dù thiếu? [y/N]: ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                resp = 'n'
-            if resp != 'y':
-                print("Hủy merge.")
-                sys.exit(1)
+            print("  → Vẫn tiếp tục merge vì có --allow-partial")
 
     # Ghi SRT output
     args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -40,22 +40,36 @@ def kiem_tra_mineru() -> str | None:
     return None
 
 
-# NEW: Hàm verify mineru CLI flags trước khi gọi subprocess
-def verify_mineru_args(mineru_path: str) -> None:
-    """Chạy `mineru --help` để kiểm tra các flag -p, -o, -m có được hỗ trợ không."""
+# === NEW: verify_mineru_args() returns tuple[bool, str] ===
+def verify_mineru_args(mineru_path: str) -> tuple[bool, str]:
+    """Kiểm tra MinerU CLI có hỗ trợ các flag dự kiến không.
+    
+    Args:
+        mineru_path: Đường dẫn đến MinerU executable
+    
+    Returns:
+        tuple: (is_valid, message)
+    """
     try:
         result = subprocess.run(
             [mineru_path, '--help'],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=15
         )
         help_text = result.stdout + result.stderr
-        for flag in ['-p', '-o', '-m']:
-            if flag not in help_text:
-                print(f"[CẢNH BÁO] Flag {flag} không xuất hiện trong `mineru --help`.", file=sys.stderr)
-                print(f"        Phiên bản MinerU có thể đã đổi CLI.", file=sys.stderr)
+        help_lower = help_text.lower()
+        
+        required_flags = ['-p', '-o', '-m']
+        missing_flags = [f for f in required_flags if f not in help_lower]
+        
+        if missing_flags:
+            return False, f"MinerU có thể không hỗ trợ: {', '.join(missing_flags)}"
+        return True, "Tất cả flag được hỗ trợ"
+    except subprocess.TimeoutExpired:
+        return False, "Timeout khi chạy mineru --help"
+    except FileNotFoundError:
+        return False, f"Không tìm thấy executable: {mineru_path}"
     except Exception as e:
-        print(f"[CẢNH BÁO] Không thể verify MinerU CLI: {e}", file=sys.stderr)
-        print("        Tiếp tục với tham số mặc định.", file=sys.stderr)
+        return False, f"Lỗi khi verify: {e}"
 
 
 def main():
@@ -85,7 +99,12 @@ def main():
         print("        Sau đó: mineru-models-download (để tải model)", file=sys.stderr)
         sys.exit(1)
 
-    verify_mineru_args(mineru_path)
+    is_valid, message = verify_mineru_args(mineru_path)
+    if not is_valid:
+        print(f"[CẢNH BÁO] {message}", file=sys.stderr)
+        print("Hãy chạy `mineru --help` để kiểm tra tham số chính xác.", file=sys.stderr)
+        print("Vẫn tiếp tục chạy với tham số dự kiến...", file=sys.stderr)
+    # Vẫn tiếp tục build cmd bình thường, không sys.exit
 
     if not args.input.exists():
         print(f"[LỖI] File không tồn tại: {args.input}", file=sys.stderr)
