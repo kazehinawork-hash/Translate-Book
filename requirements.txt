@@ -31,6 +31,7 @@ pypinyin>=0.51.0
 langdetect>=1.0.9
 
 # ===== QA & processing =====
+ftfy>=6.1.0
 pandas>=2.0.0
 chardet>=5.2.0
 

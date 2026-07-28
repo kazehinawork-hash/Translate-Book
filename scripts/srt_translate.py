@@ -146,14 +146,30 @@ def merge_batches(args):
         else:
             chua_thay.append(sub.index)
 
+    # NEW: Xử lý dòng chưa dịch theo flag --allow-partial
+    if chua_thay:
+        print(f"  ⚠️ Chưa dịch: {len(chua_thay)} dòng (index: {', '.join(map(str, chua_thay[:10]))}{'...' if len(chua_thay) > 10 else ''})")
+        print(f"  → Có thể do batch-XXX.vi.md bị thiếu hoặc chưa paste đủ")
+        if not args.allow_partial:
+            print("[LỖI] Còn dòng chưa dịch. Dùng --allow-partial nếu muốn tiếp tục.", file=sys.stderr)
+            sys.exit(1)
+        else:
+            print("  → Hỏi xác nhận: ", end='')
+            try:
+                resp = input("Tiếp tục merge dù thiếu? [y/N]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                resp = 'n'
+            if resp != 'y':
+                print("Hủy merge.")
+                sys.exit(1)
+
     # Ghi SRT output
     args.output.parent.mkdir(parents=True, exist_ok=True)
     subs.save(str(args.output), encoding='utf-8')
     print(f"\n✓ Đã ghép: {args.output}")
     print(f"  Đã thay: {da_thay}/{len(subs)} dòng")
     if chua_thay:
-        print(f"  ⚠️ Chưa dịch: {len(chua_thay)} dòng (index: {', '.join(map(str, chua_thay[:10]))}{'...' if len(chua_thay) > 10 else ''})")
-        print(f"  → Có thể do batch-XXX.vi.md bị thiếu hoặc chưa paste đủ")
+        print(f"  ⚠️ Dòng chưa dịch sẽ giữ nguyên text gốc")
     else:
         print(f"  ✅ Đầy đủ tất cả dòng")
 
@@ -171,6 +187,9 @@ def main():
     parser.add_argument('--merge', action='store_true', help='Ghép các batch đã dịch thành SRT')
     parser.add_argument('--batch-dir', type=Path, help='Thư mục chứa các batch (input/output)')
     parser.add_argument('--batch-size', type=int, default=30, help='Số dòng/batch (mặc định 30)')
+    # NEW: Cho phép merge khi còn dòng chưa dịch
+    parser.add_argument('--allow-partial', action='store_true',
+                        help='Cho phép merge dù còn dòng chưa dịch (hỏi xác nhận)')
 
     args = parser.parse_args()
 

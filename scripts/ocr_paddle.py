@@ -17,7 +17,9 @@ Ví dụ:
 """
 
 import argparse
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 try:
@@ -63,8 +65,9 @@ def ocr_anh(ocr_engine, image_path: Path, lang: str) -> str:
     return '\n\n'.join(lines)
 
 
-def chuyen_pdf_thanh_anh(pdf_path: Path, dpi: int = 200) -> list[Path]:
-    """Chuyển mỗi trang PDF thành 1 ảnh PNG tạm."""
+# NEW: Dùng tempfile.mkdtemp() để quản lý ảnh tạm
+def chuyen_pdf_thanh_anh(pdf_path: Path, dpi: int = 200) -> tuple[list[Path], str]:
+    """Chuyển mỗi trang PDF thành 1 ảnh PNG tạm trong temp dir. Trả về (images, temp_dir)."""
     try:
         import pymupdf  # PyMuPDF
     except ImportError:
@@ -74,15 +77,18 @@ def chuyen_pdf_thanh_anh(pdf_path: Path, dpi: int = 200) -> list[Path]:
         except ImportError:
             raise ImportError("Cần cài pymupdf để xử lý PDF: pip install pymupdf")
 
+    temp_dir = tempfile.mkdtemp(prefix='paddle_ocr_')
     images = []
     doc = pymupdf.open(str(pdf_path))
-    for i, page in enumerate(doc):
-        pix = page.get_pixmap(dpi=dpi)
-        img_path = pdf_path.parent / f"_paddle_tmp_{pdf_path.stem}_{i+1:03d}.png"
-        pix.save(str(img_path))
-        images.append(img_path)
-    doc.close()
-    return images
+    try:
+        for i, page in enumerate(doc):
+            pix = page.get_pixmap(dpi=dpi)
+            img_path = Path(temp_dir) / f"{pdf_path.stem}_{i+1:03d}.png"
+            pix.save(str(img_path))
+            images.append(img_path)
+    finally:
+        doc.close()
+    return images, temp_dir
 
 
 def main():
@@ -149,22 +155,21 @@ def main():
     # Xử lý theo loại file
     if args.input.suffix.lower() == '.pdf':
         print("Chuyển PDF sang ảnh...")
-        image_paths = chuyen_pdf_thanh_anh(args.input, dpi=args.dpi)
+        image_paths, temp_dir = chuyen_pdf_thanh_anh(args.input, dpi=args.dpi)
         print(f"  {len(image_paths)} trang")
 
         all_text = []
-        for i, img_path in enumerate(image_paths, 1):
-            if console:
-                console.print(f"  [dim]OCR trang {i}/{len(image_paths)}...[/dim]")
-            else:
-                print(f"  OCR trang {i}/{len(image_paths)}...")
-            text = ocr_anh(ocr_engine, img_path, args.lang)
-            all_text.append(f"\n## Trang {i}\n\n{text}\n")
-            # Xóa ảnh tạm
-            try:
-                img_path.unlink()
-            except Exception:
-                pass
+        try:
+            for i, img_path in enumerate(image_paths, 1):
+                if console:
+                    console.print(f"  [dim]OCR trang {i}/{len(image_paths)}...[/dim]")
+                else:
+                    print(f"  OCR trang {i}/{len(image_paths)}...")
+                text = ocr_anh(ocr_engine, img_path, args.lang)
+                all_text.append(f"\n## Trang {i}\n\n{text}\n")
+        finally:
+            # NEW: Luôn cleanup temp dir kể cả khi OCR crash
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
         noi_dung = '\n---\n'.join(all_text)
     elif args.input.suffix.lower() in {'.png', '.jpg', '.jpeg', '.bmp', '.tiff'}:

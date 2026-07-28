@@ -62,21 +62,39 @@ def main():
         print(f"[LỖI] File không tồn tại: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    text = args.input.read_text(encoding='utf-8')
-    print(f"Đọc: {args.input} ({len(text)} ký tự)")
-    print(f"Config: {args.config} ({CONFIG_DESCRIPTIONS[args.config]})")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+
+    # NEW: Kiểm tra kích thước file - quyết định streaming hay in-memory
+    MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+    file_size = args.input.stat().st_size
 
     converter = opencc.OpenCC(args.config)
-    text_da_chuyen = converter.convert(text)
+    print(f"Config: {args.config} ({CONFIG_DESCRIPTIONS[args.config]})")
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(text_da_chuyen, encoding='utf-8')
-    print(f"✓ Đã ghi: {args.output}")
-
-    # Thống kê
-    ky_tu_goc = sum(1 for c in text if '一' <= c <= '鿿')
-    ky_tu_moi = sum(1 for c in text_da_chuyen if '一' <= c <= '鿿')
-    print(f"  Ký tự Hán: gốc {ky_tu_goc} → sau {ky_tu_moi}")
+    if file_size > MAX_MEMORY_SIZE:
+        # Streaming: xử lý từng dòng
+        print(f"File lớn ({file_size / 1024 / 1024:.1f} MB > 50 MB), xử lý streaming...")
+        ky_tu_goc = 0
+        ky_tu_moi = 0
+        with open(args.input, 'r', encoding='utf-8') as fin, \
+             open(args.output, 'w', encoding='utf-8') as fout:
+            for dong in fin:
+                dong_da_chuyen = converter.convert(dong)
+                fout.write(dong_da_chuyen)
+                ky_tu_goc += sum(1 for c in dong if '一' <= c <= '鿿')
+                ky_tu_moi += sum(1 for c in dong_da_chuyen if '一' <= c <= '鿿')
+        print(f"✓ Đã ghi: {args.output}")
+        print(f"  Ký tự Hán: gốc {ky_tu_goc} → sau {ky_tu_moi}")
+    else:
+        # In-memory: giữ nguyên cách cũ
+        text = args.input.read_text(encoding='utf-8')
+        print(f"Đọc: {args.input} ({len(text)} ký tự)")
+        text_da_chuyen = converter.convert(text)
+        args.output.write_text(text_da_chuyen, encoding='utf-8')
+        print(f"✓ Đã ghi: {args.output}")
+        ky_tu_goc = sum(1 for c in text if '一' <= c <= '鿿')
+        ky_tu_moi = sum(1 for c in text_da_chuyen if '一' <= c <= '鿿')
+        print(f"  Ký tự Hán: gốc {ky_tu_goc} → sau {ky_tu_moi}")
 
 
 if __name__ == '__main__':
