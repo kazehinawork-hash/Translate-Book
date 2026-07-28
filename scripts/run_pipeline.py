@@ -215,10 +215,12 @@ def step_glossary(slug: str, auto: bool) -> bool:
     return True
 
 
-def step_translate_print(slug: str, auto: bool):
+def step_translate_print(slug: str, auto: bool, ngon_ngu: str = 'en'):
     chunks_dir = PROJECT_ROOT / "working" / "chunks" / slug
     progress_dir = PROJECT_ROOT / "working" / "progress" / slug
     glossary_file = PROJECT_ROOT / 'glossary' / f'{slug}.csv'
+    is_zh = ngon_ngu.startswith('zh')
+    trilingual_flag = '--trilingual' if is_zh else ''
 
     if auto:
         print_step(7, 'Translate (Agent)', '\u26a0\ufe0f Auto mode: b\u1ecf qua')
@@ -232,9 +234,12 @@ def step_translate_print(slug: str, auto: bool):
                f'  2. Xem chunk ti\u1ebfp theo:\n'
                f'     python scripts/translate_helper.py --next --chunks-dir {chunks_dir} --progress-dir {progress_dir}\n\n'
                f'  3. Chu\u1ea9n b\u1ecb prompt:\n'
-               f'     python scripts/translate_helper.py --prepare 0 --chunks-dir {chunks_dir} --glossary {glossary_file}\n\n'
+               f'     python scripts/translate_helper.py --prepare 0 --chunks-dir {chunks_dir} --glossary {glossary_file} {trilingual_flag}\n\n'
                f'  4. L\u01b0u b\u1ea3n d\u1ecbch:\n'
-               f'     python scripts/translate_helper.py --save 0 --progress-dir {progress_dir} --chunks-dir {chunks_dir}')
+               f'     python scripts/translate_helper.py --save 0 --progress-dir {progress_dir} --chunks-dir {chunks_dir}'
+               + (f'\n\n  \ud83c\udff7 Ng\u00f4n ng\u1eef ZH -> t\u1ef1 \u0111\u1ed9ng th\u00eam --trilingual '
+                  f'\u0111\u1ec3 Agent d\u1ecbch \u0111\u1ecbnh d\u1ea1ng 3 d\u00f2ng (g\u1ed1c / pinyin / d\u1ecbch).'
+                  if is_zh else ''))
 
 
 def step_qa(slug: str, lang: str, auto: bool) -> bool:
@@ -289,21 +294,103 @@ def step_qa(slug: str, lang: str, auto: bool) -> bool:
     return qa_ok
 
 
-def step_merge(slug: str, force: bool, fmt: str = 'bilingual') -> bool:
+def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
     progress_dir = PROJECT_ROOT / "working" / "progress" / slug
     if not progress_dir.exists():
         print_step(9, 'Merge', '\u26a0\ufe0f B\u1ecf qua: progress_dir ch\u01b0a t\u1ed3n t\u1ea1i')
         return True
 
-    print_step(9, 'Merge', 'G\u1ed9p t\u1ea5t c\u1ea3 chunk \u0111\u00e3 d\u1ecbch th\u00e0nh file ho\u00e0n ch\u1ec9nh')
-    merge_args = [
-        '--progress-dir', str(progress_dir),
-        '--book-name', slug,
-        '--format', fmt,
-    ]
-    if force:
-        merge_args.append('--force')
-    return run_script('merge_chunks.py', merge_args, '9. Merge chunks')
+    output_dir = PROJECT_ROOT / 'output' / slug
+    output_dir.mkdir(parents=True, exist_ok=True)
+    final_output = output_dir / f'{slug}-vi.md'
+
+    if ngon_ngu.startswith('zh'):
+        # ── ZH: trilingual (ZH gốc / Pinyin / VI) ──
+        print_step(9, 'Merge', 'G\u1ed9p chunk \u0111\u00e3 d\u1ecbch \u2192 file tam ng\u1eef ZH/Pinyin/VI')
+        merge_args = [
+            '--progress-dir', str(progress_dir),
+            '--book-name', slug,
+            '--format', 'trilingual',
+        ]
+        if force:
+            merge_args.append('--force')
+        ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (trilingual)')
+        if not ok:
+            return False
+        # Di chuy\u1ec3n output t\u1ea1m v\u1ec1 \u0111\u00fang \u0111\u01b0\u1eddng d\u1eabn cu\u1ed1i
+        temp_output = PROJECT_ROOT / 'output' / f'{slug}_trilingual.md'
+        if temp_output.exists():
+            import shutil
+            shutil.move(str(temp_output), str(final_output))
+            print(f"  \u2705 File cu\u1ed1i: {final_output}")
+        return True
+
+    elif ngon_ngu.startswith('en'):
+        # ── EN: merge bilingual thu\u1ea7n Vi\u1ec7t, sau \u0111\u00f3 make_bilingual song ng\u1eef EN+VI ──
+        print_step(9, 'Merge', 'G\u1ed9p chunk \u0111\u00e3 d\u1ecbch \u2192 file t\u1ea1m (thu\u1ea7n Vi\u1ec7t)')
+        temp_vi = PROJECT_ROOT / 'working' / 'tmp' / slug / f'{slug}-vi.md'
+        temp_vi.parent.mkdir(parents=True, exist_ok=True)
+        merge_args = [
+            '--progress-dir', str(progress_dir),
+            '--book-name', f'{slug}-tmp',
+            '--output-dir', str(temp_vi.parent),
+        ]
+        if force:
+            merge_args.append('--force')
+        ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (bilingual)')
+        if not ok:
+            return False
+        # Ki\u1ec3m tra file t\u1ea1m
+        temp_output = temp_vi.parent / f'{slug}-tmp_translated.md'
+        if not temp_output.exists():
+            print(f"  [L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y file t\u1ea1m: {temp_output}", file=sys.stderr)
+            return False
+        # Gh\u00e9p song ng\u1eef EN+VI b\u1eb1ng make_bilingual.py
+        raw_md = PROJECT_ROOT / "working" / "extracted" / slug / "raw.md"
+        if not raw_md.exists():
+            alt_md = PROJECT_ROOT / "working" / "extracted" / slug / "raw-hans.md"
+            if alt_md.exists():
+                raw_md = alt_md
+        if raw_md.exists():
+            print(f"  Gh\u00e9p song ng\u1eef: {raw_md.name} + {temp_output.name}")
+            ok2 = run_script('make_bilingual.py', [
+                '--source', str(raw_md),
+                '--translation', str(temp_output),
+                '--output', str(final_output),
+                '--lang', 'en',
+            ], '9. Make bilingual EN+VI')
+            if ok2:
+                print(f"  \u2705 File cu\u1ed1i: {final_output}")
+            return True
+        else:
+            # Kh\u00f4ng c\u00f3 raw.md -> copy t\u1ea1m v\u1ec1 output
+            import shutil
+            shutil.copy(str(temp_output), str(final_output))
+            print(f"  \u2705 File cu\u1ed1i (ch\u1ec9 ti\u1ebfng Vi\u1ec7t): {final_output}")
+            return True
+
+    else:
+        # ── Kh\u00e1c: fallback bilingual, in c\u1ea3nh b\u00e1o ──
+        print_step(9, 'Merge',
+                   '\u26a0\ufe0f Kh\u00f4ng r\u00f5 ng\u00f4n ng\u1eef ngu\u1ed3n, xu\u1ea5t b\u1ea3n ch\u1ec9 c\u00f3 ti\u1ebfng Vi\u1ec7t. '
+                   'D\u00f9ng --format th\u1ee7 c\u00f4ng n\u1ebfu c\u1ea7n kh\u00e1c.')
+        merge_args = [
+            '--progress-dir', str(progress_dir),
+            '--book-name', slug,
+            '--format', 'bilingual',
+        ]
+        if force:
+            merge_args.append('--force')
+        ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (bilingual)')
+        if not ok:
+            return False
+        # Di chuy\u1ec3n v\u1ec1 output cu\u1ed1i
+        temp_output = PROJECT_ROOT / 'output' / f'{slug}_translated.md'
+        if temp_output.exists():
+            import shutil
+            shutil.move(str(temp_output), str(final_output))
+            print(f"  \u2705 File cu\u1ed1i (ch\u1ec9 ti\u1ebfng Vi\u1ec7t): {final_output}")
+        return True
 
 
 # ─── Main ──────────────────────────────────────────────────────────────────
@@ -329,8 +416,6 @@ def main():
     parser.add_argument('--skip-qc', action='store_true', help='B\u1ecf qua QC sau tr\u00edch xu\u1ea5t')
     parser.add_argument('--force', action='store_true',
                         help='Ghi \u0111\u00e8 m\u00e0 kh\u00f4ng h\u1ecfi (cho merge)')
-    parser.add_argument('--format', type=str, choices=['bilingual', 'trilingual'], default='bilingual',
-                        help='\u0110\u1ecbnh d\u1ea1ng output merge (m\u1eb7c \u0111\u1ecbnh: bilingual)')
 
     args = parser.parse_args()
     slug = args.slug or args.book.lower().replace(' ', '-')
@@ -394,7 +479,7 @@ def main():
 
     # === STEP 7: TRANSLATE ===
     if args.from_step <= 7 and args.to_step >= 7:
-        step_translate_print(slug, args.auto)
+        step_translate_print(slug, args.auto, ngon_ngu)
     else:
         print(f"  \u23ed B\u1ecf qua b\u01b0\u1edbc 7 (Translate)")
 
@@ -406,7 +491,7 @@ def main():
 
     # === STEP 9: MERGE ===
     if args.from_step <= 9 and args.to_step >= 9:
-        step_merge(slug, args.force, args.format)
+        step_merge(slug, args.force, ngon_ngu)
     else:
         print(f"  \u23ed B\u1ecf qua b\u01b0\u1edbc 9 (Merge)")
 

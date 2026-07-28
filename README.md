@@ -60,6 +60,17 @@ python scripts/run_pipeline.py --book "MyBook" --from-step 5
 
 > `translate_full_pipeline.py` hiện là wrapper tương thích ngược, vẫn dùng được nhưng có cảnh báo. Dùng `run_pipeline.py` cho trải nghiệm tốt nhất.
 
+**Chạy pipeline đầy đủ — tự động chọn định dạng theo ngôn ngữ:**
+
+```bash
+# Một lệnh duy nhất — không cần nhớ thêm flag nào
+python scripts/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang auto
+
+# Kết quả:
+#   - Sách ZH → output/ten-sach/ten-sach-vi.md (tam ngữ: gốc/pinyin/dịch)
+#   - Sách EN → output/ten-sach/ten-sach-vi.md (song ngữ EN+VI căn chỉnh đoạn)
+```
+
 **Workflow tổng quan:**
 
 ```
@@ -68,7 +79,7 @@ Bước 2: Chunk     → scripts/chunk_text.py (smart chunking, JSON output)
 Bước 3: Gen Glossary → scripts/generate_glossary.py (tạo prompt → Agent tạo CSV)
 Bước 4: Translate → Agent đọc từng chunk + glossary → working/progress/
 Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
-Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}_translated.md)
+Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md)
 ```
 
 Xem chi tiết trong **[USAGE.md](./USAGE.md)**.

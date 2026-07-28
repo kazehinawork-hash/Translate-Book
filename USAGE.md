@@ -642,6 +642,10 @@ python scripts\merge_chunks.py `
 # → Output: output/{slug}_trilingual.md
 ```
 
+> **Mẹo**: Nếu dùng `run_pipeline.py`, định dạng merge tự động chọn theo ngôn ngữ:
+> - ZH → `--format trilingual` (3 dòng gốc/pinyin/dịch)
+> - EN → `--format bilingual` + `make_bilingual.py` (song ngữ EN+VI căn chỉnh đoạn)
+
 ### 9.4. Sinh pinyin từ file gốc (standalone)
 
 ```powershell
@@ -738,13 +742,17 @@ python scripts\translate_helper.py `
 
 ### 10.6. QA và Merge
 
+> **Tự động chọn định dạng**: `run_pipeline.py` tự động phát hiện ngôn ngữ ở bước 3,
+> và chọn đúng định dạng merge (trilingual cho ZH, song ngữ EN+VI cho EN) mà không
+> cần thêm flag `--format` hay `--trilingual`.
+
 ```powershell
 # QA tất cả chunk đã dịch
 python scripts\run_pipeline.py `
     --book $book `
     --from-step 5
 
-# Merge thành file hoàn chỉnh
+# Merge thành file hoàn chỉnh (tự động chọn định dạng theo ngôn ngữ)
 python scripts\run_pipeline.py `
     --book $book `
     --from-step 6 `
