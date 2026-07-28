@@ -46,18 +46,6 @@ def doc_chunk_json(file_path: Path) -> dict | None:
     return None
 
 
-def lay_chunk_id(file_path: Path) -> int:
-    for enc in ('utf-8-sig', 'utf-8'):
-        try:
-            data = json.loads(file_path.read_text(encoding=enc))
-            return int(data.get('chunk_id', 999999))
-        except (json.JSONDecodeError, ValueError, KeyError):
-            continue
-    stem = file_path.stem
-    nums = [int(s) for s in stem.split('_') if s.isdigit()] or [999999]
-    return nums[0]
-
-
 def print_header(title: str, char: str = '\u2550'):
     print(f"\n{char * TERMINAL_WIDTH}")
     print(f"  {title}")
@@ -111,29 +99,28 @@ def main():
 
     start_time = time.time()
 
-    # Read all chunk files
-    json_files = sorted(
-        [f for f in args.progress_dir.glob('*.json') if f.is_file()],
-        key=lay_chunk_id,
-    )
-
-    if not json_files:
-        print(f"[L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y file JSON n\u00e0o trong {args.progress_dir}", file=sys.stderr)
-        sys.exit(1)
-
-    # Parse all chunks
-    chunk_map = {}
+    # Read all chunks once
+    chunks = []
     invalid = []
-    for fpath in json_files:
-        data = doc_chunk_json(fpath)
+    for f in args.progress_dir.glob('*.json'):
+        if not f.is_file():
+            continue
+        data = doc_chunk_json(f)
         if data is None:
-            invalid.append(fpath.name)
+            invalid.append(f.name)
             continue
         cid = int(data.get('chunk_id', -1))
         if cid < 0:
-            invalid.append(fpath.name)
+            invalid.append(f.name)
             continue
-        chunk_map[cid] = data
+        chunks.append((cid, data))
+
+    if not chunks:
+        print(f"[L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y file JSON n\u00e0o trong {args.progress_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    chunks.sort(key=lambda x: x[0])
+    chunk_map = dict(chunks)
 
     # Determine total_chunks
     total_chunks = max(

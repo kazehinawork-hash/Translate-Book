@@ -149,23 +149,31 @@ def kiem_tra_dong_trong(text: str, nguong: int = 5) -> list[int]:
 
 # ========== HÀM CHÍNH: QA SÁCH (Markdown) ==========
 
-def qa_sach(args) -> dict:
-    """QA cho file dịch Markdown thường."""
+def qa_sach_text(
+    source_text: str,
+    translated_text: str,
+    glossary: list[dict],
+    lang: str,
+    genre_glossary: list[dict] | None = None,
+    source_name: str = '',
+    translation_name: str = '',
+    threshold: float = 5.0,
+) -> dict:
+    """QA logic trên text string (không đọc file)."""
     bao_cao = []
-    bao_cao.append(f"# Báo cáo QA: {args.translation.name}\n")
-    bao_cao.append(f"- **Nguồn**: `{args.source}`")
-    bao_cao.append(f"- **Bản dịch**: `{args.translation}`")
-    bao_cao.append(f"- **Ngôn ngữ**: {args.lang}")
-    bao_cao.append(f"- **Glossary sách**: `{args.glossary}`")
-    if args.genre_glossary:
-        bao_cao.append(f"- **Glossary thể loại**: `{args.genre_glossary}`")
+    bao_cao.append(f"# Báo cáo QA: {translation_name}\n")
+    if source_name:
+        bao_cao.append(f"- **Nguồn**: `{source_name}`")
+    if translation_name:
+        bao_cao.append(f"- **Bản dịch**: `{translation_name}`")
+    bao_cao.append(f"- **Ngôn ngữ**: {lang}")
     bao_cao.append("")
 
-    text_goc = doc_du_lieu(args.source)
-    text_dich = doc_du_lieu(args.translation)
+    text_goc = source_text
+    text_dich = translated_text
 
     # Thống kê cơ bản
-    if args.lang == 'zh':
+    if lang == 'zh':
         ky_tu_goc = dem_ky_tu_zh(text_goc)
         ky_tu_dich = dem_ky_tu_zh(text_dich)
         bao_cao.append("## Thống kê")
@@ -180,25 +188,21 @@ def qa_sach(args) -> dict:
         bao_cao.append(f"- Từ tiếng Anh còn sót trong bản dịch: **{tu_dich}**")
         bao_cao.append(f"- Tỷ lệ còn sót: {tu_dich / max(tu_goc, 1) * 100:.1f}%\n")
 
-    # Nạp glossary
-    glossary = []
-    if args.glossary:
-        glossary += doc_glossary(args.glossary)
-    if args.genre_glossary:
-        glossary += doc_glossary(args.genre_glossary)
+    all_glossary = list(glossary)
+    if genre_glossary:
+        all_glossary += genre_glossary
 
-    if not glossary:
+    if not all_glossary:
         bao_cao.append("## ⚠️ Không có glossary - bỏ qua kiểm tra thuật ngữ")
     else:
-        bao_cao.append(f"## Kiểm tra thuật ngữ ({len(glossary)} mục)")
+        bao_cao.append(f"## Kiểm tra thuật ngữ ({len(all_glossary)} mục)")
         bao_cao.append("")
 
-        # Nhóm theo type để báo cáo
         loi_thuat_ngu = []
         loi_chua_dich = []
-        cho_phep_giu_nguyen = []  # target = source (giữ nguyên)
+        cho_phep_giu_nguyen = []
 
-        for entry in glossary:
+        for entry in all_glossary:
             source = (entry.get('source') or '').strip()
             target = (entry.get('target') or '').strip()
             loai = (entry.get('type') or '').strip()
@@ -207,23 +211,18 @@ def qa_sach(args) -> dict:
             if not source or not target:
                 continue
 
-            # Trường hợp đặc biệt: giữ nguyên
             if source == target or 'giữ nguyên' in note.lower():
                 cho_phep_giu_nguyen.append((source, target, loai))
                 continue
 
-            # Kiểm tra: source còn xuất hiện trong bản dịch?
             if source in text_dich:
-                # Có thể là tên riêng đã giữ nguyên, hoặc chưa dịch
-                # Heuristic: nếu source có chứa ký tự Hán (riêng cho ZH) hoặc là tên riêng
-                if HAN_REGEX.search(source) and args.lang == 'zh':
+                if HAN_REGEX.search(source) and lang == 'zh':
                     loi_chua_dich.append((source, target, 'tên riêng Hán còn sót'))
                 elif re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$', source):
                     loi_chua_dich.append((source, target, 'tên riêng EN còn sót'))
                 else:
                     loi_thuat_ngu.append((source, target, loai, 'source vẫn còn trong bản dịch'))
 
-        # Báo cáo
         if loi_chua_dich:
             bao_cao.append("### ⚠️ Có thể còn sót (cần xem lại)")
             bao_cao.append("| Source | Target | Ghi chú |")
@@ -248,7 +247,6 @@ def qa_sach(args) -> dict:
             bao_cao.append("### ✅ Không phát hiện thuật ngữ bị sót")
             bao_cao.append("")
 
-    # QC sau trích xuất (áp dụng cho cả bản gốc và bản dịch)
     bao_cao.append("## QC sau trích xuất")
     for ten, text in [("Gốc", text_goc), ("Dịch", text_dich)]:
         ds_mo = kiem_tra_mojibake(text)
@@ -273,13 +271,46 @@ def qa_sach(args) -> dict:
             bao_cao.append("- ✅ Không có dòng trống quá nhiều")
         bao_cao.append("")
 
+    co_loi = False
+    for line in bao_cao:
+        if 'Tỷ lệ còn sót' in line:
+            try:
+                pct = float(line.split(':')[1].strip().rstrip('%'))
+                if pct > threshold:
+                    co_loi = True
+            except (ValueError, IndexError):
+                pass
+
     return {
-        'source': args.source,
-        'translation': args.translation,
+        'source_name': source_name,
+        'translation_name': translation_name,
         'text_goc': text_goc,
         'text_dich': text_dich,
         'report_lines': bao_cao,
+        'co_loi': co_loi,
     }
+
+
+def qa_sach(args) -> dict:
+    """QA cho file dịch Markdown thường. Wrapper quanh qa_sach_text."""
+    text_goc = doc_du_lieu(args.source)
+    text_dich = doc_du_lieu(args.translation)
+
+    glossary = []
+    if args.glossary:
+        glossary += doc_glossary(args.glossary)
+    if args.genre_glossary:
+        glossary += doc_glossary(args.genre_glossary)
+
+    return qa_sach_text(
+        source_text=text_goc,
+        translated_text=text_dich,
+        glossary=glossary,
+        lang=args.lang,
+        source_name=str(args.source),
+        translation_name=str(args.translation),
+        threshold=args.threshold,
+    )
 
 
 # ========== CLI ==========
@@ -314,15 +345,7 @@ def main():
     if args.mode == 'md':
         ket_qua = qa_sach(args)
         nd_bao_cao = '\n'.join(ket_qua['report_lines'])
-        # Đánh dấu lỗi nếu có ký tự Hán/từ EN còn sót > threshold
-        for line in ket_qua['report_lines']:
-            if 'Tỷ lệ còn sót' in line:
-                try:
-                    pct = float(line.split(':')[1].strip().rstrip('%'))
-                    if pct > args.threshold:
-                        co_loi = True
-                except (ValueError, IndexError):
-                    pass
+        co_loi = ket_qua['co_loi']
     else:
         # SRT mode: kiểm tra đầy đủ (line/timestamp/index/Hán sót/glossary)
         try:

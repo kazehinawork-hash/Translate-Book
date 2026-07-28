@@ -42,6 +42,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from glossary_qa import qa_sach_text, doc_glossary
+
+sys.path.insert(0, str(Path(__file__).parent))
 from _common import setup_encoding, PROJECT_ROOT  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).parent
@@ -244,6 +247,8 @@ def step_qa(slug: str, lang: str, auto: bool) -> bool:
     print_step(8, 'QA', 'Ki\u1ec3m tra ch\u1ea5t l\u01b0\u1ee3ng d\u1ecbch')
     qa_dir = PROJECT_ROOT / 'working' / 'qa' / slug
     qa_dir.mkdir(parents=True, exist_ok=True)
+
+    glossary = doc_glossary(glossary_file) if glossary_file.exists() else []
     qa_ok = True
 
     chunk_files = sorted(progress_dir.glob('*.json'))
@@ -256,20 +261,23 @@ def step_qa(slug: str, lang: str, auto: bool) -> bool:
                 print(f"  \u26a0\ufe0f Chunk {cid} ch\u01b0a d\u1ecbch, b\u1ecf qua QA")
                 continue
             source_text = data.get('source_text', '')
-            src_tmp = qa_dir / f'_qa_src_{cid}.md'
-            tgt_tmp = qa_dir / f'_qa_tgt_{cid}.md'
-            src_tmp.write_text(source_text or '', encoding='utf-8')
-            tgt_tmp.write_text(translated, encoding='utf-8')
+
+            result = qa_sach_text(
+                source_text=source_text or '',
+                translated_text=translated,
+                glossary=glossary,
+                lang=lang,
+                source_name=cf.name,
+                translation_name=cf.name,
+            )
             report_file = qa_dir / f'chunk-{cid}-qa.md'
-            ok = run_script('glossary_qa.py', [
-                '--source', str(src_tmp),
-                '--translation', str(tgt_tmp),
-                '--glossary', str(glossary_file),
-                '--lang', lang,
-                '--report', str(report_file),
-            ], f'8. QA chunk {cid}')
-            if not ok:
+            report_file.write_text('\n'.join(result['report_lines']), encoding='utf-8')
+
+            if result['co_loi']:
                 qa_ok = False
+                print(f"  \u26a0\ufe0f Chunk {cid}: QA ph\u00e1t hi\u1ec7n l\u1ed7i (xem {report_file.name})")
+            else:
+                print(f"  \u2705 Chunk {cid}: QA OK")
         except Exception as e:
             print(f"  \u26a0\ufe0f L\u1ed7i QA chunk {cf.name}: {e}")
 

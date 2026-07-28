@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pytest_cache/
 .Python
 .venv/
 venv/
@@ -43,11 +44,6 @@ working/qa/*
 # Generated glossary prompts
 working/glossary_prompt*.txt
 
-# Test files
-test_*
-test_input.md
-!tests/test_*
-
 # Logs
 *.log
 logs/
@@ -58,8 +54,6 @@ minerU_cache/
 models/
 *.pdf.cache
 
-# Test files
-test_*/
 tmp/
 temp/
 

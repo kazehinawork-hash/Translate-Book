@@ -219,8 +219,9 @@ def get_translated_ids(progress_dir: Path) -> set:
     return translated
 
 
-def find_next_chunk(chunks_dir: Path, progress_dir: Path, from_id: int = 0) -> int | None:
-    translated = get_translated_ids(progress_dir)
+def find_next_chunk(chunks_dir: Path, progress_dir: Path, from_id: int = 0, translated: set | None = None) -> int | None:
+    if translated is None:
+        translated = get_translated_ids(progress_dir)
     if not chunks_dir.exists():
         return None
     all_chunks = sorted(chunks_dir.glob('*.json'))
@@ -504,6 +505,7 @@ def mode_interactive(args):
                     max((doc_json(f).get('chunk_id', 0) for f in all_chunk_files if doc_json(f)), default=0) + 1)
 
     from_id = args.from_id
+    translated = get_translated_ids(progress_dir)
     history = []
     history_pos = -1
 
@@ -525,7 +527,7 @@ def mode_interactive(args):
 
     prompt_count = 0
     while True:
-        cid = find_next_chunk(chunks_dir, progress_dir, from_id)
+        cid = find_next_chunk(chunks_dir, progress_dir, from_id, translated)
         if cid is None:
             print_header(f"ALL DONE! All {total_chunks} chunks translated.")
             break
@@ -542,7 +544,6 @@ def mode_interactive(args):
 
         chapter = data.get('chapter', '')
         word_count = data.get('word_count', 0)
-        translated = get_translated_ids(progress_dir)
         completed = len(translated)
 
         # Display progress and header
@@ -618,6 +619,7 @@ def mode_interactive(args):
             'source_text': data.get('text', ''),
             'word_count_source': word_count,
         })
+        translated.add(cid)
         print(f"  \u2705 Saved chunk {cid} to {out_file.name}")
 
         do_auto_commit(cid, total_chunks, args)
