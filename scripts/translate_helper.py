@@ -168,7 +168,7 @@ def print_header(title: str, char: str = '\u2550'):
     print(f"{char * TERMINAL_WIDTH}")
 
 
-def git_auto_commit(chunk_id, total_chunks, progress_dir, dry_run=False):
+def git_auto_commit(chunk_id, total_chunks, progress_dir, dry_run=False, no_verify=False):
     """Auto-commit a translated chunk to git."""
     chunk_file = progress_dir / f"chunk_{chunk_id:03d}.json"
     if not chunk_file.exists():
@@ -179,8 +179,11 @@ def git_auto_commit(chunk_id, total_chunks, progress_dir, dry_run=False):
             capture_output=True, check=False, cwd=PROJECT_ROOT
         )
         msg = f"translate: chunk {chunk_id}/{total_chunks}"
+        cmd = ['git', 'commit', '-m', msg]
+        if no_verify:
+            cmd.append('--no-verify')
         result = subprocess.run(
-            ['git', 'commit', '-m', msg, '--no-verify'],
+            cmd,
             capture_output=True, text=True, check=False, cwd=PROJECT_ROOT
         )
         if result.returncode == 0:
@@ -190,6 +193,7 @@ def git_auto_commit(chunk_id, total_chunks, progress_dir, dry_run=False):
         else:
             if 'nothing to commit' in result.stderr or 'nothing to commit' in result.stdout:
                 return True
+            print(result.stderr, file=sys.stderr)
             return False
     except FileNotFoundError:
         return False
@@ -376,7 +380,7 @@ def save_translation(chunk_id: int, translated_text: str, args, source_data: dic
 
 def do_auto_commit(chunk_id: int, total_chunks: int, args):
     if args.auto_commit:
-        ok = git_auto_commit(chunk_id, total_chunks, args.progress_dir)
+        ok = git_auto_commit(chunk_id, total_chunks, args.progress_dir, no_verify=args.no_verify)
         if ok:
             print(f"  [AUTO-COMMIT] chunk {chunk_id}/{total_chunks} committed")
         else:
@@ -651,6 +655,8 @@ def main():
                         help='T\u1ef1 \u0111\u1ed9ng git commit sau m\u1ed7i chunk')
     parser.add_argument('--trilingual', action='store_true',
                         help='Ch\u1ebf \u0111\u1ed9 tam ng\u1eef (Chinese/Pinyin/Vietnamese)')
+    parser.add_argument('--no-verify', action='store_true',
+                        help='B\u1ecf qua git hook khi auto-commit')
 
     # Modes
     parser.add_argument('--prepare', type=int,
