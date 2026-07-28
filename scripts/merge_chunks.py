@@ -68,7 +68,7 @@ def main():
     parser.add_argument('--output-dir', type=Path,
                         help='Th\u01b0 m\u1ee5c output (m\u1eb7c \u0111\u1ecbnh: output/)')
     parser.add_argument('--format', type=str, choices=['bilingual', 'trilingual'], default='bilingual',
-                        help='\u0110\u1ecbnh d\u1ea1ng output (m\u1eb7c \u0111\u1ecbnh: bilingual)')
+                        help='\u0110\u1ecbnh d\u1ea1ng output: bilingual = ch\u1ec9 ti\u1ebfng Vi\u1ec7t (d\u00f9ng l\u00e0m input trung gian cho make_bilingual.py), trilingual = 3 d\u00f2ng g\u1ed1c/pinyin/d\u1ecbch')
     parser.add_argument('--allow-partial', action='store_true',
                         help='Cho ph\u00e9p merge khi thi\u1ebfu chunk (ch\u00e8n placeholder [CH\u01afA D\u1ecaCH])')
     parser.add_argument('--skip-missing', action='store_true',
