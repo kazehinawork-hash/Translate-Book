@@ -168,6 +168,22 @@ Dùng `scripts/merge_chunks.py --format trilingual` để gộp → `output/{boo
 
 ---
 
+## Dùng GPU (tùy chọn)
+
+Mặc định `mineru_extract.py` và `ocr_paddle.py` tự động phát hiện GPU và dùng CPU nếu không có.
+Nếu bạn có GPU NVIDIA và muốn chạy bằng GPU để tăng tốc:
+
+- **MinerU** (`mineru_extract.py`): Cần cài **torch bản CUDA** (không phải bản CPU mặc định).
+  Tra bảng lệnh cài tại: https://pytorch.org/get-started/locally/
+
+- **PaddleOCR** (`ocr_paddle.py`): Cần cài **paddlepaddle-gpu** thay vì paddlepaddle CPU.
+  Xem hướng dẫn tại: https://www.paddlepaddle.org.cn/en/install/quick
+
+Sau khi cài đúng bản GPU, script `--device auto` sẽ tự dùng GPU. Có thể ép bằng
+`--device cuda` (minerU) hoặc `--device gpu` (PaddleOCR).
+
+---
+
 ## 🔑 Nguyên tắc quan trọng
 
 - **Dịch trực tiếp ZH → VI** (KHÔNG qua Pinyin) — Pinyin mất ngữ nghĩa

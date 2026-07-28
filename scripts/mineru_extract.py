@@ -28,6 +28,24 @@ except ImportError:
     console = None
 
 
+def detect_device() -> str:
+    """Tự động phát hiện GPU (CUDA) có khả dụng không.
+    
+    Returns:
+        str: 'cuda' nếu torch CUDA available, 'cpu' nếu không.
+    """
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return 'cuda'
+        else:
+            return 'cpu'
+    except ImportError:
+        return 'cpu'
+    except Exception:
+        return 'cpu'
+
+
 def kiem_tra_mineru() -> str | None:
     """Kiểm tra MinerU CLI có sẵn không. Trả về đường dẫn hoặc None."""
     path = shutil.which('mineru')
@@ -88,6 +106,9 @@ def main():
     parser.add_argument('--no-parse-equation', dest='parse_equation', action='store_false', help='Tắt parse công thức toán')
     parser.add_argument('--server', type=str, default=None, help='MinerU server URL (nếu dùng remote)')
     parser.add_argument('--backend', type=str, default='pipeline', help='Backend: pipeline, hybrid-engine, vlm-http-client, ... (mặc định: pipeline)')
+    # === NEW: --device flag for GPU/CPU auto-detect ===
+    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'cuda', 'cpu'],
+                        help='Thiết bị chạy: auto (tự phát hiện), cuda, cpu (mặc định: auto)')
 
     args = parser.parse_args()
 
@@ -98,6 +119,36 @@ def main():
         print("        Cài bằng: pip install -U mineru", file=sys.stderr)
         print("        Sau đó: mineru-models-download (để tải model)", file=sys.stderr)
         sys.exit(1)
+
+    # === NEW: Xác định device (GPU/CPU) ===
+    if args.device == 'auto':
+        device = detect_device()
+    else:
+        device = args.device
+        if device == 'cuda':
+            try:
+                import torch
+                if not torch.cuda.is_available():
+                    print("[CẢNH BÁO] Bạn ép --device cuda nhưng torch không thấy GPU khả dụng.", file=sys.stderr)
+                    print("        Tự động rơi về CPU.", file=sys.stderr)
+                    device = 'cpu'
+            except ImportError:
+                print("[CẢNH BÁO] Bạn ép --device cuda nhưng chưa cài torch.", file=sys.stderr)
+                print("        Tự động rơi về CPU.", file=sys.stderr)
+                device = 'cpu'
+
+    if device == 'cpu':
+        # Xác định lý do CPU để in ra
+        cpu_reason = 'không xác định'
+        try:
+            import torch
+            if not torch.cuda.is_available():
+                cpu_reason = 'torch bản CPU-only hoặc không có GPU CUDA khả dụng'
+        except ImportError:
+            cpu_reason = 'chưa cài torch (pip install torch)'
+        print(f"Chạy bằng CPU ({cpu_reason})")
+    else:
+        print("Chạy bằng GPU (CUDA)")
 
     is_valid, message = verify_mineru_args(mineru_path)
     if not is_valid:
@@ -122,6 +173,7 @@ def main():
     ]
 
     cmd.extend(['--backend', args.backend])
+    cmd.extend(['--device', device])
 
     if args.server:
         cmd.extend(['--api-url', args.server])
