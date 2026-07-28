@@ -1,6 +1,6 @@
 # USAGE — Hướng dẫn sử dụng dự án (thực hành)
 
-> Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./PROCESS.md) để hiểu chi tiết từng bước.
+> Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./docs/archive/PROCESS.md) để hiểu chi tiết từng bước.
 > Phiên bản: v3.2 — Cập nhật 2026-07-27
 
 ---
@@ -78,7 +78,7 @@ git config user.name "Tên của bạn"
 git config user.email "email@example.com"
 
 # Commit ban đầu
-git add PLAN.md PROCESS.md README.md USAGE.md .gitignore
+git add docs/archive/PLAN.md docs/archive/PROCESS.md README.md USAGE.md .gitignore
 git add glossary\ prompts\ scripts\requirements.txt
 git commit -m "Initial commit: project structure and docs"
 ```
@@ -151,7 +151,7 @@ python scripts\post_extract_qc.py `
     --lang en
 ```
 
-Mở báo cáo, nếu có `❌ Mojibake` hoặc `❌ Dòng lặp` → xem [PROCESS.md §11 sự cố 1](./PROCESS.md#11-xử-lý-sự-cố-thường-gặp).
+Mở báo cáo, nếu có `❌ Mojibake` hoặc `❌ Dòng lặp` → xem [PROCESS.md §11 sự cố 1](./docs/archive/PROCESS.md#11-xử-lý-sự-cố-thường-gặp).
 
 ### Bước 4: Chia chunk (5 giây)
 
@@ -170,7 +170,7 @@ Kiểm tra số chunk tạo được. Mỗi chunk tương ứng 1 "phần" để
 
 ### Bước 5: Dịch từng chunk (lặp lại)
 
-**Bước 5a — Mở chat với AI, paste theo mẫu** (xem [PROCESS.md §9.1](./PROCESS.md#91-cho-sách-tiếng-anh)):
+**Bước 5a — Mở chat với AI, paste theo mẫu** (xem [PROCESS.md §9.1](./docs/archive/PROCESS.md#91-cho-sách-tiếng-anh)):
 
 ```
 Tôi muốn dịch cuốn "The Pragmatic Programmer" (EN → VI).
@@ -368,7 +368,7 @@ python scripts\chunk_text.py `
 
 ### Bước 6: Dịch từng chunk
 
-**Mẫu chat** cho ZH (xem [PROCESS.md §9.2](./PROCESS.md#92-cho-sách-tiếng-trung)):
+**Mẫu chat** cho ZH (xem [PROCESS.md §9.2](./docs/archive/PROCESS.md#92-cho-sách-tiếng-trung)):
 
 ```
 Tôi muốn dịch cuốn "三体" (Ba Thể) (ZH → VI trực tiếp).
@@ -586,7 +586,7 @@ git status
 | Số dòng SRT không khớp | Bỏ sót batch khi dịch | Dịch bổ sung batch thiếu |
 | Chunk cuối quá nhỏ (cảnh báo) | Input ngắn hoặc ranh giới lệch | Có thể bỏ qua hoặc merge thủ công |
 
-Chi tiết hơn → [PROCESS.md §11](./PROCESS.md#11-xử-lý-sự-cố-thường-gặp).
+Chi tiết hơn → [PROCESS.md §11](./docs/archive/PROCESS.md#11-xử-lý-sự-cố-thường-gặp).
 
 ---
 
@@ -668,13 +668,13 @@ $book = "my-book"
 $slug = "my-book"
 
 # Bước 1-2: Extract + Chunk (tự động)
-python scripts\translate_full_pipeline.py `
+python scripts\run_pipeline.py `
     --book $book `
     --input "input\my-book.pdf" `
     --source-lang English
 
 # Bước 3: Tạo glossary prompt
-python scripts\translate_full_pipeline.py `
+python scripts\run_pipeline.py `
     --book $book `
     --from-step 3
 # → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
@@ -740,12 +740,12 @@ python scripts\translate_helper.py `
 
 ```powershell
 # QA tất cả chunk đã dịch
-python scripts\translate_full_pipeline.py `
+python scripts\run_pipeline.py `
     --book $book `
     --from-step 5
 
 # Merge thành file hoàn chỉnh
-python scripts\translate_full_pipeline.py `
+python scripts\run_pipeline.py `
     --book $book `
     --from-step 6 `
     --force
