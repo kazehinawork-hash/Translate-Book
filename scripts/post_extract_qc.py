@@ -29,7 +29,14 @@ except ImportError:
     console = None
 
 
-# Mẫu mojibake phổ biến
+# NEW: Thử import ftfy (ưu tiên) cho mojibake detection
+try:
+    import ftfy
+    HAS_FTFY = True
+except ImportError:
+    HAS_FTFY = False
+
+# Mẫu mojibake phổ biến (fallback khi không có ftfy)
 MOJIBAKE_PATTERNS = [
     (re.compile(r'Ã©|Ã¨|Ã¢|Ã |Â©|Â®'), 'UTF-8 → Latin-1 lỗi'),
     (re.compile(r'ä¸­æ|ä¸æ|æ–‡|è‹±|è‹±æ–‡'), 'UTF-8 → Latin-1 (Hán tự)'),
@@ -52,7 +59,17 @@ def doc_file(file_path: Path) -> tuple[str, str]:
 
 
 def kiem_tra_mojibake(text: str) -> list[tuple[int, str, str]]:
-    """Trả về [(số_dòng, đoạn, mô_tả_lỗi)]."""
+    """Trả về [(số_dòng, đoạn, mô_tả_lỗi)].
+    Ưu tiên dùng ftfy.fix_encoding() nếu có, fallback về MOJIBAKE_PATTERNS.
+    """
+    if HAS_FTFY:
+        ket_qua = []
+        for i, dong in enumerate(text.splitlines(), 1):
+            fixed = ftfy.fix_encoding(dong)
+            if fixed != dong:
+                ket_qua.append((i, dong[:100], f'ftfy: {fixed[:60]}...'))
+        return ket_qua
+    # Fallback: regex patterns
     ket_qua = []
     for i, dong in enumerate(text.splitlines(), 1):
         for pattern, mo_ta in MOJIBAKE_PATTERNS:

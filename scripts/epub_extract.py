@@ -15,6 +15,7 @@ Ví dụ:
 import argparse
 import re
 import sys
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -39,6 +40,24 @@ try:
     console = Console()
 except ImportError:
     console = None
+
+
+# NEW: Kiểm tra DRM trong file EPUB
+def kiem_tra_drm(epub_path: Path) -> None:
+    """Kiểm tra file EPUB có chứa DRM không."""
+    drm_files = {'META-INF/encryption.xml', 'META-INF/rights.xml'}
+    try:
+        with zipfile.ZipFile(str(epub_path), 'r') as z:
+            names = set(z.namelist())
+            found = drm_files & names
+            if found:
+                print(f"[LỖI] File EPUB có DRM! Phát hiện: {', '.join(sorted(found))}", file=sys.stderr)
+                print("        EPUB có DRM không thể trích xuất trực tiếp.", file=sys.stderr)
+                print("        Gợi ý: Dùng DeDRM tools (https://github.com/apprenticeharper/DeDRM_tools)", file=sys.stderr)
+                print("        để loại bỏ DRM trước.", file=sys.stderr)
+                sys.exit(1)
+    except (zipfile.BadZipFile, Exception) as e:
+        print(f"[CẢNH BÁO] Không thể kiểm tra DRM: {e}", file=sys.stderr)
 
 
 # Bỏ qua các thẻ không cần nội dung
@@ -125,6 +144,8 @@ def main():
     if not args.input.exists():
         print(f"[LỖI] File không tồn tại: {args.input}", file=sys.stderr)
         sys.exit(1)
+
+    kiem_tra_drm(args.input)
 
     print(f"Đọc: {args.input}")
     chapters, metadata = lay_text_sach(args.input)

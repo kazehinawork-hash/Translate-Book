@@ -103,6 +103,7 @@ def step_extract(args, slug: str) -> Path | None:
             '--input', str(args.input),
             '--output', str(raw_md),
             '--lang', args.lang if args.lang != 'auto' else 'en',
+            '--backend', 'pipeline',
         ], '1. Extract PDF')
     return raw_md if ok else None
 

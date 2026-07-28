@@ -30,7 +30,32 @@ except ImportError:
 
 def kiem_tra_mineru() -> str | None:
     """Kiểm tra MinerU CLI có sẵn không. Trả về đường dẫn hoặc None."""
-    return shutil.which('mineru')
+    path = shutil.which('mineru')
+    if path:
+        return path
+    # Fallback: tìm trong .venv\Scripts (khi chạy trực tiếp từ python.exe)
+    venv_scripts = Path(sys.executable).parent / 'mineru.exe'
+    if venv_scripts.exists():
+        return str(venv_scripts)
+    return None
+
+
+# NEW: Hàm verify mineru CLI flags trước khi gọi subprocess
+def verify_mineru_args(mineru_path: str) -> None:
+    """Chạy `mineru --help` để kiểm tra các flag -p, -o, -m có được hỗ trợ không."""
+    try:
+        result = subprocess.run(
+            [mineru_path, '--help'],
+            capture_output=True, text=True, timeout=30
+        )
+        help_text = result.stdout + result.stderr
+        for flag in ['-p', '-o', '-m']:
+            if flag not in help_text:
+                print(f"[CẢNH BÁO] Flag {flag} không xuất hiện trong `mineru --help`.", file=sys.stderr)
+                print(f"        Phiên bản MinerU có thể đã đổi CLI.", file=sys.stderr)
+    except Exception as e:
+        print(f"[CẢNH BÁO] Không thể verify MinerU CLI: {e}", file=sys.stderr)
+        print("        Tiếp tục với tham số mặc định.", file=sys.stderr)
 
 
 def main():
@@ -48,6 +73,7 @@ def main():
     parser.add_argument('--method', type=str, default='auto', help='Method: auto, txt, ocr')
     parser.add_argument('--no-parse-equation', dest='parse_equation', action='store_false', help='Tắt parse công thức toán')
     parser.add_argument('--server', type=str, default=None, help='MinerU server URL (nếu dùng remote)')
+    parser.add_argument('--backend', type=str, default='pipeline', help='Backend: pipeline, hybrid-engine, vlm-http-client, ... (mặc định: pipeline)')
 
     args = parser.parse_args()
 
@@ -58,6 +84,8 @@ def main():
         print("        Cài bằng: pip install -U mineru", file=sys.stderr)
         print("        Sau đó: mineru-models-download (để tải model)", file=sys.stderr)
         sys.exit(1)
+
+    verify_mineru_args(mineru_path)
 
     if not args.input.exists():
         print(f"[LỖI] File không tồn tại: {args.input}", file=sys.stderr)
@@ -73,6 +101,8 @@ def main():
         '-o', str(args.output.parent.absolute()),
         '-m', args.method,
     ]
+
+    cmd.extend(['--backend', args.backend])
 
     if args.server:
         cmd.extend(['--api-url', args.server])
