@@ -64,37 +64,41 @@ def main():
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
-    # NEW: Kiểm tra kích thước file - quyết định streaming hay in-memory
-    MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
-    file_size = args.input.stat().st_size
-
     converter = opencc.OpenCC(args.config)
+
+    # === NEW: Kiểm tra kích thước file - streaming cho file lớn ===
+    file_size = args.input.stat().st_size
+    FILE_SIZE_THRESHOLD = 50 * 1024 * 1024  # 50 MB
+
     print(f"Config: {args.config} ({CONFIG_DESCRIPTIONS[args.config]})")
 
-    if file_size > MAX_MEMORY_SIZE:
-        # Streaming: xử lý từng dòng
-        print(f"File lớn ({file_size / 1024 / 1024:.1f} MB > 50 MB), xử lý streaming...")
-        ky_tu_goc = 0
-        ky_tu_moi = 0
+    if file_size > FILE_SIZE_THRESHOLD:
+        # ===== STREAMING MODE cho file lớn =====
+        size_mb = file_size / (1024 * 1024)
+        print(f"[INFO] File lớn ({size_mb:.1f} MB), xử lý từng dòng để tiết kiệm RAM...")
+        
+        so_dong = 0
         with open(args.input, 'r', encoding='utf-8') as fin, \
              open(args.output, 'w', encoding='utf-8') as fout:
-            for dong in fin:
-                dong_da_chuyen = converter.convert(dong)
-                fout.write(dong_da_chuyen)
-                ky_tu_goc += sum(1 for c in dong if '一' <= c <= '鿿')
-                ky_tu_moi += sum(1 for c in dong_da_chuyen if '一' <= c <= '鿿')
-        print(f"✓ Đã ghi: {args.output}")
-        print(f"  Ký tự Hán: gốc {ky_tu_goc} → sau {ky_tu_moi}")
+            for line in fin:
+                # Convert từng dòng
+                converted_line = converter.convert(line)
+                fout.write(converted_line)
+                so_dong += 1
+                
+                # Progress mỗi 1000 dòng
+                if so_dong % 1000 == 0:
+                    print(f"  Đã xử lý {so_dong} dòng...", end='\r')
+        
+        print(f"\n[OK] Đã chuẩn hóa {so_dong} dòng")
     else:
-        # In-memory: giữ nguyên cách cũ
+        # ===== BATCH MODE cho file nhỏ (giữ nguyên cách cũ) =====
         text = args.input.read_text(encoding='utf-8')
         print(f"Đọc: {args.input} ({len(text)} ký tự)")
+        
         text_da_chuyen = converter.convert(text)
         args.output.write_text(text_da_chuyen, encoding='utf-8')
-        print(f"✓ Đã ghi: {args.output}")
-        ky_tu_goc = sum(1 for c in text if '一' <= c <= '鿿')
-        ky_tu_moi = sum(1 for c in text_da_chuyen if '一' <= c <= '鿿')
-        print(f"  Ký tự Hán: gốc {ky_tu_goc} → sau {ky_tu_moi}")
+        print(f"Ghi: {args.output}")
 
 
 if __name__ == '__main__':

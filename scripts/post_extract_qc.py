@@ -29,12 +29,13 @@ except ImportError:
     console = None
 
 
-# NEW: Thử import ftfy (ưu tiên) cho mojibake detection
+# === NEW: ftfy integration (ưu tiên) cho mojibake detection ===
 try:
     import ftfy
     HAS_FTFY = True
 except ImportError:
     HAS_FTFY = False
+    print("[CẢNH BÁO] Không có ftfy, dùng regex cũ để detect mojibake", file=sys.stderr)
 
 # Mẫu mojibake phổ biến (fallback khi không có ftfy)
 MOJIBAKE_PATTERNS = [
@@ -59,23 +60,44 @@ def doc_file(file_path: Path) -> tuple[str, str]:
 
 
 def kiem_tra_mojibake(text: str) -> list[tuple[int, str, str]]:
-    """Trả về [(số_dòng, đoạn, mô_tả_lỗi)].
-    Ưu tiên dùng ftfy.fix_encoding() nếu có, fallback về MOJIBAKE_PATTERNS.
+    """Phát hiện mojibake trong text.
+    
+    Ưu tiên dùng ftfy nếu có, fallback về regex MOJIBAKE_PATTERNS.
+    
+    Returns:
+        list: [(line_number, line_preview, description), ...]
     """
-    if HAS_FTFY:
-        ket_qua = []
-        for i, dong in enumerate(text.splitlines(), 1):
-            fixed = ftfy.fix_encoding(dong)
-            if fixed != dong:
-                ket_qua.append((i, dong[:100], f'ftfy: {fixed[:60]}...'))
-        return ket_qua
-    # Fallback: regex patterns
     ket_qua = []
-    for i, dong in enumerate(text.splitlines(), 1):
-        for pattern, mo_ta in MOJIBAKE_PATTERNS:
-            if pattern.search(dong):
-                ket_qua.append((i, dong[:100], mo_ta))
-                break
+    dong_list = text.splitlines()
+    
+    for i, dong in enumerate(dong_list, 1):
+        if not dong.strip():
+            continue
+            
+        detected = False
+        
+        # Ưu tiên ftfy
+        if HAS_FTFY:
+            try:
+                fixed = ftfy.fix_encoding(dong)
+                if fixed != dong:
+                    # Kiểm tra xem fix có thực sự cải thiện không
+                    if len(fixed) > 0 and len(fixed) < len(dong) * 1.5:
+                        preview = dong[:60] + ('...' if len(dong) > 60 else '')
+                        fixed_preview = fixed[:40] + ('...' if len(fixed) > 40 else '')
+                        ket_qua.append((i, preview, f"Mojibake (ftfy fix: {fixed_preview})"))
+                        detected = True
+            except Exception:
+                pass
+        
+        # Fallback: regex
+        if not detected:
+            for pattern, mo_ta in MOJIBAKE_PATTERNS:
+                if pattern.search(dong):
+                    preview = dong[:60] + ('...' if len(dong) > 60 else '')
+                    ket_qua.append((i, preview, mo_ta))
+                    break
+    
     return ket_qua
 
 

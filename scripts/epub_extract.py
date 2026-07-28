@@ -42,22 +42,46 @@ except ImportError:
     console = None
 
 
-# NEW: Kiểm tra DRM trong file EPUB
-def kiem_tra_drm(epub_path: Path) -> None:
-    """Kiểm tra file EPUB có chứa DRM không."""
-    drm_files = {'META-INF/encryption.xml', 'META-INF/rights.xml'}
+# === NEW: kiem_tra_drm() returns tuple[bool, str] ===
+def kiem_tra_drm(epub_path: Path) -> tuple[bool, str]:
+    """Kiểm tra EPUB có DRM (bản quyền số) không.
+    
+    Args:
+        epub_path: Đường dẫn file EPUB
+    
+    Returns:
+        tuple: (has_drm, reason)
+    """
     try:
-        with zipfile.ZipFile(str(epub_path), 'r') as z:
-            names = set(z.namelist())
-            found = drm_files & names
-            if found:
-                print(f"[LỖI] File EPUB có DRM! Phát hiện: {', '.join(sorted(found))}", file=sys.stderr)
-                print("        EPUB có DRM không thể trích xuất trực tiếp.", file=sys.stderr)
-                print("        Gợi ý: Dùng DeDRM tools (https://github.com/apprenticeharper/DeDRM_tools)", file=sys.stderr)
-                print("        để loại bỏ DRM trước.", file=sys.stderr)
-                sys.exit(1)
-    except (zipfile.BadZipFile, Exception) as e:
-        print(f"[CẢNH BÁO] Không thể kiểm tra DRM: {e}", file=sys.stderr)
+        import zipfile
+        with zipfile.ZipFile(str(epub_path), 'r') as zf:
+            namelist = zf.namelist()
+            
+            # Các file chỉ điểm DRM
+            drm_indicators = {
+                'META-INF/encryption.xml': 'Có file encryption.xml',
+                'META-INF/rights.xml': 'Có file rights.xml',
+                'META-INF/l10n.xml': 'Có file l10n.xml (DRM Adobe)',
+            }
+            
+            for indicator, reason in drm_indicators.items():
+                if indicator in namelist:
+                    return True, reason
+            
+            # Check thêm trong content.opf
+            for name in namelist:
+                if name.endswith('.opf'):
+                    try:
+                        opf_content = zf.read(name).decode('utf-8', errors='ignore')
+                        if 'drm' in opf_content.lower() or 'encryption' in opf_content.lower():
+                            return True, f"Phát hiện DRM trong {name}"
+                    except Exception:
+                        pass
+            return False, ""
+    except zipfile.BadZipFile:
+        return False, "File không phải ZIP hợp lệ"
+    except Exception as e:
+        return False, f"Lỗi khi kiểm tra: {e}"
 
 
 # Bỏ qua các thẻ không cần nội dung
@@ -145,7 +169,12 @@ def main():
         print(f"[LỖI] File không tồn tại: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    kiem_tra_drm(args.input)
+    has_drm, reason = kiem_tra_drm(args.input)
+    if has_drm:
+        print(f"[LỖI] EPUB có DRM (bản quyền số): {reason}", file=sys.stderr)
+        print("Bạn cần loại bỏ DRM trước khi trích xuất.", file=sys.stderr)
+        print("Gợi ý: Dùng DeDRM tools (https://github.com/noDRM/DeDRM_tools)", file=sys.stderr)
+        sys.exit(1)
 
     print(f"Đọc: {args.input}")
     chapters, metadata = lay_text_sach(args.input)

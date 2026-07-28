@@ -65,30 +65,34 @@ def ocr_anh(ocr_engine, image_path: Path, lang: str) -> str:
     return '\n\n'.join(lines)
 
 
-# NEW: Dùng tempfile.mkdtemp() để quản lý ảnh tạm
-def chuyen_pdf_thanh_anh(pdf_path: Path, dpi: int = 200) -> tuple[list[Path], str]:
-    """Chuyển mỗi trang PDF thành 1 ảnh PNG tạm trong temp dir. Trả về (images, temp_dir)."""
-    try:
-        import pymupdf  # PyMuPDF
-    except ImportError:
-        try:
-            import fitz  # alternative name
-            pymupdf = fitz
-        except ImportError:
-            raise ImportError("Cần cài pymupdf để xử lý PDF: pip install pymupdf")
-
-    temp_dir = tempfile.mkdtemp(prefix='paddle_ocr_')
-    images = []
-    doc = pymupdf.open(str(pdf_path))
-    try:
-        for i, page in enumerate(doc):
-            pix = page.get_pixmap(dpi=dpi)
-            img_path = Path(temp_dir) / f"{pdf_path.stem}_{i+1:03d}.png"
-            pix.save(str(img_path))
-            images.append(img_path)
-    finally:
-        doc.close()
-    return images, temp_dir
+# === NEW: Dùng pdf2image + tempfile để quản lý ảnh tạm an toàn ===
+def chuyen_pdf_thanh_anh(pdf_path: Path, dpi: int = 200, output_dir: Path | None = None) -> list[Path]:
+    """Chuyển PDF thành ảnh PNG để OCR.
+    
+    Args:
+        pdf_path: Đường dẫn file PDF
+        dpi: Độ phân giải (mặc định 200)
+        output_dir: Thư mục lưu ảnh tạm (None = tạo temp dir mới)
+    
+    Returns:
+        list[Path]: Danh sách đường dẫn ảnh
+    """
+    from pdf2image import convert_from_path
+    
+    if output_dir is None:
+        output_dir = Path(tempfile.mkdtemp(prefix='ocr_pdf_'))
+    else:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    
+    images = convert_from_path(str(pdf_path), dpi=dpi)
+    image_paths = []
+    
+    for i, img in enumerate(images, 1):
+        img_path = output_dir / f"{pdf_path.stem}_page_{i:03d}.png"
+        img.save(str(img_path), 'PNG')
+        image_paths.append(img_path)
+    
+    return image_paths
 
 
 def main():
@@ -152,14 +156,20 @@ def main():
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
-    # Xử lý theo loại file
-    if args.input.suffix.lower() == '.pdf':
-        print("Chuyển PDF sang ảnh...")
-        image_paths, temp_dir = chuyen_pdf_thanh_anh(args.input, dpi=args.dpi)
-        print(f"  {len(image_paths)} trang")
+    import shutil
 
-        all_text = []
-        try:
+    # === NEW: Tạo temp dir an toàn + try/finally cleanup ===
+    temp_dir = tempfile.mkdtemp(prefix='ocr_paddle_')
+    temp_path = Path(temp_dir)
+
+    try:
+        # Xử lý theo loại file
+        if args.input.suffix.lower() == '.pdf':
+            print("Chuyển PDF sang ảnh...")
+            image_paths = chuyen_pdf_thanh_anh(args.input, dpi=args.dpi, output_dir=temp_path)
+            print(f"  {len(image_paths)} trang")
+
+            all_text = []
             for i, img_path in enumerate(image_paths, 1):
                 if console:
                     console.print(f"  [dim]OCR trang {i}/{len(image_paths)}...[/dim]")
@@ -167,11 +177,14 @@ def main():
                     print(f"  OCR trang {i}/{len(image_paths)}...")
                 text = ocr_anh(ocr_engine, img_path, args.lang)
                 all_text.append(f"\n## Trang {i}\n\n{text}\n")
-        finally:
-            # NEW: Luôn cleanup temp dir kể cả khi OCR crash
-            shutil.rmtree(temp_dir, ignore_errors=True)
 
-        noi_dung = '\n---\n'.join(all_text)
+            noi_dung = '\n---\n'.join(all_text)
+    finally:
+        # LUÔN LUÔN cleanup temp dir, kể cả khi crash
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
     elif args.input.suffix.lower() in {'.png', '.jpg', '.jpeg', '.bmp', '.tiff'}:
         noi_dung = ocr_anh(ocr_engine, args.input, args.lang)
     elif args.input.suffix.lower() in {'.docx', '.doc'}:
