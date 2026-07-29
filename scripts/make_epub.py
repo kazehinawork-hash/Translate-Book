@@ -18,6 +18,8 @@ def main() -> None:
     parser.add_argument('input', type=Path, help='File .md đầu vào')
     parser.add_argument('--title', type=str, default='', help='Tên sách (metadata)')
     parser.add_argument('--author', type=str, default='', help='Tác giả (metadata)')
+    parser.add_argument('--cover', type=Path, default=None, help='File ảnh bìa')
+    parser.add_argument('--resource-path', type=str, default='', help='Đường dẫn tìm kiếm ảnh/tài nguyên')
     args = parser.parse_args()
 
     input_path: Path = args.input
@@ -52,6 +54,10 @@ def main() -> None:
     ]
     if author:
         cmd.extend(['--metadata', f'author={author}'])
+    if args.cover and args.cover.exists():
+        cmd.extend(['--epub-cover-image', str(args.cover)])
+    if args.resource_path:
+        cmd.extend(['--resource-path', args.resource_path])
 
     print(f"  Pandoc: {pandoc_path}")
     print(f"  Input:  {input_path}")

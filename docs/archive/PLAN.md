@@ -1,8 +1,8 @@
 # PLAN — Kế hoạch tổng thể dự án dịch tài liệu
 
-> Phiên bản: v2.1 — Cập nhật 2026-07-19
-> Thay đổi so với v2.0: sửa mâu thuẫn working/ git, bỏ EPUB khỏi MinerU, fix requirements (mineru thay magic-pdf), thêm scripts/epub_extract.py, fix tham số MinerU, thêm bước skeleton GĐ0, fix ước lượng thời gian.
-> Trạng thái: Bản nháp, chờ phê duyệt cuối
+> Phiên bản: v3.2 — Cập nhật 2026-07-29
+> Thay đổi so với v2.1: Dọn dẹp sạch sẽ các script rác (translate_full_pipeline, ocr_easy, _make_epub, v.v.), hoàn thiện luồng Pandoc EPUB (TOC, CSS tối ưu E-ink).
+> Trạng thái: Lưu trữ (Archive) nhưng đã được đồng bộ với mã nguồn mới nhất.
 
 ---
 
@@ -658,6 +658,7 @@ Khi số lượng sách tăng hoặc muốn tăng tốc, cân nhắc:
 | 2026-07-19 | v2.2 | Implement code theo PLAN/PROCESS: viết 12 file `.py` (10 scripts + 1 orchestrator + 1 helper); fix P0 blockers (4), P1 chất lượng (4), P2 tài liệu (4); thêm `USAGE.md` - hướng dẫn sử dụng thực hành với 4 workflow copy-paste (PDF EN, EPUB ZH, SRT, scan); update README link sang USAGE |
 | 2026-07-19 | v2.3 | Thêm giao diện thân thiện cho non-tech: `scripts/translate.py` (CLI menu tương tác 8 lựa chọn, dùng rich), `scripts/translate.bat` (1-click launcher Windows set UTF-8 + activate venv), `QUICKSTART.md` (hướng dẫn 1 trang 3 bước). User chỉ cần double-click `.bat` → chọn số trong menu → làm theo hướng dẫn |
 | 2026-07-20 | v2.4 | Thêm `scripts/make_bilingual.py` — ghép bản gốc + dịch thành file song ngữ xen kẽ (EN: gốc đậm + dịch; ZH: gốc đậm + pinyin nghiêng + dịch). Cập nhật prompts (thêm quy tắc 1:1 đoạn), PROCESS.md (bước 3.9/4.9), PLAN.md (directory tree, pipeline), USAGE.md (bước 8), QUICKSTART.md (mẹo), translate.py (menu option 7) |
+| 2026-07-29 | v3.2 | Dọn dẹp dự án: xóa bỏ hoàn toàn `ocr_easy.py` và các file rác/cũ (`_make_epub.py`, `translate_full_pipeline.py`). Tối ưu hóa Pandoc EPUB: thêm TOC cho sách tam ngữ, chỉnh CSS thân thiện màn hình E-ink (không in nghiêng Hán tự). |
 
 ---
 

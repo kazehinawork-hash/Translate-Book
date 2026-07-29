@@ -94,18 +94,13 @@ def step_extract(args, slug: str) -> Path | None:
         print("  \u26a0\ufe0f B\u1ecf qua: kh\u00f4ng c\u00f3 --input")
         return raw_md if raw_md.exists() else None
 
-    if args.input.suffix.lower() == '.epub':
-        ok = run_script('epub_extract.py', [
-            '--input', str(args.input),
-            '--output', str(raw_md),
-        ], '1. Extract EPUB')
-    else:
-        ok = run_script('mineru_extract.py', [
-            '--input', str(args.input),
-            '--output', str(raw_md),
-            '--lang', args.lang if args.lang != 'auto' else 'en',
-            '--backend', 'pipeline',
-        ], '1. Extract PDF')
+    ok = run_script('mineru_extract.py', [
+        '--input', str(args.input),
+        '--output', str(raw_md),
+        '--lang', args.lang if args.lang != 'auto' else 'en',
+        '--backend', 'pipeline',
+        '--device', 'auto',
+    ], '1. Extract with MinerU')
     return raw_md if ok else None
 
 
@@ -258,7 +253,8 @@ def step_qa(slug: str, lang: str, auto: bool) -> bool:
     glossary = doc_glossary(glossary_file) if glossary_file.exists() else []
     qa_ok = True
 
-    chunk_files = sorted(progress_dir.glob('*.json'))
+    import re
+    chunk_files = sorted(progress_dir.glob('*.json'), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     for cf in chunk_files:
         try:
             data = json.loads(cf.read_text(encoding='utf-8-sig'))
@@ -307,7 +303,7 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
 
     if ngon_ngu.startswith('zh'):
         # ── ZH: trilingual (ZH gốc / Pinyin / VI) ──
-        print_step(9, 'Merge', 'G\u1ed9p chunk \u0111\u00e3 d\u1ecbch \u2192 file tam ng\u1eef ZH/Pinyin/VI')
+        print_step(9, 'Merge', 'Gộp chunk đã dịch → file tam ngữ ZH/Pinyin/VI')
         merge_args = [
             '--progress-dir', str(progress_dir),
             '--book-name', slug,
@@ -316,14 +312,33 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
         if force:
             merge_args.append('--force')
         ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (trilingual)')
+        
+        # Merge thuần Việt
+        merge_args_vi = [
+            '--progress-dir', str(progress_dir),
+            '--book-name', slug,
+            '--format', 'bilingual',
+        ]
+        if force:
+            merge_args_vi.append('--force')
+        run_script('merge_chunks.py', merge_args_vi, '9. Merge chunks (thuần Việt)')
+        
         if not ok:
             return False
-        # Di chuy\u1ec3n output t\u1ea1m v\u1ec1 \u0111\u00fang \u0111\u01b0\u1eddng d\u1eabn cu\u1ed1i
+            
+        import shutil
         temp_output = PROJECT_ROOT / 'output' / f'{slug}_trilingual.md'
+        temp_vi = PROJECT_ROOT / 'output' / f'{slug}_translated.md'
+        
+        tam_ngu_file = output_dir / f'{slug}-tamngu.md'
         if temp_output.exists():
-            import shutil
-            shutil.move(str(temp_output), str(final_output))
-            print(f"  \u2705 File cu\u1ed1i: {final_output}")
+            shutil.move(str(temp_output), str(tam_ngu_file))
+            print(f"  ✅ File tam ngữ: {tam_ngu_file}")
+            
+        if temp_vi.exists():
+            shutil.move(str(temp_vi), str(final_output))
+            print(f"  ✅ File thuần Việt: {final_output}")
+            
         return True
 
     elif ngon_ngu.startswith('en'):
@@ -353,21 +368,25 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
             if alt_md.exists():
                 raw_md = alt_md
         if raw_md.exists():
-            print(f"  Gh\u00e9p song ng\u1eef: {raw_md.name} + {temp_output.name}")
+            print(f"  Ghép song ngữ: {raw_md.name} + {temp_output.name}")
+            song_ngu_file = output_dir / f'{slug}-songngu.md'
             ok2 = run_script('make_bilingual.py', [
                 '--source', str(raw_md),
                 '--translation', str(temp_output),
-                '--output', str(final_output),
+                '--output', str(song_ngu_file),
                 '--lang', 'en',
             ], '9. Make bilingual EN+VI')
-            if ok2:
-                print(f"  \u2705 File cu\u1ed1i: {final_output}")
-            return True
-        else:
-            # Kh\u00f4ng c\u00f3 raw.md -> copy t\u1ea1m v\u1ec1 output
             import shutil
             shutil.copy(str(temp_output), str(final_output))
-            print(f"  \u2705 File cu\u1ed1i (ch\u1ec9 ti\u1ebfng Vi\u1ec7t): {final_output}")
+            if ok2:
+                print(f"  ✅ File song ngữ: {song_ngu_file}")
+            print(f"  ✅ File thuần Việt: {final_output}")
+            return True
+        else:
+            # Không có raw.md -> copy tạm về output
+            import shutil
+            shutil.copy(str(temp_output), str(final_output))
+            print(f"  ✅ File cuối (chỉ tiếng Việt): {final_output}")
             return True
 
     else:
@@ -509,6 +528,12 @@ def main():
                 epub_args = [
                     '--title', args.book,
                 ]
+                import os
+                res_paths = [
+                    str(PROJECT_ROOT / 'output' / slug),
+                    str(PROJECT_ROOT / 'working' / 'extracted' / slug)
+                ]
+                epub_args.extend(['--resource-path', os.pathsep.join(res_paths)])
                 if args.author:
                     epub_args.extend(['--author', args.author])
                 run_script('make_epub.py', [str(final_md)] + epub_args, '10. Make EPUB')

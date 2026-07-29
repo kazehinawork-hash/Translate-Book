@@ -61,7 +61,7 @@ python scripts/translate_helper.py --interactive --chunks-dir "working/chunks/my
 python scripts/run_pipeline.py --book "MyBook" --from-step 5
 ```
 
-> `translate_full_pipeline.py` hiện là wrapper tương thích ngược, vẫn dùng được nhưng có cảnh báo. Dùng `run_pipeline.py` cho trải nghiệm tốt nhất.
+> Dùng `run_pipeline.py` cho trải nghiệm tốt nhất để tự động hóa toàn bộ quá trình.
 
 **Chạy pipeline đầy đủ — tự động chọn định dạng theo ngôn ngữ:**
 
@@ -178,9 +178,8 @@ Pipeline tự động chuyển sang `.epub` (có cấu trúc HTML + CSS riêng c
 | **generate_glossary.py** | Tạo prompt để Agent sinh glossary CSV | Không gọi API |
 | **translate_helper.py** | Hỗ trợ Agent dịch (interactive/prepare/save/status/next/auto-commit) | Interactive mode tự động lặp |
 | **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
-| **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Đã thay thế translate_full_pipeline.py |
+| **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Script chạy toàn bộ pipeline tự động |
 | **pandoc** | Chuyển .md → .epub với CSS tùy chỉnh | Cài từ https://pandoc.org/installing.html |
-| **translate_full_pipeline.py** | Wrapper tương thích ngược | Cảnh báo deprecated, dùng run_pipeline.py thay thế |
 | **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
 | **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |
 | **git** | Version control | OneDrive không thay thế được |

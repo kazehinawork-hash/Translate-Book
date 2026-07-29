@@ -1,7 +1,7 @@
 # PROCESS — Quy trình thực hiện chi tiết
 
-> Phiên bản: v2.1 — Cập nhật 2026-07-19
-> Đồng bộ với PLAN.md v2.1: sửa mâu thuẫn working/ git, tách EPUB, fix MinerU install, thêm CSV escape, fix pseudo-code.
+> Phiên bản: v3.2 — Cập nhật 2026-07-29
+> Đồng bộ với dự án v3.2: Dọn dẹp sạch sẽ các script rác, chốt lại PaddleOCR là fallback OCR duy nhất, hoàn thiện luồng EPUB Pandoc.
 > Tài liệu hướng dẫn từng bước để dịch 1 cuốn sách từ đầu đến cuối
 
 ---

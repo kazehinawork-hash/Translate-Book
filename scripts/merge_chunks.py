@@ -61,12 +61,11 @@ def merge_texts(
             data = chunk_map[cid]
             chapter = (data.get('chapter') or '').strip()
 
-            # Chèn heading ## chapter nếu chapter thay đổi
+            # Chèn page break nếu chapter thay đổi
             heading = ''
             if chapter and chapter != last_chapter:
                 if last_chapter is not None:
                     heading = '<div style="page-break-before: always;"></div>\n\n'
-                heading += f'## {chapter}\n\n'
                 last_chapter = chapter
 
             if fmt == 'trilingual':
@@ -87,13 +86,22 @@ def merge_texts(
                     o = orig_lines[i] if i < len(orig_lines) else ''
                     p = pin_lines[i] if i < len(pin_lines) else ''
                     v = trans_lines[i] if i < len(trans_lines) else ''
-                    block_parts.append(
-                        f'<div class="tri-block">\n'
-                        f'<p class="src-zh">{o}</p>\n'
-                        f'<p class="pinyin">{p}</p>\n'
-                        f'<p class="vi">{v}</p>\n'
-                        f'</div>'
-                    )
+
+                    if o.startswith('#') or v.startswith('#'):
+                        # Output heading natively for Pandoc TOC
+                        raw_o = re.sub(r'^(#{1,6})\s+', '', o).strip()
+                        block_parts.append(f"{v}\n\n**{raw_o}**\n\n*{p}*")
+                    elif o.startswith('![') or v.startswith('!['):
+                        # Images should not be wrapped
+                        block_parts.append(f"{o}\n\n{v}")
+                    else:
+                        block_parts.append(
+                            f'<div class="tri-block">\n'
+                            f'<p class="src-zh">{o}</p>\n'
+                            f'<p class="pinyin">{p}</p>\n'
+                            f'<p class="vi">{v}</p>\n'
+                            f'</div>'
+                        )
                 t = '\n\n'.join(block_parts)
                 t = heading + t
             else:
@@ -104,7 +112,7 @@ def merge_texts(
             total_words_source += data.get('word_count_source', 0) or len(data.get('source_text', '').split())
             total_words_translated += data.get('word_count_translated', 0) or len(t.split())
         elif allow_partial:
-            segments.append(f'[CH\u01afA D\u1ecaCH - Chunk {cid}]')
+            segments.append(f'[CHƯA DỊCH - Chunk {cid + 1}]')
         elif skip_missing:
             pass
 
@@ -235,10 +243,10 @@ def main():
     if missing_all:
         print(f"  Missing/empty chunks: {len(missing_all)}")
         for cid in missing_ids:
-            print(f"    \u274c Chunk {cid}: MISSING")
+            print(f"    ❌ Chunk {cid + 1}: MISSING (file chunk-{cid + 1:03d}.json)")
         for cid in empty_ids:
             if cid not in missing_ids:
-                print(f"    \u274c Chunk {cid}: EMPTY translation")
+                print(f"    ❌ Chunk {cid + 1}: EMPTY translation")
 
         if args.skip_missing:
             print(f"\n  \u23ed --skip-missing: b\u1ecf qua {len(missing_all)} chunk thi\u1ebfu/r\u1ed7ng")
@@ -265,7 +273,7 @@ def main():
     print(f"  Total chunks: {total_chunks}")
     print(f"  Merged: {result['merged_count']}")
     if missing_all:
-        print(f"  Missing: {len(missing_all)} (chunk {', '.join(str(x) for x in missing_all[:10])}"
+        print(f"  Missing: {len(missing_all)} (chunk {', '.join(str(x + 1) for x in missing_all[:10])}"
               f"{'...' if len(missing_all) > 10 else ''})")
     print(f"  Total words (source): ~{result['total_words_source']:,}")
     print(f"  Total words (translated): ~{result['total_words_translated']:,}")
