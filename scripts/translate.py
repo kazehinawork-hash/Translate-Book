@@ -324,7 +324,8 @@ def buoc_2_tiep_tuc_du_an():
     slug = projects[chon - 1]
     in_thuong(f"\n→ Đã chọn: {slug}")
 
-    chunks = sorted((chunks_root / slug).glob("chunk-*.md"))
+    import re
+    chunks = sorted((chunks_root / slug).glob("chunk-*.md"), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     output_dir = PROJECT_ROOT / "output" / slug
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -339,14 +340,10 @@ def buoc_2_tiep_tuc_du_an():
     if not chunk_tiep_theo:
         in_thanh_cong(f"Đã dịch xong tất cả {len(chunks)} chunks!")
         in_thuong(f"\n💡 Bước tiếp: ghép file hoàn chỉnh")
-        if hoi_yes_no("Ghép các chunk thành full.md?"):
-            full = output_dir / "full.md"
-            with open(full, 'wb') as fout:
-                for c in chunks:
-                    fout.write(c.with_suffix('.md').read_bytes() if c.with_suffix('.md').exists() else b'')
-                    fout.write(b'\n\n---\n\n')
-            # Read existing translations
-            translations = sorted(output_dir.glob("chunk-*.md"))
+        if hoi_yes_no(f"Ghép các chunk thành {slug}-vi.md?"):
+            full = output_dir / f"{slug}-vi.md"
+            import re
+            translations = sorted(output_dir.glob("chunk-*.md"), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
             with open(full, 'w', encoding='utf-8') as fout:
                 for t in translations:
                     fout.write(t.read_text(encoding='utf-8'))
@@ -423,7 +420,8 @@ def buoc_3_chay_qa(slug=None):
         lang = hoi_text("Ngôn ngữ (en/zh)", mac_dinh='en')
 
     # QA từng chunk
-    translations = sorted(output_dir.glob("chunk-*.md"))
+    import re
+    translations = sorted(output_dir.glob("chunk-*.md"), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     if not translations:
         in_loi(f"Chưa có bản dịch nào trong {output_dir}")
         return

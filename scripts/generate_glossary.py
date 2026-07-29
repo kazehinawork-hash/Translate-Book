@@ -30,21 +30,23 @@ from _common import setup_encoding, PROJECT_ROOT
 
 
 PROMPT_TEMPLATE = """Read the following text and extract ALL:
-1. Character names (nh\u00e2n v\u1eadt)
-2. Place names (\u0111\u1ecba \u0111i\u1ec3m)
-3. Organization names (t\u1ed5 ch\u1ee9c)
-4. Domain-specific terms (thu\u1eadt ng\u1eef chuy\u00ean ng\u00e0nh)
-5. Brand/product names (th\u01b0\u01a1ng hi\u1ec7u/s\u1ea3n ph\u1ea9m)
+1. Character names (nhân vật)
+2. Place names (địa điểm)
+3. Organization names (tổ chức)
+4. Domain-specific terms (thuật ngữ chuyên ngành)
+5. Skills / Magic items / Artifacts / Cultivation levels (Chiêu thức, pháp bảo, vật phẩm, cảnh giới)
+6. Brand/product names (thương hiệu/sản phẩm)
 
 Output as CSV format:
 source,target,notes
 
 Rules:
 - "source" = original term (English/Chinese)
-- "target" = suggested Vietnamese translation (leave blank if unsure, Agent will fill later)
-- "notes" = brief context (e.g., "main character", "fictional city", "ML term")
+- "target" = suggested Vietnamese translation (leave blank if unsure)
+- "notes" = brief context (e.g., "main character", "fictional city", "artifact", "martial art")
 - Sort by frequency (most frequent first)
 - Do NOT include common words, only proper nouns and specialized terms
+- CRITICAL: OUTPUT ONLY THE RAW CSV TEXT. NO EXPLANATIONS, NO MARKDOWN BLOCKS (```), NO GREETINGS.
 
 TEXT:
 {text}
@@ -95,7 +97,9 @@ def main():
         if not args.source_dir.exists():
             print(f"[L\u1ed6I] Th\u01b0 m\u1ee5c kh\u00f4ng t\u1ed3n t\u1ea1i: {args.source_dir}", file=sys.stderr)
             sys.exit(1)
-        json_files = sorted(args.source_dir.glob('*.json'))
+        # Sort numerically by extracting digits from filename to handle >999 chunks
+        import re
+        json_files = sorted(args.source_dir.glob('*.json'), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
         if not json_files:
             print(f"[L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y file JSON n\u00e0o trong {args.source_dir}", file=sys.stderr)
             sys.exit(1)
@@ -114,15 +118,42 @@ def main():
         print("[L\u1ed6I] Kh\u00f4ng \u0111\u1ecdc \u0111\u01b0\u1ee3c n\u1ed9i dung", file=sys.stderr)
         sys.exit(1)
 
-    # Truncate if needed
-    preview = text[:args.max_chars]
-    if len(text) > args.max_chars:
-        last_period = preview.rfind('.')
-        last_newline = preview.rfind('\n')
-        cut = max(last_period, last_newline)
-        if cut > args.max_chars * 0.5:
-            preview = preview[:cut + 1]
-        print(f"  (c\u1eaft t\u1eeb {len(text)} k\u00fd t\u1ef1 xu\u1ed1ng {len(preview)} k\u00fd t\u1ef1)")
+    # L\u1ea5y m\u1eabu tr\u1ea3i \u0111\u1ec1u (\u0110\u1ea7u, Gi\u1eefa, Cu\u1ed1i) n\u1ebfu v\u0103n b\u1ea3n qu\u00e1 d\u00e0i
+    if len(text) > args.max_chars * 1.5:
+        part_size = args.max_chars // 3
+        
+        start_text = text[:part_size]
+        mid_idx = len(text) // 2 - part_size // 2
+        mid_text = text[mid_idx:mid_idx + part_size]
+        end_text = text[-part_size:]
+        
+        # C\u1ed1 g\u1eafng c\u1eaft g\u1ecdn g\u00e0ng t\u1ea1i c\u00e1c d\u00f2ng m\u1edbi
+        def clean_chunk(chunk_text, is_start=False, is_end=False):
+            start_cut = 0 if is_start else chunk_text.find('\n')
+            if start_cut == -1: start_cut = 0
+            end_cut = len(chunk_text) if is_end else chunk_text.rfind('\n')
+            if end_cut <= 0: end_cut = len(chunk_text)
+            return chunk_text[start_cut:end_cut].strip()
+
+        start_text = clean_chunk(start_text, is_start=True)
+        mid_text = clean_chunk(mid_text)
+        end_text = clean_chunk(end_text, is_end=True)
+        
+        preview = (
+            "--- PH\u1ea6N \u0110\u1ea6U TRUY\u1ec6N ---\n" + start_text + "\n\n" +
+            "--- PH\u1ea6N GI\u1eeeA TRUY\u1ec6N ---\n" + mid_text + "\n\n" +
+            "--- PH\u1ea6N CU\u1ed0I TRUY\u1ec6N ---\n" + end_text
+        )
+        print(f"  (L\u1ea5y m\u1eabu \u0110\u1ea7u-Gi\u1eefa-Cu\u1ed1i t\u1eeb {len(text)} k\u00fd t\u1ef1, xu\u1ed1ng c\u00f2n {len(preview)} k\u00fd t\u1ef1)")
+    else:
+        preview = text[:args.max_chars]
+        if len(text) > args.max_chars:
+            last_period = preview.rfind('.')
+            last_newline = preview.rfind('\n')
+            cut = max(last_period, last_newline)
+            if cut > args.max_chars * 0.5:
+                preview = preview[:cut + 1]
+            print(f"  (c\u1eaft t\u1eeb {len(text)} k\u00fd t\u1ef1 xu\u1ed1ng {len(preview)} k\u00fd t\u1ef1)")
 
     prompt_content = PROMPT_TEMPLATE.format(text=preview)
 

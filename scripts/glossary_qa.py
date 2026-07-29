@@ -50,9 +50,11 @@ HAN_REGEX = re.compile(r'[㐀-鿿豈-﫿]')
 
 # Mẫu mojibake phổ biến (encoding sai trên Windows)
 MOJIBAKE_PATTERNS = [
-    re.compile(r'Ã©|Ã¨|Ã¢|Ã '),     # UTF-8 đọc thành Latin-1
-    re.compile(r'ä¸­æ|ä¸æ|æ–‡'),     # UTF-8 đọc thành Latin-1 cho Hán
+    re.compile(r'Ã©|Ã¨|Ã¢|Ã |Â©|Â®'),     # UTF-8 đọc thành Latin-1
+    re.compile(r'ä¸­æ|ä¸æ|æ–‡|è‹±|è‹±æ–‡'),     # UTF-8 đọc thành Latin-1 cho Hán
     re.compile(r'â€™|â€œ|â€|Â '),  # Smart quote broken
+    re.compile(r'^\ufeff', re.MULTILINE), # BOM ở đầu dòng
+    re.compile(r'\ufffd'), # Ký tự thay thế U+FFFD
 ]
 
 # Bỏ qua các thẻ Markdown khi đếm từ/ký tự
@@ -114,6 +116,20 @@ def kiem_tra_mojibake(text: str) -> list[tuple[int, str]]:
                 ket_qua.append((i, dong[:80]))
                 break
     return ket_qua
+
+
+def is_word_in_text(word: str, text: str, is_latin: bool = False) -> bool:
+    """Kiểm tra từ có nằm trong văn bản không, dùng word boundary cho chữ Latin để tránh lỗi chuỗi con."""
+    if not word or not text:
+        return False
+    if is_latin or not HAN_REGEX.search(word):
+        try:
+            pattern = r'\b' + re.escape(word) + r'\b'
+            return bool(re.search(pattern, text, flags=re.IGNORECASE))
+        except re.error:
+            return word.lower() in text.lower()
+    else:
+        return word in text
 
 
 def kiem_tra_dong_lap(text: str, nguong: int = 3) -> list[tuple[int, str]]:
@@ -200,6 +216,7 @@ def qa_sach_text(
 
         loi_thuat_ngu = []
         loi_chua_dich = []
+        loi_dich_sai = []
         cho_phep_giu_nguyen = []
 
         for entry in all_glossary:
@@ -215,13 +232,17 @@ def qa_sach_text(
                 cho_phep_giu_nguyen.append((source, target, loai))
                 continue
 
-            if source in text_dich:
+            if is_word_in_text(source, text_dich, lang == 'en'):
                 if HAN_REGEX.search(source) and lang == 'zh':
                     loi_chua_dich.append((source, target, 'tên riêng Hán còn sót'))
                 elif re.match(r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$', source):
                     loi_chua_dich.append((source, target, 'tên riêng EN còn sót'))
                 else:
                     loi_thuat_ngu.append((source, target, loai, 'source vẫn còn trong bản dịch'))
+            
+            if is_word_in_text(source, text_goc, lang == 'en') and source != target and 'giữ nguyên' not in note.lower():
+                if not is_word_in_text(target, text_dich, True):
+                    loi_dich_sai.append((source, target, loai, 'Không dùng target của glossary'))
 
         if loi_chua_dich:
             bao_cao.append("### ⚠️ Có thể còn sót (cần xem lại)")
@@ -243,8 +264,16 @@ def qa_sach_text(
             bao_cao.append(f"### ℹ️ Cho phép giữ nguyên: {len(cho_phep_giu_nguyen)} mục")
             bao_cao.append("")
 
-        if not loi_chua_dich and not loi_thuat_ngu:
-            bao_cao.append("### ✅ Không phát hiện thuật ngữ bị sót")
+        if loi_dich_sai:
+            bao_cao.append("### ❌ Lỗi dịch sai (không bám sát glossary)")
+            bao_cao.append("| Source | Target | Loại | Ghi chú |")
+            bao_cao.append("|--------|--------|------|---------|")
+            for s, t, loai, note in loi_dich_sai:
+                bao_cao.append(f"| `{s}` | {t} | {loai} | {note} |")
+            bao_cao.append("")
+
+        if not loi_chua_dich and not loi_thuat_ngu and not loi_dich_sai:
+            bao_cao.append("### ✅ Không phát hiện lỗi thuật ngữ")
             bao_cao.append("")
 
     bao_cao.append("## QC sau trích xuất")
@@ -408,19 +437,29 @@ def main():
             bao_cao.append(f"## Glossary ({len(glossary)} mục)")
             text_dich_all = '\n'.join(s.text for s in sub_dich)
             loi_glossary = []
+            loi_dich_sai = []
             for entry in glossary:
                 source = (entry.get('source') or '').strip()
                 target = (entry.get('target') or '').strip()
                 if not source or not target or source == target:
                     continue
-                if source in text_dich_all:
+                if is_word_in_text(source, text_dich_all, args.lang == 'en'):
                     loi_glossary.append((source, target))
-            if loi_glossary:
-                bao_cao.append(f"- ❌ Có {len(loi_glossary)} thuật ngữ glossary còn sót:")
-                for s, t in loi_glossary[:20]:
-                    bao_cao.append(f"  - `{s}` → `{t}`")
-                if len(loi_glossary) > 20:
-                    bao_cao.append(f"  - ... và {len(loi_glossary) - 20} mục")
+                if is_word_in_text(source, text_goc_all, args.lang == 'en') and not is_word_in_text(target, text_dich_all, True):
+                    loi_dich_sai.append((source, target))
+            if loi_glossary or loi_dich_sai:
+                if loi_glossary:
+                    bao_cao.append(f"- ❌ Có {len(loi_glossary)} thuật ngữ glossary còn sót (chưa dịch):")
+                    for s, t in loi_glossary[:20]:
+                        bao_cao.append(f"  - `{s}` → `{t}`")
+                    if len(loi_glossary) > 20:
+                        bao_cao.append(f"  - ... và {len(loi_glossary) - 20} mục")
+                if loi_dich_sai:
+                    bao_cao.append(f"- ❌ Có {len(loi_dich_sai)} thuật ngữ không dùng đúng target của glossary:")
+                    for s, t in loi_dich_sai[:20]:
+                        bao_cao.append(f"  - `{s}` đáng lẽ phải dịch là `{t}`")
+                    if len(loi_dich_sai) > 20:
+                        bao_cao.append(f"  - ... và {len(loi_dich_sai) - 20} mục")
                 co_loi = True
             else:
                 bao_cao.append("- ✅ Glossary OK")

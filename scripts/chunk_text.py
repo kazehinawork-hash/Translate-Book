@@ -42,11 +42,33 @@ MANUAL_BREAK = '<!-- CHUNK_BREAK -->'
 # Ký tự Hán
 HAN_REGEX = re.compile(r'[㐀-鿿豈-﫿]')
 
-# Sentence boundary regex
-SENTENCE_BOUNDARY = re.compile(r'(?<=[.?!])\s+(?=[A-Z])|(?<=[\u3002\uff01\uff1f])\s*')
+# Sentence boundary regex - Cải tiến cho hội thoại (tiểu thuyết)
+# Hỗ trợ bắt dấu câu kết thúc kèm theo ngoặc kép/ngoặc đơn
+SENTENCE_BOUNDARY = re.compile(
+    r'([.?!][\"\'”’)]?\s+(?=[A-ZÀ-Ỹ])|[\u3002\uff01\uff1f][\"\'”’)]?\s*)'
+)
 
 # Context window size (chars)
 CONTEXT_CHARS = 200
+
+def get_safe_context(text: str, is_prev: bool, chars: int = 200) -> str:
+    """Lấy ngữ cảnh an toàn, không cắt ngang chữ ở hai đầu."""
+    if len(text) <= chars:
+        return text
+    if is_prev:
+        ctx = text[-chars:]
+        # Tìm khoảng trắng đầu tiên để bỏ phần chữ bị đứt khúc
+        first_space = ctx.find(' ')
+        if first_space != -1 and first_space < 50:
+            return ctx[first_space:].lstrip()
+        return ctx
+    else:
+        ctx = text[:chars]
+        # Tìm khoảng trắng cuối cùng để bỏ phần chữ bị đứt khúc
+        last_space = ctx.rfind(' ')
+        if last_space != -1 and (chars - last_space) < 50:
+            return ctx[:last_space].rstrip()
+        return ctx
 
 
 STRATEGIES = ['smart', 'paragraph', 'line', 'fixed']
@@ -228,17 +250,23 @@ def canh_bao_chunk_cuoi_nho(chunks: list[str], min_size: int, lang: str) -> None
 
 
 def tach_cau(text: str) -> list[str]:
-    """Tách text thành các câu, giữ delimiter."""
+    """Tách text thành các câu, giữ delimiter và xử lý ngoặc kép hội thoại."""
     sentences = []
+    # Sử dụng SENTENCE_BOUNDARY để cắt
+    parts = re.split(SENTENCE_BOUNDARY, text)
+    
     buf = ''
-    for line in text.splitlines(keepends=True):
-        buf += line
-        stripped = line.strip()
-        if stripped and stripped[-1] in '.!?\u3002\uff01\uff1f':
-            sentences.append(buf.rstrip())
+    for i in range(0, len(parts), 2):
+        chunk = parts[i]
+        delim = parts[i+1] if i+1 < len(parts) else ''
+        buf += chunk + delim
+        if delim:
+            sentences.append(buf.strip())
             buf = ''
+            
     if buf.strip():
-        sentences.append(buf.rstrip())
+        sentences.append(buf.strip())
+    
     return [s for s in sentences if s.strip()]
 
 
@@ -324,8 +352,8 @@ def chunk_smart(text: str, max_chars: int, min_chars: int, lang: str) -> list[di
 
         if u_heading:
             current_chapter = u_chapter
-            # Start new chunk for new chapter if current chunk has content
-            if current_chunk:
+            # Chỉ bẻ chunk mới tại Heading nếu chunk hiện tại đã đủ lớn (>= min_chars)
+            if current_chunk and current_size >= min_chars:
                 chunks_raw.append((current_chapter, current_chunk))
                 current_chunk = []
                 current_size = 0
@@ -333,7 +361,7 @@ def chunk_smart(text: str, max_chars: int, min_chars: int, lang: str) -> list[di
                 current_size = u_size
             else:
                 current_chunk.append(u_text)
-                current_size = u_size
+                current_size += u_size
         else:
             current_chunk.append(u_text)
             current_size += u_size
@@ -343,17 +371,21 @@ def chunk_smart(text: str, max_chars: int, min_chars: int, lang: str) -> list[di
 
     # Convert to dict format with context
     full_texts = ['\n\n'.join(parts) for chapter, parts in chunks_raw]
+    
+    # Lọc bỏ các chunk hoàn toàn không có chữ (size = 0)
+    valid_texts = [txt for txt in full_texts if dem_so_luong(txt, lang) > 0]
+    
     result = []
-    total = len(full_texts)
+    total = len(valid_texts)
 
-    for i, text in enumerate(full_texts):
+    for i, text in enumerate(valid_texts):
         prev_ctx = ''
         next_ctx = ''
 
         if i > 0:
-            prev_ctx = full_texts[i - 1][-CONTEXT_CHARS:]
+            prev_ctx = get_safe_context(valid_texts[i - 1], is_prev=True, chars=CONTEXT_CHARS)
         if i < total - 1:
-            next_ctx = full_texts[i + 1][:CONTEXT_CHARS]
+            next_ctx = get_safe_context(valid_texts[i + 1], is_prev=False, chars=CONTEXT_CHARS)
 
         # Determine chapter from first heading in text
         chapter = ''
@@ -407,9 +439,9 @@ def chunk_by_paragraph(text: str, max_chars: int, min_chars: int, lang: str) -> 
         prev_ctx = ''
         next_ctx = ''
         if i > 0:
-            prev_ctx = full_texts[i - 1][-CONTEXT_CHARS:]
+            prev_ctx = get_safe_context(full_texts[i - 1], is_prev=True, chars=CONTEXT_CHARS)
         if i < total - 1:
-            next_ctx = full_texts[i + 1][:CONTEXT_CHARS]
+            next_ctx = get_safe_context(full_texts[i + 1], is_prev=False, chars=CONTEXT_CHARS)
 
         chapter = ''
         for line in text.splitlines():
@@ -458,11 +490,9 @@ def chunk_by_line(text: str, max_chars: int, min_chars: int, lang: str) -> list[
         prev_ctx = ''
         next_ctx = ''
         if i > 0:
-            full_prev = full_texts[i - 1]
-            prev_ctx = full_prev[-CONTEXT_CHARS:] if len(full_prev) > CONTEXT_CHARS else full_prev
+            prev_ctx = get_safe_context(full_texts[i - 1], is_prev=True, chars=CONTEXT_CHARS)
         if i < total - 1:
-            full_next = full_texts[i + 1]
-            next_ctx = full_next[:CONTEXT_CHARS] if len(full_next) > CONTEXT_CHARS else full_next
+            next_ctx = get_safe_context(full_texts[i + 1], is_prev=False, chars=CONTEXT_CHARS)
 
         chapter = ''
 

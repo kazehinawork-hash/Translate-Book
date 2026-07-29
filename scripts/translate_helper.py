@@ -114,6 +114,7 @@ Chúng tôi đi dạo trong công viên。
 5. Do NOT translate content inside code blocks, URLs, or placeholder tags
 6. Maintain the original tone and style
 7. Output ONLY the trilingual blocks \u2014 no extra text before or after
+8. Preserve markdown tables and LaTeX formulas EXACTLY as they are.
 
 ## GLOSSARY
 {glossary_text if glossary_text else '(No glossary provided)'}
@@ -139,6 +140,8 @@ You are a professional translator. Your task is to translate the chunk below fro
 5. Do NOT translate content inside code blocks, URLs, or placeholder tags
 6. Maintain the original tone and style
 7. Output ONLY the translated text
+8. CRITICAL: Maintain a strictly 1:1 paragraph ratio! Do NOT merge multiple short paragraphs into one, and do NOT split one paragraph into many.
+9. Preserve markdown tables and LaTeX formulas EXACTLY as they are.
 
 ## GLOSSARY
 {glossary_text if glossary_text else '(No glossary provided)'}
@@ -228,7 +231,8 @@ def find_next_chunk(chunks_dir: Path, progress_dir: Path, from_id: int = 0, tran
         translated = get_translated_ids(progress_dir)
     if not chunks_dir.exists():
         return None
-    all_chunks = sorted(chunks_dir.glob('*.json'))
+    import re
+    all_chunks = sorted(chunks_dir.glob('*.json'), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     for f in all_chunks:
         data = doc_json(f)
         if data is None:
@@ -429,7 +433,8 @@ def mode_status(args):
         print(f"Ti\u1ebfn tr\u00ecnh: 0/0 (0%)")
         return
 
-    json_files = sorted(progress_dir.glob('*.json'))
+    import re
+    json_files = sorted(progress_dir.glob('*.json'), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     if not json_files:
         print(f"Kh\u00f4ng c\u00f3 chunk n\u00e0o trong {progress_dir}")
         return
@@ -470,7 +475,8 @@ def mode_next(args):
         print("[L\u1ed6I] C\u1ea7n --chunks-dir \u0111\u1ec3 x\u00e1c \u0111\u1ecbnh t\u1ed5ng s\u1ed1 chunk", file=sys.stderr)
         sys.exit(1)
 
-    all_chunks = sorted(chunks_dir.glob('*.json'))
+    import re
+    all_chunks = sorted(chunks_dir.glob('*.json'), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     for f in all_chunks:
         data = doc_json(f)
         if data is None:
@@ -499,7 +505,8 @@ def mode_interactive(args):
     glossary_text = doc_glossary(args.glossary) if args.glossary else ''
 
     # Get total chunks
-    all_chunk_files = sorted(chunks_dir.glob('*.json'))
+    import re
+    all_chunk_files = sorted(chunks_dir.glob('*.json'), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
     if not all_chunk_files:
         print(f"[L\u1ed6I] Kh\u00f4ng c\u00f3 chunk JSON n\u00e0o trong {chunks_dir}", file=sys.stderr)
         sys.exit(1)
