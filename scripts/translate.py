@@ -298,10 +298,41 @@ def buoc_1_tao_du_an_moi():
         in_thuong(f"   Xem mẫu chat trong: docs/chat-templates.md (sắp có)")
 
 
+def sync_progress_to_output(slug):
+    """Đồng bộ bản dịch từ working/progress/<slug> sang output/<slug>/chunk-*.md.
+
+    Giúp CLI nhận diện chunk đã dịch và để QA/commit (menu cũ) hoạt động
+    với pipeline trilingual (nguồn chính là progress JSON).
+    """
+    import json, re
+    progress_dir = PROJECT_ROOT / "working" / "progress" / slug
+    output_dir = PROJECT_ROOT / "output" / slug
+    if not progress_dir.exists():
+        return 0
+    output_dir.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for pf in sorted(progress_dir.glob("chunk_*.json")):
+        try:
+            data = json.loads(pf.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        cid = data.get('chunk_id')
+        text = (data.get('translated_text') or '').strip()
+        if cid is None or not text:
+            continue
+        out = output_dir / f"chunk-{int(cid):03d}.md"
+        out.write_text(text + '\n', encoding='utf-8')
+        n += 1
+    if n:
+        in_thanh_cong(f"Đã đồng bộ {n} chunk vào output\\{slug}\\")
+    return n
+
+
 def buoc_2_tiep_tuc_du_an():
     """Tiếp tục dự án đang dịch."""
     in_noi_bat("📖 BƯỚC 2: TIẾP TỤC DỰ ÁN ĐANG DỊCH")
 
+    import json
     chunks_root = PROJECT_ROOT / "working" / "chunks"
     if not chunks_root.exists():
         in_loi(f"Chưa có dự án nào trong {chunks_root}")
@@ -315,35 +346,78 @@ def buoc_2_tiep_tuc_du_an():
 
     in_thuong("Dự án đang có:")
     for i, p in enumerate(projects, 1):
-        # Đếm chunks
-        n_chunks = len(list((chunks_root / p).glob("chunk-*.md")))
-        n_done = len(list((PROJECT_ROOT / "output" / p).glob("chunk-*.md")))
+        # Đếm chunks (ưu tiên progress JSON — pipeline trilingual)
+        pd = PROJECT_ROOT / "working" / "progress" / p
+        pfiles = sorted(pd.glob("chunk_*.json")) if pd.exists() else []
+        if pfiles:
+            n_chunks = len(pfiles)
+            n_done = 0
+            for pf in pfiles:
+                try:
+                    d = json.loads(pf.read_text(encoding='utf-8'))
+                    if (d.get('translated_text') or '').strip():
+                        n_done += 1
+                except Exception:
+                    pass
+        else:
+            n_chunks = len(list((chunks_root / p).glob("chunk-*.md")))
+            n_done = len(list((PROJECT_ROOT / "output" / p).glob("chunk-*.md")))
         in_thuong(f"  {i}. {p}  (đã dịch {n_done}/{n_chunks} chunks)")
 
     chon = hoi_so(f"\nChọn dự án (1-{len(projects)})", mac_dinh=1, lua_chon=list(range(1, len(projects) + 1)))
     slug = projects[chon - 1]
     in_thuong(f"\n→ Đã chọn: {slug}")
 
-    import re
-    chunks = sorted((chunks_root / slug).glob("chunk-*.md"), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
+    import re, json
+
+    def _load_progress(p):
+        try:
+            return json.loads(Path(p).read_text(encoding='utf-8'))
+        except Exception:
+            return None
+
+    def _sort(files):
+        return sorted(files, key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
+
+    chunks_md = _sort(list((chunks_root / slug).glob("chunk-*.md")))
+    chunks_json = _sort(list((chunks_root / slug).glob("chunk-*.json")))
+    progress_dir = PROJECT_ROOT / "working" / "progress" / slug
+    progress_files = _sort(list(progress_dir.glob("chunk_*.json"))) if progress_dir.exists() else []
     output_dir = PROJECT_ROOT / "output" / slug
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Tìm chunk tiếp theo cần dịch
-    chunk_tiep_theo = None
-    for c in chunks:
-        out = output_dir / c.name
-        if not out.exists():
-            chunk_tiep_theo = c
-            break
+    # Tìm chunk tiếp theo cần dịch (ưu tiên progress JSON — pipeline trilingual)
+    chunk_id = None
+    file_nguon = None
+    if progress_files:
+        for pf in progress_files:
+            d = _load_progress(pf)
+            if d and not (d.get('translated_text') or '').strip():
+                chunk_id = int(d.get('chunk_id', -1))
+                file_nguon = pf
+                break
+    if chunk_id is None and chunks_md:
+        for c in chunks_md:
+            if not (output_dir / c.name).exists():
+                m = re.search(r'\d+', c.name)
+                chunk_id = int(m.group()) if m else None
+                file_nguon = c
+                break
 
-    if not chunk_tiep_theo:
-        in_thanh_cong(f"Đã dịch xong tất cả {len(chunks)} chunks!")
+    # Nếu hết chunk: ghép file hoàn chỉnh
+    if chunk_id is None:
+        in_thanh_cong("Đã dịch xong tất cả chunks!")
         in_thuong(f"\n💡 Bước tiếp: ghép file hoàn chỉnh")
-        if hoi_yes_no(f"Ghép các chunk thành {slug}-vi.md?"):
+        if progress_files and hoi_yes_no("Ghép thành file tam ngữ hoàn chỉnh (merge_chunks)?"):
+            chay_script('merge_chunks.py', [
+                '--progress-dir', str(progress_dir),
+                '--book-name', slug,
+                '--format', 'trilingual',
+                '--force',
+            ])
+        elif chunks_md and hoi_yes_no(f"Ghép các chunk thành {slug}-vi.md?"):
             full = output_dir / f"{slug}-vi.md"
-            import re
-            translations = sorted(output_dir.glob("chunk-*.md"), key=lambda x: int(re.search(r'\d+', x.name).group() if re.search(r'\d+', x.name) else 0))
+            translations = _sort(list(output_dir.glob("chunk-*.md")))
             with open(full, 'w', encoding='utf-8') as fout:
                 for t in translations:
                     fout.write(t.read_text(encoding='utf-8'))
@@ -351,30 +425,62 @@ def buoc_2_tiep_tuc_du_an():
             in_thanh_cong(f"Đã ghép: {full}")
         return
 
-    n_da_xong = chunks.index(chunk_tiep_theo)
-    in_noi_bat(f"\n📝 Chunk tiếp theo: {chunk_tiep_theo.name}")
-    in_thuong(f"  Đã xong: {n_da_xong}/{len(chunks)}")
-    in_thuong(f"\n  File gốc: {chunk_tiep_theo}")
-    in_thuong(f"  Lưu bản dịch vào: {output_dir / chunk_tiep_theo.name}\n")
+    total = len(progress_files) if progress_files else len(chunks_md)
+    if progress_files:
+        n_da_xong = sum(1 for pf in progress_files if (_load_progress(pf) or {}).get('translated_text', '').strip())
+    else:
+        n_da_xong = sum(1 for c in chunks_md if (output_dir / c.name).exists())
 
-    in_thuong("Bạn cần làm:")
-    in_thuong(f"  1. Mở file gốc: {chunk_tiep_theo.name}")
-    in_thuong("  2. Copy nội dung → paste vào chat AI để dịch")
-    in_thuong("  3. Lưu bản dịch vào output\\{slug}\\{chunk_tiep_theo.name}")
-    in_thuong("  4. Quay lại menu này, chọn 'Chạy QA' hoặc 'Git commit'")
-    in_thuong("  5. Chọn lại menu 'Tiếp tục' để làm chunk tiếp theo\n")
+    in_noi_bat(f"\n📝 Chunk tiếp theo: {chunk_id:03d}")
+    in_thuong(f"  Đã xong: {n_da_xong}/{total}")
+    if file_nguon:
+        in_thuong(f"  File gốc: {file_nguon}")
 
-    if hoi_yes_no("Mở file chunk gốc bằng editor?"):
-        mo_file_bang_app(chunk_tiep_theo)
+    in_thuong("\nCách dịch chunk này:")
+    in_thuong("  1. AI chat — agent (opencode) tự động dịch")
+    in_thuong("  2. Local AI — LM Studio tự động dịch chunk này")
+    in_thuong("  3. Local AI — tự động dịch TẤT CẢ chunk còn lại")
+    cach = hoi_so("Chọn cách dịch", mac_dinh=1, lua_chon=[1, 2, 3])
 
-    if hoi_yes_no("Mở thư mục output để paste bản dịch?"):
-        mo_file_bang_app(output_dir)
+    if not progress_files and chunks_json:
+        in_noi_bat("\nTạo skeleton progress (tách câu + pinyin)...")
+        if chay_script('init_trilingual_skeleton.py', [
+            '--chunks-dir', str(chunks_root / slug),
+            '--progress-dir', str(progress_dir),
+        ]):
+            progress_files = _sort(list(progress_dir.glob("chunk_*.json"))) if progress_dir.exists() else []
 
+    if cach == 1:
+        # === AI CHAT (agent opencode tự động dịch) ===
+        in_thanh_cong("\nAI chat sẽ tự động dịch — bạn không cần copy/paste.")
+        in_thuong("Hãy nói với opencode (AI): \"dịch tiếp sách " + slug + "\"")
+        in_thuong("AI sẽ tự đọc working/progress/" + slug + "/, dịch dòng-đối-dòng từng")
+        in_thuong("chunk chưa xong và lưu lại (giống các cuốn đã dịch trước đây).\n")
+        if hoi_yes_no("Bản dịch đã xong (AI đã lưu vào progress JSON)?"):
+            sync_progress_to_output(slug)
+            in_thanh_cong("Đã đồng bộ bản dịch sang output!")
+        else:
+            in_thuong("OK — quay lại menu này sau khi AI dịch xong.\n")
+    elif cach >= 2:
+        # === LOCAL AI ===
+        if progress_files:
+            args = ['--slug', slug]
+            if cach == 2:
+                args += ['--chunk', str(chunk_id)]
+            if chay_script('local_translate.py', args):
+                in_thanh_cong("Dịch bằng Local AI hoàn tất!")
+                sync_progress_to_output(slug)
+            else:
+                in_loi("Local AI dịch thất bại. Kiểm tra LM Studio đã mở và bật Start Server chưa.")
+        else:
+            in_loi("Không có chunk JSON để tạo skeleton progress — không dùng được Local AI.")
+            in_thuong("💡 Kiểm tra working/chunks/" + slug + "/ có chunk JSON không.")
+
+    # QA + commit (có hiệu lực sau khi đã dịch bằng 1 trong 2 cách)
     if hoi_yes_no("Chạy QA ngay (cần có bản dịch trước)?"):
         buoc_3_chay_qa(slug)
-
-    if hoi_yes_no("Git commit chunk này?"):
-        buoc_4_git_commit(slug, chunk_tiep_theo.name)
+    if hoi_yes_no("Git commit bản dịch mới?"):
+        buoc_4_git_commit(slug, None)
 
 
 def buoc_3_chay_qa(slug=None):

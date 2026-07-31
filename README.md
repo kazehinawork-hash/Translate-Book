@@ -52,7 +52,7 @@ python scripts/translate_helper.py --interactive \
 
 ```bash
 # Pipeline đầy đủ (tự động extract → chunk → glossary prompt)
-python scripts/run_pipeline.py --book "MyBook" --input "input/mybook.pdf" --source-lang English
+python scripts/run_pipeline.py --book "MyBook" --input "input/mybook.pdf" --lang en
 
 # Agent dịch từng chunk:
 python scripts/translate_helper.py --interactive --chunks-dir "working/chunks/mybook" --progress-dir "working/progress/mybook" --glossary "glossary/mybook.csv"
@@ -70,8 +70,8 @@ python scripts/run_pipeline.py --book "MyBook" --from-step 5
 python scripts/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang auto
 
 # Kết quả:
-#   - Sách ZH → output/ten-sach/ten-sach-vi.md (tam ngữ: gốc/pinyin/dịch)
-#              → output/ten-sach/ten-sach-vi.epub (tự động, nếu có pandoc)
+#   - Sách ZH → output/ten-sach_trilingual.md (tam ngữ: gốc/pinyin/dịch)
+#              → output/ten-sach_trilingual.epub (tự động, nếu có pandoc)
 #   - Sách EN → output/ten-sach/ten-sach-vi.md (song ngữ EN+VI căn chỉnh đoạn)
 #              → output/ten-sach/ten-sach-vi.epub (tự động, nếu có pandoc)
 ```
@@ -79,37 +79,28 @@ python scripts/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang
 **Workflow tổng quan:**
 
 ```
-Bước 1: Extract   → scripts/extract_pdf.py (hoặc extract_epub.py, extract_srt.py)
+Bước 1: Extract   → scripts/mineru_extract.py (PDF/DOCX/ảnh) hoặc scripts/epub_extract.py (EPUB)
 Bước 2: Chunk     → scripts/chunk_text.py (smart chunking, JSON output)
 Bước 3: Gen Glossary → scripts/generate_glossary.py (tạo prompt → Agent tạo CSV)
-Bước 4: Translate → Agent đọc từng chunk + glossary → working/progress/
+Bước 4: Translate → Agent đọc từng chunk + glossary → working/progress/ (hoặc scripts/local_translate.py cho Local AI)
 Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
-Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md)
-Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub)
+Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md; sách ZH: output/{book}_trilingual.md)
+Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub; sách ZH: output/{book}_trilingual.epub)
 ```
 
 Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
 
 ---
 
-## ✅ Thành tựu — 4 cuốn sách đã dịch hoàn thành
+## ✅ Thành tựu — 3 cuốn sách đã dịch hoàn thành
 
 | STT | Slug | Tên sách (tạm dịch) | Ngôn ngữ gốc | Định dạng |
 |-----|------|---------------------|:------------:|:---------:|
-| 1 | `the-alchemist` | *The Alchemist* (Nhà giả kim) — Paulo Coelho | EN | PDF |
-| 2 | `nu-zi` | *Nữ tử* (女子) | ZH | EPUB |
-| 3 | `wei-yang` | *Vi dương* (微阳) | ZH | EPUB |
-| 4 | `you-feng-gu` | *Hữu phụng cốc* (有凤谷) | ZH | EPUB |
+| 1 | `zuo-yi-ge-gang-gang-hao-de-nu-zi` | *Trở thành người phụ nữ vừa vặn* (做一个刚刚好的女子) — Khang Tĩnh Văn | ZH | EPUB |
+| 2 | `zuo-yi-ge-gang-gang-hao-de-nu-zi-3` | *Trở thành người phụ nữ vừa vặn — Tập 3* (做一个刚刚好的女子·第三卷) — Vi Dương | ZH | EPUB |
+| 3 | `zuo-yi-ge-you-feng-gu-de-nu-zi` | *Trở thành người phụ nữ có phong thái* (做一个有风骨的女子) — Vi Dương | ZH | EPUB |
 
 Mỗi cuốn đều có bản dịch Markdown + EPUB hoàn chỉnh trong [`output/`](./output/), kèm glossary riêng và báo cáo QA.
-
----
-
-## 📚 Tài liệu
-
-- **[USAGE.md](./USAGE.md)** — Hướng dẫn sử dụng thực hành (copy-paste commands, 4 workflow: PDF EN, EPUB ZH, SRT, scan)
-- **[docs/archive/PLAN.md](./docs/archive/PLAN.md)** — Kế hoạch tổng thể, pipeline, công cụ, lộ trình (lưu trữ)
-- **[docs/archive/PROCESS.md](./docs/archive/PROCESS.md)** — Quy trình chi tiết từng bước, mẫu chat, xử lý sự cố (lưu trữ)
 
 ---
 
