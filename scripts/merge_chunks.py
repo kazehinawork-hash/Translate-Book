@@ -91,10 +91,15 @@ def merge_texts(
                     if o.startswith('#') or v.startswith('#'):
                         # Output heading natively for Pandoc TOC
                         raw_o = re.sub(r'^(#{1,6})\s+', '', o).strip()
-                        block_parts.append(f"{v}\n\n**{raw_o}**\n\n*{p}*")
+                        raw_p = re.sub(r'^(#{1,6})\s*', '', p).strip()
+                        block_parts.append(f"{v}\n\n**{raw_o}**\n\n*{raw_p}*")
                     elif o.startswith('![') or v.startswith('!['):
-                        # Images should not be wrapped
-                        block_parts.append(f"{o}\n\n{v}")
+                        # Images should not be wrapped; avoid duplicating when
+                        # the translation kept the same image line
+                        if o == v:
+                            block_parts.append(o)
+                        else:
+                            block_parts.append(f"{o}\n\n{v}")
                     else:
                         block_parts.append(
                             f'<div class="tri-block">\n'

@@ -1,62 +1,106 @@
-chinese,english,notes
-做一个有风骨的女子,Be a Woman with Integrity,Book title
-风骨,integrity; strength of character; backbone,Core concept throughout the book
-微阳,Wei Yang,Author
-西蒙娜·波伏娃,Simone de Beauvoir,French existentialist philosopher
-索菲亚·罗兰,Sophia Loren,Italian actress quoted in foreword
-松下幸之助,Konosuke Matsushita,Founder of Panasonic; example of charismatic leader
-拿破仑·希尔,Napoleon Hill,American self-help author quoted in the book
-布鲁金斯学会,Brookings Institution,US think tank mentioned in confidence chapter
-乔治·赫伯特,George Herbert,Salesman who sold an axe to President Bush
-小布什,George W. Bush,US President mentioned in sales story
-克林顿,Bill Clinton,US President mentioned in sales story
-肖邦,Chopin,Polish composer in story about Liszt
-李斯特,Liszt,Hungarian pianist who helped Chopin
-伊壁鸠鲁,Epicurus,Ancient Greek philosopher quoted
-梁思成,Liang Sicheng,Chinese architect; husband of Lin Huiyin
-林徽因,Lin Huiyin,Chinese architect and writer; example of wisdom
-莫尼卡·狄更斯,Monica Dickens,British writer; example of overcoming insecurity
-玛莉·马特琳,Marlee Matlin,Deaf American actress; Oscar winner
-沈万三,Shen Wansan,Fictional wealthy merchant in Ming Dynasty story
-朱元璋,Zhu Yuanzhang,Hongwu Emperor; Ming Dynasty founder
-张士诚,Zhang Shicheng,Warlord rival of Zhu Yuanzhang
-陈友谅,Chen Youliang,Warlord rival of Zhu Yuanzhang
-方国珍,Fang Guozhen,Warlord rival of Zhu Yuanzhang
-伏尔泰,Voltaire,French philosopher quoted on happiness
-松下电器,Panasonic / Matsushita Electric,Company founded by Konosuke Matsushita
-吉林文史出版社,Jilin Literature and History Press,Publisher of the book
-不迎合,don't pander / don't flatter,Core attitude of the book
-不将就,don't settle / don't compromise,Core attitude of the book
-不媚俗,don't be kitsch / don't pander to vulgarity,Core attitude of the book
-气场,presence / aura / charisma,Key concept; personal magnetism
-魅力,charm / charisma,Key concept discussed throughout
-个人魅力,personal charisma / personal magnetism,Chapter 1 concept
-个人品牌,personal brand,Chapter 1 concept
-自信,self-confidence,Key concept across multiple chapters
-底气,inner confidence / assurance,Key concept; confidence from within
-身价,one's worth / personal value,Concept in chapter on self-promotion
-绩优股,blue-chip stock,Metaphor for personal worth
-城府,calculation / subtle scheming,Concept in interpersonal relations chapter
-贤淑,virtuous and gentle / traditional feminine virtue,Discussed in chapter 7
-狠女孩,tough girl / strong-willed woman,Chapter 7 concept; women who are decisive
-公主病,princess syndrome,Negative trait discussed in chapter 7
-沙漏哲学,hourglass philosophy,Coping strategy for stress
-修养,self-cultivation,Central concept for self-improvement
-气质,temperament / aura,Key concept throughout
-心态,mindset,One of the book's focus areas
-职场,workplace,One of the book's topic areas
-交际,social interaction / networking,One of the book's topic areas
-谈吐,speech / conversation style,Key aspect of personal development
-外表,appearance,Discussed in beauty/fashion chapters
-内在,inner self,Discussed as more important than appearance
-优雅,elegance,Concept in fashion chapters
-品位,taste,Concept in fashion chapters
-时尚,fashion,Chapter 5 topic
-命运,fate / destiny,Concept in chapter 3
-情商,emotional quotient (EQ),Implicit concept throughout
-吸引力,attractiveness / appeal,Concept in chapter 1
-坚强,strong / resilient,Chapter 3 concept
-挫折,setbacks / adversity,Chapter 3 topic
-拼搏,to struggle / to strive,Chapter 6 concept
-幸福,happiness,Overarching goal discussed in the book
-蝴蝶效应,butterfly effect,Metaphor used in foreword
+source,target,notes
+做一個有風骨的女子,Trở thành người phụ nữ có phong thái,Book title
+微阳,Vi Dương,Author name
+风骨,Phong thái,Core concept - backbone/integrity
+女人,Phụ nữ,Women
+气质,Khí chất,Disposition/temperament
+修养,Dưỡng chất,Self-cultivation
+魅力,Sức hút,Charm
+幸福,Hạnh phúc,Happiness
+成熟,Trưởng thành,Maturity
+淡定,Bình tĩnh,Composure
+从容,Từ từ,Leisurely
+智慧,Trí tuệ,Wisdom
+自信,Tự tin,Confidence
+独立,Độc lập,Independence
+尊严,Lương khí,Dignity
+优雅,Thanh nhã,Elegance
+温柔,Dịu dàng,Gentleness
+坚强,Mạnh mẽ,Strength
+勇敢,Dũng cảm,Courage
+真诚,Chân thành,Sincerity
+善良,Tốt bụng,Kindness
+宽容,Khoan dung,Tolerance
+感恩,Biết ơn,Gratitude
+乐观,Lạc quan,Optimism
+坚韧,Kiên cường,Perseverance
+淡泊,Nhạt nhẽo,Indifference to fame
+从容不迫,Không vội vã,Calm and unhurried
+不迎合,Không xu nịnh,Not catering to others
+不将就,Không thỏa hiệp,Not settling
+不媚俗,Không mê tục,Not being vulgar
+内心强大,Tâm hồn mạnh mẽ,Strong inner self
+面带微笑,Mỉm cười,Smiling
+法国,Pháp,France
+西蒙娜·波伏娃,Simone de Beauvoir,French existentialist writer
+索菲亚·罗兰,Sophia Loren,Italian actress
+蝴蝶效应,Hiệu ứng bướm,Butterfly effect
+岁月,Thời gian,Time/years
+修养,Dưỡng chất,Self-cultivation
+魅力,Sức hút,Charm
+风骨,Phong thái,Backbone/integrity
+女人,Phụ nữ,Women
+气质,Khí chất,Disposition
+幸福,Hạnh phúc,Happiness
+成熟,Trưởng thành,Maturity
+淡定,Bình tĩnh,Composure
+从容,Từ từ,Leisurely
+智慧,Trí tuệ,Wisdom
+自信,Tự tin,Confidence
+独立,Độc lập,Independence
+尊严,Lương khí,Dignity
+优雅,Thanh nhã,Elegance
+温柔,Dịu dàng,Gentleness
+坚强,Mạnh mẽ,Strength
+勇敢,Dũng cảm,Courage
+真诚,Chân thành,Sincerity
+善良,Tốt bụng,Kindness
+宽容,Khoan dung,Tolerance
+感恩,Biết ơn,Gratitude
+乐观,Lạc quan,Optimism
+坚韧,Kiên cường,Perseverance
+淡泊,Nhạt nhẽo,Indifference to fame
+从容不迫,Không vội vã,Calm and unhurried
+不迎合,Không xu nịnh,Not catering
+不将就,Không thỏa hiệp,Not settling
+不媚俗,Không mê tục,Not vulgar
+内心强大,Tâm hồn mạnh mẽ,Strong inner self
+面带微笑,Mỉm cười,Smiling
+法国,Pháp,France
+西蒙娜·波伏娃,Simone de Beauvoir,French writer
+索菲亚·罗兰,Sophia Loren,Italian actress
+蝴蝶效应,Hiệu ứng bướm,Butterfly effect
+岁月,Thời gian,Time/years
+女人,Phụ nữ,Women
+风骨,Phong thái,Backbone/integrity
+气质,Khí chất,Disposition
+幸福,Hạnh phúc,Happiness
+修养,Dưỡng chất,Self-cultivation
+魅力,Sức hút,Charm
+智慧,Trí tuệ,Wisdom
+自信,Tự tin,Confidence
+独立,Độc lập,Independence
+优雅,Thanh nhã,Elegance
+坚强,Mạnh mẽ,Strength
+勇敢,Dũng cảm,Courage
+真诚,Chân thành,Sincerity
+善良,Tốt bụng,Kindness
+宽容,Khoan dung,Tolerance
+感恩,Biết ơn,Gratitude
+乐观,Lạc quan,Optimism
+坚韧,Kiên cường,Perseverance
+淡定,Bình tĩnh,Composure
+从容,Từ từ,Leisurely
+成熟,Trưởng thành,Maturity
+尊严,Lương khí,Dignity
+温柔,Dịu dàng,Gentleness
+不迎合,Không xu nịnh,Not catering
+不将就,Không thỏa hiệp,Not settling
+不媚俗,Không mê tục,Not vulgar
+内心强大,Tâm hồn mạnh mẽ,Strong inner self
+面带微笑,Mỉm cười,Smiling
+法国,Pháp,France
+西蒙娜·波伏娃,Simone de Beauvoir,French writer
+索菲亚·罗兰,Sophia Loren,Italian actress
+蝴蝶效应,Hiệu ứng bướm,Butterfly effect
+岁月,Thời gian,Time/years
