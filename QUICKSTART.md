@@ -39,82 +39,66 @@ pip install -U mineru
 mineru-models-download
 ```
 
-> Tải model mất 5-10 phút. Bỏ qua nếu chỉ dịch EPUB/TXT.
+> Tải model mất 5-10 phút. Bỏ qua nếu chỉ dịch EPUB.
 
 ---
 
 ## Bước 2: Bắt đầu dịch sách
 
-### Cách 1: Dùng giao diện menu (KHUYẾN NGHỊ)
+### Cách 1: Double-click `scripts\translate.bat` (KHUYẾN NGHỊ)
 
 1. **Double-click** file `scripts\translate.bat`
-2. Chọn **`1`** → Dịch sách mới
+2. Menu hiện ra, chọn **`1`** → Dịch sách MỚI
 3. Chọn file trong danh sách (file phải có sẵn trong `input\`)
 4. Đặt tên slug (hoặc Enter để dùng tên mặc định)
-5. Chọn ngôn ngữ
-6. Đợi tool trích xuất + chia chunk (~1-3 phút)
+5. Chọn ngôn ngữ: `1` Tiếng Anh, `2` Tiếng Trung, `3` Tự phát hiện
+6. Đợi tool tự trích xuất + phát hiện ngôn ngữ + chia chunk (1-3 phút)
 
-→ Tool sẽ tự mở chunk đầu tiên bằng Notepad/VS Code.
+→ Dự án đã sẵn sàng, bạn thấy tổng số chunk.
 
-### Cách 2: Copy file vào input\ thủ công
+### Cách 2: Mở opencode và gõ lệnh `dich` (tự động hoàn toàn)
 
-Nếu tool không tìm thấy file, copy thủ công:
+Trong opencode (chat), gõ:
 
-1. Mở thư mục `<PROJECT_ROOT>\input\`
-2. Copy file sách (.pdf, .epub, .srt, .docx) vào đó
-3. Quay lại tool, chọn lại **`1`**
+```
+/dich
+```
+
+Rồi chọn file PDF/EPUB trong `input\`. Tool sẽ tự chạy **toàn bộ** pipeline:
+trích xuất → QC → phát hiện ngôn ngữ → chia chunk → glossary → **dịch** → QA → merge → EPUB.
+Bạn chỉ cần chờ kết quả trong `output\<slug>\`.
 
 ---
 
 ## Bước 3: Dịch từng phần
 
-Với mỗi chunk (phần văn bản), bạn làm theo 4 bước:
+Nếu dùng `dich`, bạn không cần làm bước này — bản dịch tự hoàn thành.
 
-### 3.1. Mở chat AI
-- Mở chat với tôi (hoặc ChatGPT, Claude, Gemini, Qwen...)
+Nếu dùng `translate.bat`, sau khi dự án sẵn sàng:
 
-### 3.2. Copy chunk
-- Mở file `working\chunks\<tên-sách>\chunk-XXX.md` bằng editor
-- **Ctrl+A** (chọn tất cả) → **Ctrl+C** (copy)
+1. Quay lại menu, chọn **`2`** → Tiếp tục sách ĐANG dịch
+2. Chọn dự án → tool chỉ ra chunk tiếp theo
+3. Chọn cách dịch:
+   - **`1`** — **AI chat (opencode)**: tool tạo sẵn prompt, bạn paste bản dịch trả về
+   - **`2`** — **Local AI (LM Studio)**: dịch chunk này bằng model cục bộ (cần LM Studio mở Local Server)
+   - **`3`** — **Local AI**: dịch tự động TẤT CẢ chunk còn lại
 
-### 3.3. Paste vào chat theo mẫu
+→ Bản dịch được lưu vào `working\progress\<slug>\` (dạng JSON, có tiến độ).
 
-```
-Tôi muốn dịch tiếp cuốn "<Tên sách>" (EN/ZH → VI).
+Sau khi dịch xong:
+- Chọn **`3`** → Chạy QA tự động (kiểm tra Hán sót, thuật ngữ)
+- Chọn **`4`** → Git commit (lưu phiên bản)
 
-== GLOSSARY CUỐN SÁCH ==
-[Open file glossary\<tên-sách>.md → Ctrl+A → Ctrl+C → Paste vào đây]
-
-== YÊU CẦU ==
-- Dịch sát nghĩa, tự nhiên
-- Giữ tên riêng
-- [Các yêu cầu riêng của bạn]
-
-== TEXT GỐC (chunk XXX) ==
-[Paste nội dung chunk vừa copy]
-```
-
-→ AI sẽ trả lời bằng bản dịch tiếng Việt.
-
-### 3.4. Lưu bản dịch
-- **Ctrl+A** (chọn hết bản dịch AI vừa trả) → **Ctrl+C**
-- Mở file `output\<tên-sách>\chunk-XXX.md` bằng editor
-- **Ctrl+V** (paste) → **Ctrl+S** (lưu)
-
-### 3.5. Quay lại tool
-- Quay lại cửa sổ tool, chọn:
-  - **`3`** → Chạy QA tự động (kiểm tra lỗi)
-  - **`4`** → Git commit (lưu phiên bản)
-  - **`2`** → Tiếp tục chunk tiếp theo
+> Ghép thành file hoàn chỉnh + tạo EPUB: mở opencode gõ `/dich` lần nữa (tool tự ghép tiếp
+> phần đã dịch) hoặc chạy `python scripts\run_pipeline.py --book "<Ten>" --input input\<file> --lang auto`.
 
 ---
 
 ## 💡 Mẹo
 
-- **Mỗi chunk ~5-10 phút dịch** (bao gồm cả copy/paste)
+- **Glossary = file CSV** (`glossary\<slug>.csv`): danh sách thuật ngữ + tên nhân vật với bản dịch cố định, giúp AI dịch nhất quán
+- **Sách tiếng Trung** được dịch theo định dạng **tam ngữ**: dòng Hán tự + dòng Pinyin (phụ chú) + dòng dịch tiếng Việt
 - **Commit sau MỖI chunk** để không mất dữ liệu
-- **Đọc lại glossary** ở đầu phiên chat - giúp AI dùng đúng thuật ngữ
-- **File song ngữ**: sau khi dịch xong, chạy `python scripts\make_bilingual.py` để tạo file gốc + dịch xen kẽ (dùng cho review)
 - **Gặp lỗi?** Mở chat với tôi, copy lỗi và dán vào - tôi sẽ hướng dẫn tiếp
 
 ---
@@ -122,19 +106,19 @@ Tôi muốn dịch tiếp cuốn "<Tên sách>" (EN/ZH → VI).
 ## ❓ FAQ
 
 **Hỏi: Tôi không tìm thấy file PDF khi chọn số 1?**
-Đáp: Copy file vào thư mục `input\` trước (xem Bước 2 - Cách 2).
+Đáp: Copy file vào thư mục `input\` trước (xem Bước 2 - Cách 1).
 
 **Hỏi: Chunk là gì?**
-Đáp: Mỗi chunk là 1 đoạn văn bản (~500-1500 từ) để dịch. Tool sẽ tự chia sách thành nhiều chunk.
+Đáp: Mỗi chunk là 1 đoạn văn bản (~1500-3000 chữ Hán hoặc 3000-8000 từ tiếng Anh) để dịch. Tool sẽ tự chia sách thành nhiều chunk.
 
 **Hỏi: Tôi dịch tiếng Trung, có cần Pinyin không?**
-Đáp: KHÔNG. Dịch thẳng Hán tự → Việt, không cần Pinyin.
+Đáp: Không. Bản dịch tam ngữ gồm 3 dòng: Hán tự gốc → Pinyin (phụ chú) → tiếng Việt. Bạn chỉ cần dịch thẳng Hán tự → Việt; Pinyin được sinh tự động.
 
 **Hỏi: Glossary là gì?**
-Đáp: Danh sách thuật ngữ + tên nhân vật + tên riêng, kèm bản dịch cố định. Giúp AI dịch nhất quán.
+Đáp: Danh sách thuật ngữ + tên nhân vật + tên riêng, kèm bản dịch cố định, lưu dạng CSV. Giúp AI dịch nhất quán.
 
 **Hỏi: Làm sao thêm thuật ngữ mới vào glossary?**
-Đáp: Chọn `5` trong menu chính → chọn glossary → sửa file. **Nhớ sửa CẢ file .md và .csv** (cùng tên).
+Đáp: Chọn `5` trong menu translate.bat → chọn glossary → sửa file CSV. Hoặc nhờ tôi (opencode) tạo/sửa giúp.
 
 ---
 
