@@ -36,18 +36,18 @@ Luồng tổng quát:
 4. In tóm tắt số thuật ngữ cho người dùng xem.
 
 ## F. Skeleton progress
-- ZH: `.venv\Scripts\python.exe scripts\init_trilingual_skeleton.py --chunks-dir working\chunks\<slug> --progress-dir working\progress\<slug>`
-- EN: bước này không bắt buộc nhưng nên tạo skeleton (script vẫn chạy được với EN, `mode=trilingual`; nếu script lỗi với EN thì bỏ qua và tiến hành dịch trực tiếp).
+- ZH: `.venv\Scripts\python.exe scripts\init_trilingual_skeleton.py --chunks-dir working\chunks\<slug> --progress-dir working\progress\<slug>` → tạo `working\progress\<slug>\chunk_<NNN>.json` (`mode=trilingual`, `original_text` 1 câu/dòng, `translated_text` rỗng).
+- EN: chạy script tương tự (vẫn tạo được skeleton). Nếu script LỖI với EN: tự tạo `working\progress\<slug>\chunk_<NNN>.json` tối giản cho từng chunk gốc với fields: `chunk_id`, `total_chunks`, `chapter`, `source_text` (bằng `text` của chunk gốc), `translated_text` (`''`), `word_count_source`, `word_count_translated` (`0`), `mode` (`'bilingual'`), `translated_at` (`''`). Ghi bằng `json.dumps(ensure_ascii=False, indent=2)` UTF-8.
 
 ## G. Dịch (bạn tự dịch — AI chat)
 Lặp qua từng file `working\progress\<slug>\chunk_<NNN>.json` có `translated_text` rỗng (theo thứ tự số):
-1. Đọc JSON: dịch `original_text` dòng-đối-dòng sang `translated_text` — số dòng kết quả PHẢI bằng số dòng gốc; giữ heading `#`/`##`, dòng ảnh `![...]`, dòng trống, dòng số/ISBN/URL; bỏ `///` OCR dư; dùng glossary.
+1. Đọc JSON: nguồn cần dịch là `original_text` (mode `trilingual`) hoặc `source_text` (mode `bilingual`). Dịch dòng-đối-dòng sang `translated_text` — số dòng kết quả PHẢI bằng số dòng gốc; giữ heading `#`/`##`, dòng ảnh `![...]`, dòng trống, dòng số/ISBN/URL; bỏ `///` OCR dư; dùng glossary.
 2. Cập nhật: `translated_text`, `translated_at` (giờ ISO hiện tại, VD `2026-07-31T00:00:00`), `word_count_translated`. Giữ nguyên field khác. Ghi bằng `json.dumps(data, ensure_ascii=False, indent=2)` UTF-8.
 3. Chunk ngắn tự dịch; chunk dài dùng **subagent** dịch rồi đọc lại kiểm tra. Kiểm tra số dòng sau mỗi chunk, nếu lệch thì dịch lại.
 4. In tiến độ mỗi 5 chunk: "Đã dịch x/n".
 
 ## H. QA
-- Nếu có `glossary\<slug>.csv` + progress đầy đủ: chạy QA từng chunk hoặc gọi `.venv\Scripts\python.exe scripts\run_pipeline.py --book <book> --slug <slug> --from-step 8` (bước 8 = QA). In báo cáo cho người dùng; sửa các lỗi rõ ràng (Hán sót, mojibake) nếu dễ.
+- Nếu có `glossary\<slug>.csv` + progress đầy đủ: `.venv\Scripts\python.exe scripts\run_pipeline.py --book <book> --slug <slug> --from-step 8 --to-step 8` — BẮT BUỘC thêm `--to-step 8` để CHỈ chạy bước 8 (QA), tránh tự merge/EPUB luôn. In báo cáo cho người dùng; sửa các lỗi rõ ràng (Hán sót, mojibake) nếu dễ.
 
 ## I. Merge
 - ZH: `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug> --format trilingual --force` → `output\<slug>_trilingual.md`; rồi `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug> --force` → `output\<slug>_translated.md`. Tạo `output\<slug>\` và di chuyển thành `output\<slug>\<slug>-tamngu.md` + `output\<slug>\<slug>-vi.md`.

@@ -137,16 +137,9 @@ Yêu cầu Agent (opencode) đọc file prompt đó và tạo `glossary\$slug.cs
 
 ### Bước 4: Dịch từng chunk
 
-**Cách A — Local AI (LM Studio)** — tự động dịch toàn bộ phần còn thiếu:
-
-```powershell
-# Cần LM Studio đang mở Local Server (mặc định http://localhost:1234/v1)
-python scripts\local_translate.py --slug $slug
-# Thêm --chunk 5 để dịch riêng 1 chunk, --retries 3 để thử lại khi lệch dòng
-```
-
-**Cách B — AI chat (opencode)** — mở opencode, gõ `/dich` (tự chạy nốt pipeline),
-hoặc yêu cầu Agent dịch dòng-đối-dòng từng chunk trong `working\chunks\$slug`.
+**Dịch bằng AI chat (opencode)** — mở opencode, gõ `/dich <slug>` (tự chạy nốt pipeline),
+hoặc nói `"dịch tiếp sách <slug>"` để Agent dịch dòng-đối-dòng từng chunk chưa xong
+trong `working\progress\$slug\` rồi tự lưu lại.
 
 Bản dịch được lưu vào `working\progress\$slug\chunk_*.json` (có `translated_at`).
 
@@ -170,7 +163,7 @@ python scripts\glossary_qa.py `
 ```
 
 Nếu có lỗi (exit code 1), xem báo cáo → sửa bản dịch trong progress JSON
-(chỉnh `translated_text`, hoặc dịch lại chunk đó bằng `local_translate.py --chunk N`).
+(chỉnh `translated_text`, hoặc nhờ AI dịch lại chunk đó bằng lệnh `/dich`).
 
 ### Bước 6: Merge + EPUB hoàn chỉnh
 
@@ -243,15 +236,7 @@ python scripts\init_trilingual_skeleton.py `
 
 ### Bước 5: Dịch từng chunk
 
-**Cách A — Local AI (LM Studio)** — tự động dịch toàn bộ phần còn thiếu:
-
-```powershell
-python scripts\local_translate.py --slug $slug
-# Mặc định dịch tam ngữ (giữ gốc + pinyin), LM Studio phải đang mở Local Server
-# Thêm --chunk 5 cho riêng 1 chunk; --force để dịch lại cả chunk đã có bản dịch
-```
-
-**Cách B — AI chat (opencode)**: gõ `/dich` để chạy trọn pipeline, hoặc yêu cầu
+**Dịch bằng AI chat (opencode)**: gõ `/dich <slug>` để chạy trọn pipeline, hoặc yêu cầu
 Agent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng bằng nhau,
 giữ heading `#`/`##` và dòng ảnh `![...]`).
 
@@ -506,20 +491,11 @@ python scripts\init_trilingual_skeleton.py `
     --progress-dir "working\progress\$slug"
 ```
 
-**Bước 2 — Dịch bằng Local AI (LM Studio)** — tự động, dòng-đối-dòng, tự kiểm tra số dòng:
-
-```powershell
-# LM Studio phải đang mở Local Server (mặc định http://localhost:1234/v1)
-python scripts\local_translate.py --slug $slug
-# Options: --chunk N (dịch riêng chunk), --force (dịch lại), --retries 3,
-#          --base-url http://localhost:1234/v1 --model "tên model"
-```
-
-**Bước 2b — Hoặc dịch bằng AI chat**: Agent (opencode) dịch `original_text` dòng-đối-dòng
+**Bước 2 — Dịch bằng AI chat**: Agent (opencode) dịch `original_text` dòng-đối-dòng
 sang `translated_text`, số dòng bằng nhau, giữ heading `#`/`##`, giữ dòng ảnh `![...]`,
 bỏ dòng OCR dư `///`, dùng glossary, ghi `translated_at="2026-07-31T00:00:00"`.
 
-**Bước 2c — Hoặc interactive mode** (`translate_helper.py --trilingual`):
+**Bước 2b — Hoặc interactive mode** (`translate_helper.py --trilingual`):
 
 ```powershell
 # Prepare prompt tam ngữ
@@ -572,7 +548,6 @@ python scripts\add_pinyin.py `
 >
 > **Cách đơn giản nhất**: mở opencode, gõ `/dich` → chọn file trong `input\` → chờ kết quả
 > trong `output\<slug>\` (tool chạy toàn bộ pipeline, xem AGENTS.md).
-> Nếu muốn dịch bằng LM Studio, dùng `local_translate.py` (mục dưới).
 
 ### 10.1. Pipeline toàn bộ
 
@@ -590,8 +565,8 @@ python scripts\run_pipeline.py `
     --lang auto
 # → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
 
-# Bước 7: Dịch bằng Local AI (LM Studio) — tự động, cần LM Studio đang mở Local Server
-python scripts\local_translate.py --slug $slug
+# Bước 7: Dịch bằng AI chat — mở opencode, gõ /dich <slug> hoặc nói "dịch tiếp sách <slug>"
+# (Agent tự dịch dòng-đối-dòng từng chunk chưa xong và lưu vào progress JSON)
 
 # Bước 8-10: QA + Merge + EPUB
 python scripts\run_pipeline.py `
@@ -602,20 +577,16 @@ python scripts\run_pipeline.py `
 
 > Lưu ý: run_pipeline không có flag `--source-lang` — dùng `--lang en|zh|auto`.
 
-### 10.2. Dịch tự động bằng Local AI (KHUYẾN NGHỊ)
+### 10.2. Dịch bằng AI chat (KHUYẾN NGHỊ)
 
-> **Ít thao tác nhất**: một lệnh duy nhất, tự dịch hết chunk còn thiếu, tự kiểm tra số dòng
-> và ghi `translated_at`. Cần **LM Studio** đang mở **Local Server** (`http://localhost:1234/v1`).
+> **Ít thao tác nhất**: mở opencode gõ `/dich <slug>` (hoặc nói `"dịch tiếp sách <slug>"`).
+> Agent tự đọc `working\progress\$slug\`, dịch dòng-đối-dòng từng chunk chưa xong
+> (giữ heading/ảnh, dùng glossary, ghi `translated_at` + số dòng khớp) và tự lưu lại.
 
 ```powershell
-# Dịch toàn bộ chunk chưa dịch
-python scripts\local_translate.py --slug $slug
-
-# Dịch riêng chunk 10, dịch lại nếu lệch dòng (retry 3 lần)
-python scripts\local_translate.py --slug $slug --chunk 10 --retries 3
-
-# Chỉ định khác URL/model (mặc định tự suy từ --slug)
-python scripts\local_translate.py --slug $slug --base-url http://localhost:1234/v1 --model "qwen2.5-7b-instruct"
+# Trong opencode, gõ:
+/dich <slug>
+# hoặc yêu cầu: "dịch tiếp sách <slug>"
 ```
 
 ### 10.3. Interactive mode (dịch bằng AI chat qua terminal)

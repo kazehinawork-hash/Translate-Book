@@ -42,7 +42,7 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 4. **Chunk**: `chunk_text.py` strategy smart (ZH: min 1500/max 3000 chữ)
 5. **Glossary**: `generate_glossary.py` → CSV `glossary/<slug>.csv` (cột `source,target` bắt buộc)
 6. **Skeleton trilingual**: `scripts/init_trilingual_skeleton.py --chunks-dir ... --progress-dir ...` → progress JSON `{chunk_id, total_chunks, chapter, source_text, translated_text, word_count_source, word_count_translated, mode:'trilingual', original_text, pinyin_text}`
-7. **Dịch**: (a) subagent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng BẰNG nhau), giữ heading `#`/`##`, giữ nguyên dòng `![...]` ảnh, bỏ `///` OCR dư, dùng glossary, `translated_at="2026-07-31T00:00:00"`, ghi `json.dumps(ensure_ascii=False, indent=2)` utf-8; hoặc (b) **Local AI**: `scripts/local_translate.py --slug <slug>` (LM Studio, OpenAI-compatible, mặc định `http://localhost:1234/v1` — cần LM Studio đang chạy + bật Local Server). Script tự đọc progress JSON, gọi model dịch dòng-đối-dòng, tự kiểm tra số dòng khớp (retry `--retries` lần), ghi `translated_at` tự động.
+7. **Dịch**: subagent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng BẰNG nhau), giữ heading `#`/`##`, giữ nguyên dòng `![...]` ảnh, bỏ `///` OCR dư, dùng glossary, `translated_at="2026-07-31T00:00:00"`, ghi `json.dumps(ensure_ascii=False, indent=2)` utf-8. (KHÔNG dùng Local AI — chất lượng kém, đã bỏ.)
 8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
 9. **Merge**: `merge_chunks.py --format trilingual --force` → `output/<slug>_trilingual.md`
 10. **EPUB**: `make_epub.py` (cần pandoc)

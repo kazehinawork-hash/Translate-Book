@@ -82,7 +82,7 @@ python scripts/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang
 Bước 1: Extract   → scripts/mineru_extract.py (PDF/DOCX/ảnh) hoặc scripts/epub_extract.py (EPUB)
 Bước 2: Chunk     → scripts/chunk_text.py (smart chunking, JSON output)
 Bước 3: Gen Glossary → scripts/generate_glossary.py (tạo prompt → Agent tạo CSV)
-Bước 4: Translate → Agent đọc từng chunk + glossary → working/progress/ (hoặc scripts/local_translate.py cho Local AI)
+Bước 4: Translate → Agent đọc từng chunk + glossary → ghi vào working/progress/
 Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
 Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md; sách ZH: output/{book}_trilingual.md)
 Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub; sách ZH: output/{book}_trilingual.epub)

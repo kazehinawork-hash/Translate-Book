@@ -436,11 +436,8 @@ def buoc_2_tiep_tuc_du_an():
     if file_nguon:
         in_thuong(f"  File gốc: {file_nguon}")
 
-    in_thuong("\nCách dịch chunk này:")
-    in_thuong("  1. AI chat — agent (opencode) tự động dịch")
-    in_thuong("  2. Local AI — LM Studio tự động dịch chunk này")
-    in_thuong("  3. Local AI — tự động dịch TẤT CẢ chunk còn lại")
-    cach = hoi_so("Chọn cách dịch", mac_dinh=1, lua_chon=[1, 2, 3])
+    in_thuong("\nCách dịch: AI chat (agent opencode) sẽ tự động dịch chunk này.")
+    in_thuong("Bạn không cần copy/paste — chỉ cần nói với AI: \"dịch tiếp sách " + slug + "\"")
 
     if not progress_files and chunks_json:
         in_noi_bat("\nTạo skeleton progress (tách câu + pinyin)...")
@@ -450,37 +447,16 @@ def buoc_2_tiep_tuc_du_an():
         ]):
             progress_files = _sort(list(progress_dir.glob("chunk_*.json"))) if progress_dir.exists() else []
 
-    if cach == 1:
-        # === AI CHAT (agent opencode tự động dịch) ===
-        in_thanh_cong("\nAI chat sẽ tự động dịch — bạn không cần copy/paste.")
-        in_thuong("Hãy nói với opencode (AI): \"dịch tiếp sách " + slug + "\"")
-        in_thuong("AI sẽ tự đọc working/progress/" + slug + "/, dịch dòng-đối-dòng từng")
-        in_thuong("chunk chưa xong và lưu lại (giống các cuốn đã dịch trước đây).\n")
-        if hoi_yes_no("Bản dịch đã xong (AI đã lưu vào progress JSON)?"):
-            sync_progress_to_output(slug)
-            in_thanh_cong("Đã đồng bộ bản dịch sang output!")
-        else:
-            in_thuong("OK — quay lại menu này sau khi AI dịch xong.\n")
-    elif cach >= 2:
-        # === LOCAL AI ===
-        if progress_files:
-            args = ['--slug', slug]
-            if cach == 2:
-                args += ['--chunk', str(chunk_id)]
-            if chay_script('local_translate.py', args):
-                in_thanh_cong("Dịch bằng Local AI hoàn tất!")
-                sync_progress_to_output(slug)
-            else:
-                in_loi("Local AI dịch thất bại. Kiểm tra LM Studio đã mở và bật Start Server chưa.")
-        else:
-            in_loi("Không có chunk JSON để tạo skeleton progress — không dùng được Local AI.")
-            in_thuong("💡 Kiểm tra working/chunks/" + slug + "/ có chunk JSON không.")
-
-    # QA + commit (có hiệu lực sau khi đã dịch bằng 1 trong 2 cách)
-    if hoi_yes_no("Chạy QA ngay (cần có bản dịch trước)?"):
-        buoc_3_chay_qa(slug)
-    if hoi_yes_no("Git commit bản dịch mới?"):
-        buoc_4_git_commit(slug, None)
+    # === AI CHAT (agent opencode tự động dịch) ===
+    in_thanh_cong("\nAI chat sẽ tự động dịch — bạn không cần copy/paste.")
+    in_thuong("Hãy nói với opencode (AI): \"dịch tiếp sách " + slug + "\"")
+    in_thuong("AI sẽ tự đọc working/progress/" + slug + "/, dịch dòng-đối-dòng từng")
+    in_thuong("chunk chưa xong và lưu lại (giống các cuốn đã dịch trước đây).\n")
+    if hoi_yes_no("Bản dịch đã xong (AI đã lưu vào progress JSON)?"):
+        sync_progress_to_output(slug)
+        in_thanh_cong("Đã đồng bộ bản dịch sang output!")
+    else:
+        in_thuong("OK — quay lại menu này sau khi AI dịch xong.\n")
 
 
 def buoc_3_chay_qa(slug=None):

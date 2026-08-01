@@ -78,10 +78,8 @@ Nếu dùng `translate.bat`, sau khi dự án sẵn sàng:
 
 1. Quay lại menu, chọn **`2`** → Tiếp tục sách ĐANG dịch
 2. Chọn dự án → tool chỉ ra chunk tiếp theo
-3. Chọn cách dịch:
-   - **`1`** — **AI chat (opencode)**: tool tạo sẵn prompt, bạn paste bản dịch trả về
-   - **`2`** — **Local AI (LM Studio)**: dịch chunk này bằng model cục bộ (cần LM Studio mở Local Server)
-   - **`3`** — **Local AI**: dịch tự động TẤT CẢ chunk còn lại
+3. Dịch tự động bằng **AI chat (opencode)**: mở opencode nói `"dịch tiếp sách <slug>"` — AI tự
+   đọc progress, dịch dòng-đối-dòng từng chunk chưa xong và lưu lại (không cần copy/paste)
 
 → Bản dịch được lưu vào `working\progress\<slug>\` (dạng JSON, có tiến độ).
 

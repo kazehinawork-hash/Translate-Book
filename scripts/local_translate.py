@@ -31,6 +31,7 @@ Usage:
 
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -74,6 +75,41 @@ def slug_from_path(progress_dir: Path) -> str:
     return progress_dir.name
 
 
+# Ký tự Hán tự (CJK Unified Ideographs + mở rộng A)
+_HAN_RE = re.compile(r'[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]')
+
+
+def han_ratio(text: str) -> float:
+    """Tỷ lệ ký tự Hán trong văn bản (0.0-1.0). Dùng để phát hiện bản dịch
+    còn sót chữ Trung (model trả nguyên văn tiếng Trung)."""
+    if not text:
+        return 0.0
+    total = len(text.strip())
+    if total == 0:
+        return 0.0
+    return len(_HAN_RE.findall(text)) / total
+
+
+def detect_ngao(text: str, original: str, sys_prompt: str) -> str:
+    """Phát hiện dấu hiệu model 'ngáo': lặp prompt, lặp vô hạn, copy nguyên
+    văn câu gốc. Trả về chuỗi mô tả nếu có vấn đề, ngược lại trả ''. """
+    if not text.strip():
+        return 'bản dịch rỗng'
+    if original.strip():
+        ratio = len(text) / max(len(original.strip()), 1)
+        if ratio > 4:
+            return f'đầu ra quá dài (gấp {ratio:.1f} lần đầu vào) — nghi lặp'
+        if ratio < 0.15 and len(original.strip()) > 200:
+            return f'đầu ra quá ngắn (chỉ {ratio * 100:.0f}% độ dài đầu vào) — nghi thiếu'
+    if 'QUY TẮC BẮT BUỘC' in text:
+        return 'đầu ra chứa lại nội dung prompt — nghi lặp'
+    for line in original.splitlines():
+        s = line.strip()
+        if len(s) >= 30 and s in text:
+            return 'đầu ra còn giữ nguyên câu gốc tiếng Trung — nghi copy'
+    return ''
+
+
 # ============== GỌI API LM STUDIO ==============
 
 def fetch_models(base_url: str) -> list:
@@ -100,11 +136,12 @@ def call_chat(base_url: str, model: str, messages: list,
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         data = json.loads(resp.read().decode('utf-8'))
-    content = data['choices'][0]['message'].get('content')
+    choice = data['choices'][0]
+    content = choice['message'].get('content')
+    finish = choice.get('finish_reason', '?')
     if not content:
-        finish = data['choices'][0].get('finish_reason', '?')
         raise RuntimeError(f"Model trả về rỗng (finish_reason={finish})")
-    return content
+    return content, finish
 
 
 def detect_model(base_url: str, model: str | None) -> str:
@@ -137,6 +174,12 @@ def build_system_prompt(source_lang: str, target_lang: str, glossary_text: str,
             "Dòng heading (bắt đầu bằng #) giữ nguyên ký tự # nhưng dịch phần nội dung.",
             "Giữ NGUYÊN VẸN các dòng: ảnh (![...](...)), dòng trống, dòng chứa số/ISBN/URL/tên file.",
         ]
+
+    if any(k in source_lang.lower() for k in ('trung', 'china', 'chinese')):
+        rules.append(
+            "Bản dịch phải 100% TIẾNG VIỆT: TUYỆT ĐỐI không được giữ lại bất kỳ "
+            "ký tự Hán (Trung Quốc) nào — mọi chữ Hán phải được dịch hết sang tiếng Việt."
+        )
 
     parts = [
         f"Bạn là dịch giả chuyên nghiệp. Dịch văn bản tiếng {source_lang} sang tiếng {target_lang} DÒNG-ĐỐI-DÒNG.",
@@ -338,13 +381,14 @@ def run(args):
         warning = ''
         ok = False
         for attempt in range(1, args.retries + 1):
+            warning = ''
             messages = [
                 {'role': 'system', 'content': sys_prompt},
                 {'role': 'user', 'content': build_user_message(original, tril)},
             ]
             try:
-                raw = call_chat(args.base_url, model, messages,
-                                args.temperature, args.max_tokens, args.timeout)
+                raw, finish = call_chat(args.base_url, model, messages,
+                                        args.temperature, args.max_tokens, args.timeout)
             except Exception as e:
                 print(f"    ⚠️  Lần {attempt}/{args.retries} thất bại: {e}")
                 if attempt < args.retries:
@@ -356,17 +400,45 @@ def run(args):
 
             result_text = normalize_direction(strip_leading_prefix(clean_output(raw)))
             out_lines = len(result_text.splitlines())
+            han = han_ratio(result_text)
+            ngao = detect_ngao(result_text, original, sys_prompt)
 
+            problems = []
             if orig_lines > 0 and out_lines != orig_lines:
-                warning = f"số dòng lệch: {out_lines} (gốc {orig_lines})"
-                print(f"    ⚠️  Lần {attempt}: {warning} — thử lại...")
+                problems.append(f"số dòng lệch: {out_lines} (gốc {orig_lines})")
+            if han > 0.05:
+                problems.append(f"còn {han * 100:.0f}% ký tự Hán trong bản dịch")
+            if finish == 'length':
+                problems.append("bị cắt cụt (đạt max_tokens — model bật thinking/quá dài)")
+            if ngao:
+                problems.append(ngao)
+
+            if problems:
+                warning = "; ".join(problems)
                 if attempt < args.retries:
-                    extra = (f"\n\nLƯU Ý QUAN TRỌNG: Lần trước bạn trả {out_lines} dòng nhưng "
-                             f"cần đúng {orig_lines} dòng. Hãy trả ĐÚNG {orig_lines} dòng, "
-                             "mỗi dòng là bản dịch của 1 dòng đầu vào.")
-                    sys_prompt += extra
+                    print(f"    ⚠️  Lần {attempt}: {warning} — thử lại...")
+                    extra_parts = ["\n\nLƯU Ý QUAN TRỌNG:"]
+                    if 'số dòng' in warning:
+                        extra_parts.append(f"Lần trước bạn trả {out_lines} dòng nhưng cần đúng {orig_lines} dòng. "
+                                           f"Hãy trả ĐÚNG {orig_lines} dòng, mỗi dòng là bản dịch của 1 dòng đầu vào.")
+                    if 'Hán' in warning:
+                        extra_parts.append("Bản dịch phải 100% tiếng Việt, TUYỆT ĐỐI không giữ lại bất kỳ ký tự Hán nào.")
+                    if 'quá dài' in warning or 'lặp' in warning or 'giữ nguyên câu gốc' in warning:
+                        extra_parts.append("Đừng lặp lại hay copy văn bản. Dịch ngắn gọn từng dòng, đầu ra CHỈ gồm "
+                                           "bản dịch tiếng Việt, độ dài tương đương đầu vào, không lặp lại prompt.")
+                    if 'cắt cụt' in warning:
+                        extra_parts.append("Phải TRẢ LỜI HOÀN CHỈNH đến hết, không dừng giữa chừng, không bỏ dở.")
+                    if 'quá ngắn' in warning:
+                        extra_parts.append("Bản dịch bị thiếu nhiều dòng — phải dịch ĐỦ toàn bộ văn bản đầu vào.")
+                    sys_prompt += '\n'.join(extra_parts)
                     time.sleep(2)
                     continue
+                print(f"    ⚠️  Lần {attempt}: {warning}")
+                if any(k in warning for k in ('Hán', 'lặp', 'quá dài', 'giữ nguyên câu gốc', 'cắt cụt', 'rỗng', 'quá ngắn')):
+                    print(f"    ❌ Bỏ qua chunk {cid} — bản dịch lỗi, không ghi đè bản cũ.")
+                    n_fail += 1
+                    ok = False
+                    break
             ok = True
             break
 
