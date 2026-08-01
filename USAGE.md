@@ -1,7 +1,7 @@
 # USAGE — Hướng dẫn sử dụng dự án (thực hành)
 
 > Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./docs/archive/PROCESS.md) để hiểu chi tiết từng bước.
-> Phiên bản: v3.2 — Cập nhật 2026-07-27
+> Phiên bản: v3.3 — Cập nhật 2026-07-31
 
 ---
 
@@ -89,197 +89,104 @@ git commit -m "Initial commit: project structure and docs"
 
 > Ví dụ cuốn "The Pragmatic Programmer" PDF, slug=`pragmatic-programmer`.
 
-### Bước 1: Chuẩn bị (2 phút)
+> **Khuyến nghị**: dùng pipeline tự động (`run_pipeline.py`) — không cần tạo thư mục,
+> copy glossary hay dịch từng chunk thủ công. Để dịch bằng AI chat trong opencode,
+> chỉ cần gõ lệnh `/dich` và chọn file trong `input\` (xem AGENTS.md).
+
+### Bước 1: Chuẩn bị (1 phút)
 
 ```powershell
 cd "<PROJECT_ROOT>"
 .\.venv\Scripts\Activate.ps1
 
-# Đặt biến dùng xuyên suốt
 $root = "<PROJECT_ROOT>"
+$book = "The Pragmatic Programmer"
 $slug = "pragmatic-programmer"
 
 # Copy file gốc vào input\
 Copy-Item "F:\Downloads\the-pragmatic-programmer.pdf" "$root\input\"
-
-# Tạo thư mục dự án
-$dirs = @(
-    "$root\output\$slug",
-    "$root\working\extracted\$slug",
-    "$root\working\chunks\$slug",
-    "$root\working\progress\$slug",
-    "$root\working\summary\$slug",
-    "$root\working\qa\$slug"
-)
-foreach ($d in $dirs) {
-    if (-not (Test-Path -LiteralPath $d)) {
-        New-Item -ItemType Directory -Path $d -Force | Out-Null
-    }
-}
-
-# Copy glossary từ template
-Copy-Item "$root\glossary\_template.md" "$root\glossary\$slug.md"
-Copy-Item "$root\glossary\_template.csv" "$root\glossary\$slug.csv"
 ```
 
-### Bước 2: Trích xuất PDF → Markdown (3-5 phút)
+### Bước 2: Chạy pipeline tự động đến bước 6 (3-5 phút)
 
-```powershell
-python scripts\mineru_extract.py `
-    --input "$root\input\the-pragmatic-programmer.pdf" `
-    --output "$root\working\extracted\$slug\raw.md" `
-    --lang en
-```
-
-**Hoặc dùng orchestrator** (chạy hết pipeline trích xuất + QC + chunk):
+Pipeline lo hết: trích xuất → QC → detect ngôn ngữ → OpenCC (nếu Phồn) → chunk → tạo prompt glossary:
 
 ```powershell
 python scripts\run_pipeline.py `
     --input "$root\input\the-pragmatic-programmer.pdf" `
+    --book $book `
     --slug $slug `
-    --lang en
-```
-
-Sau khi xong, kiểm tra file `working\extracted\$slug\raw.md` - mở bằng VS Code xem có ổn không.
-
-### Bước 3: QC sau trích xuất (10 giây)
-
-```powershell
-python scripts\post_extract_qc.py `
-    --input "$root\working\extracted\$slug\raw.md" `
-    --report "$root\working\qa\$slug\extract-qc.md" `
-    --lang en
-```
-
-Mở báo cáo, nếu có `❌ Mojibake` hoặc `❌ Dòng lặp` → xem [PROCESS.md §11 sự cố 1](./docs/archive/PROCESS.md#11-xử-lý-sự-cố-thường-gặp).
-
-### Bước 4: Chia chunk (5 giây)
-
-```powershell
-python scripts\chunk_text.py `
-    --input "$root\working\extracted\$slug\raw.md" `
-    --output-dir "$root\working\chunks\$slug" `
     --lang en `
-    --min-chars 3000 `
-    --max-chars 8000 `
-    --overlap-chars 200 `
-    --respect-headings
+    --to-step 6
 ```
 
-Kiểm tra số chunk tạo được. Mỗi chunk tương ứng 1 "phần" để paste vào chat.
+Sau khi xong, kiểm tra `working\extracted\$slug\raw.md` - mở bằng VS Code xem có ổn không.
 
-### Bước 5: Dịch từng chunk (lặp lại)
-
-**Bước 5a — Mở chat với AI, paste theo mẫu** (xem [PROCESS.md §9.1](./docs/archive/PROCESS.md#91-cho-sách-tiếng-anh)):
-
-```
-Tôi muốn dịch cuốn "The Pragmatic Programmer" (EN → VI).
-
-== GLOSSARY CUỐN SÁCH ==
-[paste toàn bộ $root\glossary\$slug.md]
-
-== GLOSSARY THỂ LOẠI ==
-[Không áp dụng - sách kỹ thuật IT, dùng term trong glossary cuốn]
-
-== TÓM TẮT ==
-[Nếu có, paste $root\working\summary\$slug\summary.md]
-
-== TIẾN ĐỘ ==
-Đã xong: chunks 1-5
-Giờ làm: chunk 6
-
-== 2 ĐOẠN ĐÃ DỊCH GẦN NHẤT (làm mẫu phong cách) ==
-[paste 100-200 từ từ chunk 5 đã dịch]
-
-== YÊU CẦU ==
-- Giữ format Markdown
-- Thuật ngữ kỹ thuật IT: giữ EN kèm giải thích ngắn lần đầu
-- API, function names: giữ nguyên EN
-
-== TEXT GỐC (chunk 6) ==
-[paste nội dung $root\working\chunks\$slug\chunk-006.md]
-```
-
-**Bước 5b — AI dịch → bạn copy bản dịch → lưu vào `output\$slug\chunk-006.md`**:
+### Bước 3: Tạo glossary CSV
 
 ```powershell
-# Tạo file output rỗng, paste bản dịch vào
-New-Item -ItemType File -Path "$root\output\$slug\chunk-006.md" -Force | Out-Null
-notepad "$root\output\$slug\chunk-006.md"
+# Tạo prompt glossary (từ chunk đã chia)
+python scripts\generate_glossary.py `
+    --source-dir "working\chunks\$slug" `
+    --book-name $slug
+# → File prompt tại working/glossary_prompt_{slug}.txt
 ```
 
-**Bước 5c — QA tự động**:
+Yêu cầu Agent (opencode) đọc file prompt đó và tạo `glossary\$slug.csv`
+(cột bắt buộc: `source,target`, xem `glossary\_fields.md`). Rà soát lại trước khi dịch.
+
+### Bước 4: Dịch từng chunk
+
+**Dịch bằng AI chat (opencode)** — mở opencode, gõ `/dich <slug>` (tự chạy nốt pipeline),
+hoặc nói `"dịch tiếp sách <slug>"` để Agent dịch dòng-đối-dòng từng chunk chưa xong
+trong `working\progress\$slug\` rồi tự lưu lại.
+
+Bản dịch được lưu vào `working\progress\$slug\chunk_*.json` (có `translated_at`).
+
+### Bước 5: QA
 
 ```powershell
+# Tạo bản dịch thuần Việt để QA
+python scripts\merge_chunks.py `
+    --progress-dir "working\progress\$slug" `
+    --book-name $slug `
+    --format bilingual `
+    --force
+
+# Chạy QA (kiểm tra thuật ngữ, Hán sót, mojibake, dòng lặp)
 python scripts\glossary_qa.py `
-    --source "$root\working\chunks\$slug\chunk-006.md" `
-    --translation "$root\output\$slug\chunk-006.md" `
-    --glossary "$root\glossary\$slug.csv" `
+    --source "working\extracted\$slug\raw.md" `
+    --translation "output\${slug}_translated.md" `
+    --glossary "glossary\$slug.csv" `
     --lang en `
-    --report "$root\working\qa\$slug\chunk-006-qa.md"
+    --report "working\qa\$slug\qa-vi.md"
 ```
 
-Nếu có lỗi (exit code 1), xem báo cáo → sửa bản dịch.
+Nếu có lỗi (exit code 1), xem báo cáo → sửa bản dịch trong progress JSON
+(chỉnh `translated_text`, hoặc nhờ AI dịch lại chunk đó bằng lệnh `/dich`).
 
-**Bước 5d — Commit**:
+### Bước 6: Merge + EPUB hoàn chỉnh
 
 ```powershell
-git add output/$slug/chunk-006.md glossary/$slug.*
-git commit -m "feat($slug): chunk 006 - <tên chương>"
+python scripts\run_pipeline.py `
+    --book $book `
+    --slug $slug `
+    --from-step 9 `
+    --force
+# Bước 9 (Merge) tự chọn định dạng theo ngôn ngữ:
+#   - EN → song ngữ EN+VI + bản thuần Việt
+#   - ZH → tam ngữ Hán/Pinyin/Việt
+# Bước 10 (EPUB) chạy make_epub.py nếu có pandoc
 ```
 
-**Bước 5e — Lặp lại cho chunk tiếp theo** (chunk 7, 8, ...).
-
-### Bước 6: Ghép file hoàn chỉnh (khi xong tất cả chunks)
-
-```powershell
-# Ghép bằng PowerShell
-Get-Content "$root\output\$slug\chunk-*.md" | Set-Content "$root\output\$slug\full.md"
-
-# Đọc lại 1 lần cuối, sửa chỗ không nhất quán
-notepad "$root\output\$slug\full.md"
-```
-
-### Bước 7: Commit cuối
-
-```powershell
-git add output/$slug/full.md working/progress/$slug/
-git commit -m "feat($slug): hoàn thành bản dịch"
-```
-
-### Bước 8: Tạo file song ngữ (tùy chọn)
-
-File song ngữ xen kẽ bản gốc + bản dịch, useful cho review song song:
-
-```powershell
-# Tiếng Anh
-python scripts\make_bilingual.py `
-    --source "$root\working\extracted\$slug\raw.md" `
-    --translation "$root\output\$slug\$slug-vi.md" `
-    --output "$root\output\$slug\$slug-songngu.md" `
-    --lang en
-
-# Tiếng Trung (có Pinyin)
-python scripts\make_bilingual.py `
-    --source "$root\working\extracted\$slug\raw.md" `
-    --translation "$root\output\$slug\$slug-vi.md" `
-    --output "$root\output\$slug\$slug-songngu.md" `
-    --lang zh
-```
-
-Kiểm tra chất lượng alignment:
-```powershell
-python scripts\make_bilingual.py --check `
-    --source "$root\working\extracted\$slug\raw.md" `
-    --translation "$root\output\$slug\$slug-vi.md" `
-    --lang en
-```
+Kết quả trong `output\$slug\`. Commit tiến trình trong `working\progress\$slug\`.
 
 ---
 
 ## 3. Dịch 1 cuốn EPUB tiếng Trung
 
 > Ví dụ cuốn "三体" (Ba Thể), slug=`san-ti`, thể loại `tien-hiep`.
+> Sách ZH được dịch theo định dạng **tam ngữ** (Hán tự + Pinyin + Việt).
 
 ### Bước 1: Chuẩn bị
 
@@ -288,115 +195,85 @@ cd "F:\OneDrive\onyx\Translate Book"
 .\.venv\Scripts\Activate.ps1
 
 $root = "F:\OneDrive\onyx\Translate Book"
+$book = "三体"
 $slug = "san-ti"
 $genre = "tien-hiep"
 
 # Copy file
 Copy-Item "F:\Downloads\santi.epub" "$root\input\"
-
-# Tạo thư mục
-$dirs = @("$root\output\$slug",
-          "$root\working\extracted\$slug",
-          "$root\working\chunks\$slug",
-          "$root\working\progress\$slug",
-          "$root\working\summary\$slug",
-          "$root\working\qa\$slug")
-foreach ($d in $dirs) {
-    if (-not (Test-Path -LiteralPath $d)) {
-        New-Item -ItemType Directory -Path $d -Force | Out-Null
-    }
-}
-
-# Copy glossary
-Copy-Item "$root\glossary\_template.md" "$root\glossary\$slug.md"
-Copy-Item "$root\glossary\_template.csv" "$root\glossary\$slug.csv"
 ```
 
-### Bước 2: Trích xuất EPUB
+### Bước 2: Chạy pipeline tự động đến bước 6
 
 ```powershell
-# EPUB dùng script riêng (MinerU không hỗ trợ EPUB)
-python scripts\epub_extract.py `
+python scripts\run_pipeline.py `
     --input "$root\input\santi.epub" `
-    --output "$root\working\extracted\$slug\raw.md"
-```
-
-### Bước 3: Phát hiện ngôn ngữ + OpenCC (nếu là Phồn)
-
-```powershell
-# Phát hiện
-python scripts\detect_language.py "$root\working\extracted\$slug\raw.md"
-
-# Nếu output là "zh-Hant" → chuẩn hóa sang Giản
-if ((python scripts\detect_language.py "$root\working\extracted\$slug\raw.md" --quiet) -eq "zh-Hant") {
-    python scripts\opencc_normalize.py `
-        --input "$root\working\extracted\$slug\raw.md" `
-        --output "$root\working\extracted\$slug\raw-hans.md" `
-        --config t2s
-}
-# Dùng raw-hans.md cho các bước sau (nếu đã chuyển) hoặc raw.md
-```
-
-### Bước 4: QC
-
-```powershell
-# Dùng raw-hans.md nếu có, không thì raw.md
-$md = if (Test-Path "$root\working\extracted\$slug\raw-hans.md") {
-    "$root\working\extracted\$slug\raw-hans.md"
-} else {
-    "$root\working\extracted\$slug\raw.md"
-}
-
-python scripts\post_extract_qc.py `
-    --input $md `
-    --report "$root\working\qa\$slug\extract-qc.md" `
-    --lang zh
-```
-
-### Bước 5: Chia chunk (chữ Hán)
-
-```powershell
-python scripts\chunk_text.py `
-    --input $md `
-    --output-dir "$root\working\chunks\$slug" `
+    --book $book `
+    --slug $slug `
     --lang zh `
-    --min-chars 1500 `
-    --max-chars 3000 `
-    --overlap-chars 100 `
-    --respect-headings
+    --to-step 6
+# Tự lo: extract (epub_extract) → QC → detect lang → OpenCC (nếu Phồn) → chunk → glossary prompt
 ```
 
-### Bước 6: Dịch từng chunk
-
-**Mẫu chat** cho ZH (xem [PROCESS.md §9.2](./docs/archive/PROCESS.md#92-cho-sách-tiếng-trung)):
-
-```
-Tôi muốn dịch cuốn "三体" (Ba Thể) (ZH → VI trực tiếp).
-
-== GLOSSARY CUỐN SÁCH ==
-[paste $root\glossary\$slug.md]
-
-== GLOSSARY THỂ LOẠI (tiên hiệp) ==
-[paste $root\glossary\genres\tien-hiep.md]
-
-== YÊU CẦU ==
-- Dịch thẳng Hán tự → VI, KHÔNG qua Pinyin
-- Gặp thuật ngữ nghi mới → đánh dấu [TERM-NEW: ...]
-- Tên nhân vật: phiên âm Hán Việt (giữ sát gốc)
-
-== HÁN TỰ GỐC (chunk 1) ==
-[paste nội dung $root\working\chunks\$slug\chunk-001.md]
-```
-
-Lưu bản dịch vào `$root\output\$slug\chunk-001.md` → QA → commit → lặp lại.
-
-### Bước 7: Ghép & commit cuối
+### Bước 3: Tạo glossary CSV
 
 ```powershell
-Get-Content "$root\output\$slug\chunk-*.md" | Set-Content "$root\output\$slug\full.md"
-git add output/$slug/full.md working/progress/$slug/
-git commit -m "feat($slug): hoàn thành bản dịch"
+python scripts\generate_glossary.py `
+    --source-dir "working\chunks\$slug" `
+    --book-name $slug `
+    --merge-genre $genre
+# Agent (opencode) đọc working/glossary_prompt_{slug}.txt → tạo glossary\$slug.csv
 ```
+
+### Bước 4: Khởi tạo skeleton tam ngữ
+
+```powershell
+python scripts\init_trilingual_skeleton.py `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug"
+# Tạo progress JSON trống cho từng chunk, gồm original_text + pinyin_text
+```
+
+### Bước 5: Dịch từng chunk
+
+**Dịch bằng AI chat (opencode)**: gõ `/dich <slug>` để chạy trọn pipeline, hoặc yêu cầu
+Agent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng bằng nhau,
+giữ heading `#`/`##` và dòng ảnh `![...]`).
+
+### Bước 6: QA
+
+```powershell
+# Tạo bản dịch thuần Việt để QA
+python scripts\merge_chunks.py `
+    --progress-dir "working\progress\$slug" `
+    --book-name $slug `
+    --format trilingual `
+    --force
+
+# QA: kiểm tra Hán sót (<5%), thuật ngữ, mojibake, dòng lặp
+python scripts\glossary_qa.py `
+    --source "working\extracted\$slug\raw.md" `
+    --translation "output\${slug}_translated.md" `
+    --glossary "glossary\$slug.csv" `
+    --lang zh `
+    --report "working\qa\$slug\qa-vi.md"
+```
+
+> `merge_chunks.py --format trilingual` tạo `output\${slug}_trilingual.md` (tam ngữ)
+> và `output\${slug}_translated.md` (thuần Việt) — dùng bản thuần Việt để QA.
+
+### Bước 7: Merge + EPUB hoàn chỉnh
+
+```powershell
+python scripts\run_pipeline.py `
+    --book $book `
+    --slug $slug `
+    --from-step 9 `
+    --force
+# → output/${slug}_trilingual.md + output/${slug}_trilingual.epub (nếu có pandoc)
+```
+
+Commit tiến trình trong `working\progress\$slug\`.
 
 ---
 
@@ -515,14 +392,7 @@ Tiếp tục như bước chia chunk + dịch + QA.
 
 ### Thêm thuật ngữ mới
 
-**Markdown** (cho người đọc):
-
-```powershell
-notepad "$root\glossary\$slug.md"
-# Thêm dòng vào bảng "Nhân vật" / "Thuật ngữ" / "Địa danh"
-```
-
-**CSV** (cho script QA) - **BẮT BUỘC đồng bộ**:
+**CSV** (bản nguồn duy nhất - cho cả script QA lẫn AI dịch):
 
 ```powershell
 notepad "$root\glossary\$slug.csv"
@@ -532,10 +402,12 @@ notepad "$root\glossary\$slug.csv"
 
 > Quy tắc CSV: nếu `note` có dấu phẩy → bọc trong `"..."`. Xem `glossary\_fields.md`.
 
+> Lưu ý: glossary **chỉ còn là CSV** (không còn dạng `.md` riêng cho người đọc).
+
 ### Commit
 
 ```powershell
-git add glossary/$slug.md glossary/$slug.csv
+git add glossary/$slug.csv
 git commit -m "glossary($slug): them 5 nhan vat moi"
 ```
 
@@ -555,8 +427,8 @@ notepad "$root\glossary\genres\tien-hiep.csv"
 cd "F:\OneDrive\onyx\Translate Book"
 git pull  # nếu làm việc nhiều máy
 
-# Trong ngày - commit mỗi chunk xong
-git add output/$slug/chunk-006.md glossary/$slug.*
+# Trong ngày - commit mỗi chunk xong (bản dịch nằm trong progress JSON)
+git add working/progress/$slug/ glossary/$slug.csv
 git commit -m "feat($slug): chunk 006"
 
 # Xem lịch sử
@@ -565,7 +437,7 @@ git log --stat
 
 # So sánh phiên bản
 git diff glossary/$slug.csv
-git log -p output/$slug/chunk-001.md
+git log -p working/progress/$slug/chunk_006.json
 
 # Cuối ngày - kiểm tra trạng thái
 git status
@@ -611,7 +483,19 @@ python scripts\generate_trilingual.py `
 
 ### 9.2. Dịch trực tiếp với tam ngữ (khuyến nghị)
 
-Dùng `--trilingual` trong translate_helper.py — Agent output 3 dòng/block:
+**Bước 1 — Tạo skeleton trilingual** (progress JSON có sẵn `original_text` + `pinyin_text`):
+
+```powershell
+python scripts\init_trilingual_skeleton.py `
+    --chunks-dir "working\chunks\$slug" `
+    --progress-dir "working\progress\$slug"
+```
+
+**Bước 2 — Dịch bằng AI chat**: Agent (opencode) dịch `original_text` dòng-đối-dòng
+sang `translated_text`, số dòng bằng nhau, giữ heading `#`/`##`, giữ dòng ảnh `![...]`,
+bỏ dòng OCR dư `///`, dùng glossary, ghi `translated_at="2026-07-31T00:00:00"`.
+
+**Bước 2b — Hoặc interactive mode** (`translate_helper.py --trilingual`):
 
 ```powershell
 # Prepare prompt tam ngữ
@@ -661,6 +545,9 @@ python scripts\add_pinyin.py `
 
 > Workflow này dùng pipeline scripts mới, Agent tự đọc chunk JSON + glossary và dịch trực tiếp.
 > Không cần copy-paste thủ công từng chunk, không cần tạo file Markdown riêng.
+>
+> **Cách đơn giản nhất**: mở opencode, gõ `/dich` → chọn file trong `input\` → chờ kết quả
+> trong `output\<slug>\` (tool chạy toàn bộ pipeline, xem AGENTS.md).
 
 ### 10.1. Pipeline toàn bộ
 
@@ -671,20 +558,38 @@ cd "F:\OneDrive\onyx\Translate Book"
 $book = "my-book"
 $slug = "my-book"
 
-# Bước 1-2: Extract + Chunk (tự động)
+# Bước 1-6: Extract + QC + Detect lang + Chunk + Glossary prompt
 python scripts\run_pipeline.py `
     --book $book `
     --input "input\my-book.pdf" `
-    --source-lang English
+    --lang auto
+# → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
 
-# Bước 3: Tạo glossary prompt
+# Bước 7: Dịch bằng AI chat — mở opencode, gõ /dich <slug> hoặc nói "dịch tiếp sách <slug>"
+# (Agent tự dịch dòng-đối-dòng từng chunk chưa xong và lưu vào progress JSON)
+
+# Bước 8-10: QA + Merge + EPUB
 python scripts\run_pipeline.py `
     --book $book `
-    --from-step 3
-# → Đọc file working/glossary_prompt_my-book.txt, yêu cầu Agent tạo glossary/my-book.csv
+    --from-step 8 `
+    --force
 ```
 
-### 10.2. Interactive mode (KHUYẾN NGHỊ) — Tự động lặp
+> Lưu ý: run_pipeline không có flag `--source-lang` — dùng `--lang en|zh|auto`.
+
+### 10.2. Dịch bằng AI chat (KHUYẾN NGHỊ)
+
+> **Ít thao tác nhất**: mở opencode gõ `/dich <slug>` (hoặc nói `"dịch tiếp sách <slug>"`).
+> Agent tự đọc `working\progress\$slug\`, dịch dòng-đối-dòng từng chunk chưa xong
+> (giữ heading/ảnh, dùng glossary, ghi `translated_at` + số dòng khớp) và tự lưu lại.
+
+```powershell
+# Trong opencode, gõ:
+/dich <slug>
+# hoặc yêu cầu: "dịch tiếp sách <slug>"
+```
+
+### 10.3. Interactive mode (dịch bằng AI chat qua terminal)
 
 > **Giảm thao tác**: một lệnh duy nhất, tự động prompt → đợi dịch → save → commit → next.
 
@@ -710,7 +615,7 @@ python scripts\translate_helper.py --interactive --from 10 `
 #   ---EXIT---   Thoát
 ```
 
-### 10.3. Dịch thủ công từng chunk (nếu không dùng interactive)
+### 10.4. Dịch thủ công từng chunk (nếu không dùng interactive)
 
 ```powershell
 # Xem chunk nào chưa dịch
@@ -740,7 +645,7 @@ python scripts\translate_helper.py `
     --progress-dir "working\progress\$slug"
 ```
 
-### 10.6. QA và Merge
+### 10.7. QA và Merge
 
 > **Tự động chọn định dạng**: `run_pipeline.py` tự động phát hiện ngôn ngữ ở bước 3,
 > và chọn đúng định dạng merge (trilingual cho ZH, song ngữ EN+VI cho EN) mà không
@@ -795,7 +700,7 @@ python scripts\merge_chunks.py `
 
 Nếu cả `--allow-partial` và `--skip-missing` đều không dùng, script **không ghi file** khi phát hiện thiếu chunk, tránh output không hoàn chỉnh.
 
-### 10.4. Glossary flow hoàn chỉnh
+### 10.5. Glossary flow hoàn chỉnh
 
 > **Luồng xử lý glossary**: `generate_glossary.py` → Agent tạo CSV → user review → dùng trong translate → QA check.
 
@@ -819,15 +724,18 @@ Lưu kết quả vào glossary/{slug}.csv
 
 Script `glossary_qa.py` và `translate_helper.py` expect CSV có cột:
 ```csv
-source,target,notes
-"Machine Learning","Học máy","ML term"
-"Harry Potter","Harry Potter","main character"
-"Hogwarts","Hogwarts","fictional school"
+source,target,type,note,genre,book
+"张伟","Trương Vĩ","character","Nhân vật chính","tien-hiep","san-ti"
+"阴剑","âm kiếm","term","thuật ngữ võ học","tien-hiep",""
 ```
 
 - `source`: Thuật ngữ gốc (bắt buộc)
 - `target`: Bản dịch (bỏ trống nếu chưa biết, Agent sẽ điền sau)
-- `notes`: Ngữ cảnh ngắn (tùy chọn)
+- `type`: `character` / `term` / `place` / `item`...
+- `note`: Ngữ cảnh ngắn (tùy chọn)
+- `genre` / `book`: thẻ gán thể loại / cuốn sách (rỗng = áp dụng chung)
+
+> Xem quy ước đầy đủ tại `glossary\_fields.md`.
 
 #### Bước D: Dùng glossary khi dịch
 
@@ -856,7 +764,7 @@ python scripts\glossary_qa.py `
 
 ---
 
-### 10.5. Chunking riêng (nếu muốn tùy chỉnh)
+### 10.6. Chunking riêng (nếu muốn tùy chỉnh)
 
 ```powershell
 # Smart chunking (mặc định)
