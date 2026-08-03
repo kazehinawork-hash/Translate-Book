@@ -86,9 +86,32 @@ Bước 4: Translate → Agent đọc từng chunk + glossary → ghi vào worki
 Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
 Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md; sách ZH: output/{book}_trilingual.md)
 Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub; sách ZH: output/{book}_trilingual.epub)
+Bước 8: Audiobook → clone giọng từ reference → scripts/audiobook_long.py → WAV 48kHz (sách ZH)
 ```
 
 Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
+
+---
+
+## 🎧 Tạo Audiobook (sách ZH)
+
+Sau khi có bản dịch `-vi.md` (thuần Việt từ bước 9 Merge), có thể tạo audiobook bằng giọng clone:
+
+```bash
+# 1. Clone giọng từ audiobook mẫu (cần 5-10s reference audio)
+python scripts/clone_voice_test.py
+
+# 2. Tạo audio chapter đầy đủ (~9 phút, ~4 phút gen trên CPU)
+python scripts/audiobook_long.py
+```
+
+**Yêu cầu**: venv riêng `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)
+
+**Quy trình**: Đọc `_trilingual.md` → regex lấy dòng Việt → chunk ≤240 chars → generate từng đoạn bằng VieNeu-TTS v3 Turbo (clone giọng + style `doc_truyen`) → join + normalize → WAV 48kHz
+
+**Tham số**: RTF ~0.41 (nhanh hơn real-time 2.4x), chạy CPU, không cần GPU.
+
+Xem chi tiết trong **[AGENTS.md](./AGENTS.md)** (Bước 11).
 
 ---
 
@@ -171,6 +194,7 @@ Pipeline tự động chuyển sang `.epub` (có cấu trúc HTML + CSS riêng c
 | **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
 | **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Script chạy toàn bộ pipeline tự động |
 | **pandoc** | Chuyển .md → .epub với CSS tùy chỉnh | Cài từ https://pandoc.org/installing.html |
+| **VieNeu-TTS v3 Turbo** | Tạo audiobook — clone giọng từ reference audio | CPU/ONNX, 48kHz, 14 giọng preset, voice cloning 3-8s |
 | **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
 | **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |
 | **git** | Version control | OneDrive không thay thế được |

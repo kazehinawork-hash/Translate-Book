@@ -46,14 +46,45 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
 9. **Merge**: `merge_chunks.py --format trilingual --force` → `output/<slug>_trilingual.md`
 10. **EPUB**: `make_epub.py` (cần pandoc)
+11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `<slug>-vi.md` (bản dịch thuần Việt)
+
+## BƯỚC 11 — TẠO AUDIOBOOK (VieNeu-TTS v3 Turbo)
+
+### Pipeline
+1. **Trích reference audio**: `manage_voice.py extract` — lấy 5-10s giọng đọc sạch từ file audiobook mẫu, save WAV + metadata vào `core/voices/` (chỉ cần làm 1 lần)
+2. **Clone giọng**: `tts.add_voice(name, ref_path)` — tự extract speaker embedding (192-d x-vector) + MOSS code tokens
+3. **Đọc text Việt**: Đọc trực tiếp `<slug>-vi.md` (bản dịch thuần Việt từ bước 9 Merge)
+4. **Smart chunk**: Chia text ≤240 ký tự/đoạn (VieNeu limit ~256), giữ nguyên câu
+5. **Generate**: `tts.infer(chunk, voice=name, style="doc_truyen")` từng đoạn
+6. **Join**: `np.concatenate(all_audio)` + silence 0.4-0.8s giữa các đoạn → normalize → WAV 48kHz
+
+### Scripts
+- `scripts/manage_voice.py` — Quản lý reference audio: extract từ MP3, save WAV + metadata, list/info/delete
+- `scripts/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, --first/--chapter N, output vào `output/<slug>/`
+- `scripts/audiobook_from_trilingual.py` — Tạo audio sample ngắn (~23s) từ -vi.md
+
+### Env
+- venv: `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)
+- Chạy trên **CPU** (ONNX Runtime), RTF ~0.42, không cần GPU
+- 14 preset voices, emotion tags ([cười]/[thở dài]/[hắng giọng]), 3 styles (tu_nhien/tin_tuc/doc_truyen)
+- Voice clone cần 3-8s reference audio sạch
+
+### Output
+- `output/<slug>/<slug>-ch01.wav` — audio chapter (mỗi file ~50MB/9min)
+- `output/<slug>/<slug>-vi.md` — bản dịch thuần Việt (từ bước 9 Merge)
+- Audio samples ngắn tại `output/voice_clone_test/`
 
 ## CẤU TRÚC THƯ MỤC QUAN TRỌNG
 - `input/` — file gốc PDF/EPUB, **KHÔNG commit**
 - `working/extracted/`, `working/chunks/`, `working/qa/` — **KHÔNG commit**
 - `working/progress/<slug>/` — chunk đã dịch, **CÓ commit**
+- `working/venv-vieneu/` — venv VieNeu-TTS, **KHÔNG commit**
 - `glossary/` — glossary cuốn, **có commit**
-- `output/` — bản dịch hoàn chỉnh (md + epub + images/), **có commit**
+- `output/` — bản dịch hoàn chỉnh (md + epub) + audiobook, **có commit**
+- `core/` — audio mẫu + reference voices dùng chung, **KHÔNG commit**
+- `core/voices/` — reference audio đã extract (WAV + JSON metadata), **KHÔNG commit**
 - Scripts chạy bằng `.venv\Scripts\python.exe` (Python 3.11)
+- Audiobook scripts chạy bằng `working/venv-vieneu\Scripts\python.exe`
 
 ## MÔI TRƯỜNG
 - Windows / PowerShell 5.1. Không dùng `&&`; dùng `;` và `if ($?)`.

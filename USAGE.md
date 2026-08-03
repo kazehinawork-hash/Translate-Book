@@ -1,7 +1,7 @@
 # USAGE — Hướng dẫn sử dụng dự án (thực hành)
 
 > Tài liệu thực hành - copy-paste commands. Đọc [README.md](./README.md) để hiểu tổng quan, [PROCESS.md](./docs/archive/PROCESS.md) để hiểu chi tiết từng bước.
-> Phiên bản: v3.3 — Cập nhật 2026-07-31
+> Phiên bản: v3.4 — Cập nhật 2026-08-03
 
 ---
 
@@ -18,6 +18,7 @@
 9. [Tam ngữ (Chinese → Pinyin → Vietnamese)](#9-tam-ngữ-chinese--pinyin--vietnamese)
 10. [Workflow mới: Agent-first](#10-workflow-mới-agent-first-khuyến-nghị)
 11. [Interactive mode chi tiết](#11-interactive-mode-chi-tiết)
+12. [Tạo Audiobook từ bản dịch](#12-tạo-audiobook-từ-bản-dịch-sách-zh)
 
 ---
 
@@ -855,6 +856,67 @@ python scripts\translate_helper.py --interactive `
 
 - Python 3.10+
 - `pyperclip` (optional): `pip install pyperclip` để tự động copy prompt vào clipboard
+
+---
+
+## 12. Tạo Audiobook từ bản dịch (sách ZH)
+
+> Dùng **VieNeu-TTS v3 Turbo** — chạy CPU (ONNX), 48kHz, clone giọng từ audiobook mẫu.
+
+### 12.1. Setup venv VieNeu-TTS (1 lần)
+
+```powershell
+cd "<PROJECT_ROOT>"
+python -m venv working/venv-vieneu
+.\working\venv-vieneu\Scripts\Activate.ps1
+pip install vieneu soundfile numpy
+```
+
+### 12.2. Chuẩn bị reference audio
+
+Đặt file audiobook mẫu (MP3/WAV) vào `core/`. Script sẽ tự trích 5-10s đoạn sạch làm reference.
+
+### 12.3. Test clone giọng nhanh
+
+```powershell
+.\working\venv-vieneu\Scripts\Activate.ps1
+python scripts/clone_voice_test.py
+```
+
+Output: `output/voice_clone_test/` — 7 file WAV test (clone + emotion + style)
+
+### 12.4. Tạo audio chapter đầy đủ
+
+```powershell
+.\working\venv-vieneu\Scripts\Activate.ps1
+python scripts/audiobook_long.py
+```
+
+Script tự động:
+- Đọc `output/<slug>_trilingual.md`
+- Trích dòng Việt bằng regex `<p class="vi">`
+- Chunk ≤240 ký tự (giữ nguyên câu)
+- Generate từng đoạn (voice clone + style `doc_truyen`)
+- Join + silence 0.4-0.8s + normalize → WAV 48kHz
+
+Output: `output/voice_clone_test/chapter01_suso_hiep.wav` (~9 phút, ~52 MB)
+
+### 12.5. Hiệu suất
+
+| Thông số | Giá trị |
+|----------|---------|
+| RTF | ~0.41 (nhanh hơn real-time 2.4x) |
+| Thời gian gen | ~4 phút cho 9 phút audio |
+| Hardware | CPU (ONNX Runtime), không cần GPU |
+| Sample rate | 48 kHz |
+| Voice cloning | 3-8s reference audio |
+
+### 12.6. Tùy chỉnh
+
+- **Thay đổi style**: sửa `style="doc_truyen"` thành `style="tu_nhien"` hoặc `style="tin_tuc"`
+- **Thay đổi giọng**: dùng `voice="Ngọc Linh"` (preset) hoặc clone giọng mới
+- **Thay đổi chapter**: sửa `chapter_start` và `chapter_end` trong script
+- **Emotion tags**: thêm `[cười]`, `[thở dài]`, `[hắng giọng]` trong text
 
 ---
 
