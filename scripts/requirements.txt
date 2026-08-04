@@ -1,4 +1,0 @@
-# Requirements chính ở /requirements.txt
-# File này giữ lại để tương thích, nhưng VUI LÒNG cập nhật file gốc.
-# Xem: pip install -r requirements.txt (từ thư mục gốc project)
--r ..\requirements.txt
