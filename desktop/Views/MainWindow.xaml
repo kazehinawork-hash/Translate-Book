@@ -22,203 +22,202 @@
         </Grid.Effect>
 
         <Border CornerRadius="16" ClipToBounds="True">
-        <Border.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#1a1a2e" Offset="0"/>
-                <GradientStop Color="#16213e" Offset="1"/>
-            </LinearGradientBrush>
-        </Border.Background>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#1a1a2e" Offset="0"/>
+                    <GradientStop Color="#16213e" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
 
-        <Grid>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="48"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <!-- Title Bar -->
-            <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="📚 Translate Book" FontSize="16" FontWeight="Bold"
-                           Foreground="White" VerticalAlignment="Center" Margin="16,0"/>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="—" Click="Minimize_Click" Style="{StaticResource TitleBarButton}"/>
-                    <Button Content="□" Click="Maximize_Click" Style="{StaticResource TitleBarButton}"/>
-                    <Button Content="✕" Click="Close_Click" Style="{StaticResource TitleBarButton}"/>
-                </StackPanel>
-            </Grid>
-
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Sidebar -->
-                <Border Grid.Column="0" Background="#0affffff" BorderBrush="#0affffff"
-                        BorderThickness="0,0,1,0">
-                    <StackPanel Margin="8,16">
-                        <TextBlock Text="📚 Translate Book" FontSize="15" FontWeight="Bold"
-                                   Foreground="White" Margin="12,0,0,20"/>
-
-                        <RadioButton x:Name="NavBooks" Content="📖  Sach" IsChecked="True"
-                                     Style="{StaticResource SidebarButton}" Click="Nav_Click"/>
-                        <RadioButton x:Name="NavAudio" Content="🎧  Audio"
-                                     Style="{StaticResource SidebarButton}" Click="Nav_Click"/>
-                        <RadioButton x:Name="NavApi" Content="⚙️  API Settings"
-                                     Style="{StaticResource SidebarButton}" Click="Nav_Click"/>
-
-                        <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,8">
-                            <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="12,0">
-                                <Run Text="API: "/>
-                                <Run Text="{Binding ActiveProvider, Mode=OneWay}"/>
-                            </TextBlock>
-                        </StackPanel>
+                <!-- Title Bar -->
+                <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Translate Book" FontSize="16" FontWeight="Bold"
+                               Foreground="White" VerticalAlignment="Center" Margin="16,0"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="-" Click="Minimize_Click" Style="{StaticResource TitleBarButton}"/>
+                        <Button Content="口" Click="Maximize_Click" Style="{StaticResource TitleBarButton}"/>
+                        <Button Content="X" Click="Close_Click" Style="{StaticResource TitleBarButton}"/>
                     </StackPanel>
-                </Border>
+                </Grid>
 
-                <!-- Content -->
-                <Grid Grid.Column="1" Margin="24,16">
-                    <!-- Books Page -->
-                    <Grid x:Name="BooksPage" Visibility="Visible">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="📖 Danh sach sach" FontSize="24" FontWeight="Bold"
-                                   Foreground="White" Margin="0,0,0,12"/>
-                        <TabControl Grid.Row="1" Style="{StaticResource GlassTabControl}">
-                            <TabItem Header="📁 Input" Style="{StaticResource GlassTabItem}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
-                                    <ItemsControl ItemsSource="{Binding InputBooks}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type models:BookStatus}">
-                                                <Border Style="{StaticResource GlassCard}" Margin="8,4">
-                                                    <StackPanel>
-                                                        <Border Background="#2660a5fa" CornerRadius="4"
-                                                                HorizontalAlignment="Left" Padding="8,2" Margin="0,0,0,8">
-                                                            <TextBlock Text="INPUT" FontSize="10" Foreground="#60a5fa" FontWeight="Bold"/>
-                                                        </Border>
-                                                        <TextBlock Text="{Binding Slug}" FontSize="15" FontWeight="Bold"
-                                                                   Foreground="White" TextWrapping="Wrap"/>
-                                                        <TextBlock Text="Chua dich — dat vao input/" FontSize="13"
-                                                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4"/>
-                                                        <Button Content="Bat dau dich" Style="{StaticResource GlassButtonSuccess}"
-                                                                HorizontalAlignment="Left" Margin="0,8,0,0"
-                                                                Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                CommandParameter="{Binding}"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </TabItem>
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                            <TabItem Header="📖 Output" Style="{StaticResource GlassTabItem}">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
-                                    <ItemsControl ItemsSource="{Binding OutputBooks}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type models:BookStatus}">
-                                                <Border Style="{StaticResource GlassCard}" Margin="8,4">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Slug}" FontSize="15" FontWeight="Bold"
-                                                                   Foreground="White" TextWrapping="Wrap"/>
-                                                        <TextBlock Text="{Binding StatusText}" FontSize="13"
-                                                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4"/>
-                                                        <ProgressBar Value="{Binding ProgressPercent}" Maximum="100"
-                                                                     Style="{StaticResource GlassProgressBar}" Margin="0,4"/>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,0">
-                                                                <Run Text="EPUB: "/>
-                                                                <Run Text="{Binding HasEpub, Mode=OneWay}"/>
-                                                            </TextBlock>
-                                                            <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
-                                                                <Run Text="Audio: "/>
-                                                                <Run Text="{Binding Mp3Count, Mode=OneWay}"/>
-                                                                <Run Text=" files"/>
-                                                            </TextBlock>
-                                                        </StackPanel>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                                            <Button Content="Dich" Style="{StaticResource GlassButton}" Margin="0,0,8,0"
+                    <!-- Sidebar -->
+                    <Border Grid.Column="0" Background="#0affffff" BorderBrush="#0affffff"
+                            BorderThickness="0,0,1,0">
+                        <StackPanel Margin="8,16">
+                            <TextBlock Text="Translate Book" FontSize="15" FontWeight="Bold"
+                                       Foreground="White" Margin="12,0,0,20"/>
+
+                            <RadioButton x:Name="NavBooks" Content="  Sach" IsChecked="True"
+                                         Style="{StaticResource SidebarButton}" Checked="Nav_Checked"/>
+                            <RadioButton x:Name="NavAudio" Content="  Audio"
+                                         Style="{StaticResource SidebarButton}" Checked="Nav_Checked"/>
+                            <RadioButton x:Name="NavApi" Content="  API Settings"
+                                         Style="{StaticResource SidebarButton}" Checked="Nav_Checked"/>
+
+                            <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,8">
+                                <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="12,0">
+                                    <Run Text="API: "/>
+                                    <Run Text="{Binding ActiveProvider, Mode=OneWay}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Content -->
+                    <Grid Grid.Column="1" Margin="24,16">
+                        <!-- Books Page -->
+                        <Grid x:Name="BooksPage" Visibility="Visible">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Danh sach sach" FontSize="24" FontWeight="Bold"
+                                       Foreground="White" Margin="0,0,0,12"/>
+                            <TabControl Grid.Row="1" Style="{StaticResource GlassTabControl}">
+                                <TabItem Header="Input (Chua dich)" Style="{StaticResource GlassTabItem}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
+                                        <ItemsControl ItemsSource="{Binding InputBooks}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type models:BookStatus}">
+                                                    <Border Style="{StaticResource GlassCard}" Margin="8,4">
+                                                        <StackPanel>
+                                                            <Border Background="#2660a5fa" CornerRadius="4"
+                                                                    HorizontalAlignment="Left" Padding="8,2" Margin="0,0,0,8">
+                                                                <TextBlock Text="INPUT" FontSize="10" Foreground="#60a5fa" FontWeight="Bold"/>
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Slug}" FontSize="15" FontWeight="Bold"
+                                                                       Foreground="White" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="Chua dich - dat vao input/" FontSize="13"
+                                                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4"/>
+                                                            <Button Content="Bat dau dich" Style="{StaticResource GlassButtonSuccess}"
+                                                                    HorizontalAlignment="Left" Margin="0,8,0,0"
                                                                     Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                     CommandParameter="{Binding}"/>
-                                                            <Button Content="Tao audio" Style="{StaticResource GlassButtonSuccess}"
-                                                                    Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                    CommandParameter="{Binding}"/>
                                                         </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </TabItem>
-                        </TabControl>
-                    </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </TabItem>
 
-                    <!-- Audio Page (hidden) -->
-                    <Grid x:Name="AudioPage" Visibility="Collapsed">
-                        <TextBlock Text="🎧 Audiobook" FontSize="24" FontWeight="Bold"
-                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Grid>
+                                <TabItem Header="Output (Da dich)" Style="{StaticResource GlassTabItem}">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
+                                        <ItemsControl ItemsSource="{Binding OutputBooks}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type models:BookStatus}">
+                                                    <Border Style="{StaticResource GlassCard}" Margin="8,4">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Slug}" FontSize="15" FontWeight="Bold"
+                                                                       Foreground="White" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding StatusText}" FontSize="13"
+                                                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4"/>
+                                                            <ProgressBar Value="{Binding ProgressPercent}" Maximum="100"
+                                                                         Style="{StaticResource GlassProgressBar}" Margin="0,4"/>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                                <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,0">
+                                                                    <Run Text="EPUB: "/>
+                                                                    <Run Text="{Binding HasEpub, Mode=OneWay}"/>
+                                                                </TextBlock>
+                                                                <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
+                                                                    <Run Text="Audio: "/>
+                                                                    <Run Text="{Binding Mp3Count, Mode=OneWay}"/>
+                                                                    <Run Text=" files"/>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                                <Button Content="Dich" Style="{StaticResource GlassButton}" Margin="0,0,8,0"
+                                                                        Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"/>
+                                                                <Button Content="Tao audio" Style="{StaticResource GlassButtonSuccess}"
+                                                                        Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </TabItem>
+                            </TabControl>
+                        </Grid>
 
-                    <!-- API Settings Page (hidden) -->
-                    <Grid x:Name="ApiPage" Visibility="Collapsed">
+                        <!-- Audio Page (hidden) -->
+                        <Grid x:Name="AudioPage" Visibility="Collapsed">
+                            <TextBlock Text="Audiobook" FontSize="24" FontWeight="Bold"
+                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <!-- API Settings Page (hidden) -->
+                        <Grid x:Name="ApiPage" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="API Settings" FontSize="24" FontWeight="Bold"
+                                       Foreground="White" Margin="0,0,0,16"/>
+                            <Border Grid.Row="1" Style="{StaticResource GlassCard}">
+                                <StackPanel Margin="8">
+                                    <TextBlock Text="Provider" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="ProviderCombo" Width="200" HorizontalAlignment="Left"
+                                              SelectedValue="deepseek">
+                                        <ComboBoxItem Content="gemini"/>
+                                        <ComboBoxItem Content="deepseek"/>
+                                        <ComboBoxItem Content="custom"/>
+                                    </ComboBox>
+
+                                    <TextBlock Text="API Key" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,4"/>
+                                    <PasswordBox x:Name="ApiKeyBox" Width="400" HorizontalAlignment="Left"
+                                                 Style="{StaticResource GlassPasswordBox}"/>
+
+                                    <TextBlock Text="Model" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,4"/>
+                                    <TextBox x:Name="ModelBox" Width="400" HorizontalAlignment="Left"
+                                             Text="deepseek-chat" Style="{StaticResource GlassTextBox}"/>
+
+                                    <Button Content="Test Connection" Style="{StaticResource GlassButton}"
+                                            HorizontalAlignment="Left" Margin="0,20,0,0"
+                                            Click="TestApi_Click"/>
+
+                                    <TextBlock x:Name="ApiStatus" FontSize="13" Margin="0,12,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <!-- Log Panel -->
+                <Border Grid.Row="2" Margin="24,0,24,16" BorderBrush="#0affffff" BorderThickness="1"
+                        CornerRadius="10" Background="#40000000">
+                    <Grid Margin="12,8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <TextBlock Text="⚙️ API Settings" FontSize="24" FontWeight="Bold"
-                                   Foreground="White" Margin="0,0,0,16"/>
-                        <Border Grid.Row="1" Style="{StaticResource GlassCard}">
-                            <StackPanel Margin="8">
-                                <TextBlock Text="Provider" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="ProviderCombo" Width="200" HorizontalAlignment="Left"
-                                          SelectedValue="deepseek">
-                                    <ComboBoxItem Content="gemini"/>
-                                    <ComboBoxItem Content="deepseek"/>
-                                    <ComboBoxItem Content="custom"/>
-                                </ComboBox>
-
-                                <TextBlock Text="API Key" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,4"/>
-                                <PasswordBox x:Name="ApiKeyBox" Width="400" HorizontalAlignment="Left"
-                                             Style="{StaticResource GlassPasswordBox}"/>
-
-                                <TextBlock Text="Model" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,4"/>
-                                <TextBox x:Name="ModelBox" Width="400" HorizontalAlignment="Left"
-                                         Text="deepseek-chat" Style="{StaticResource GlassTextBox}"/>
-
-                                <Button Content="🔍 Test Connection" Style="{StaticResource GlassButton}"
-                                        HorizontalAlignment="Left" Margin="0,20,0,0"
-                                        Click="TestApi_Click"/>
-
-                                <TextBlock x:Name="ApiStatus" FontSize="13" Margin="0,12,0,0"/>
-                            </StackPanel>
-                        </Border>
+                        <TextBlock Text="Realtime Log" FontSize="13" FontWeight="Bold"
+                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                        <TextBox Grid.Row="1" Text="{Binding LogText, Mode=OneWay}"
+                                 Style="{StaticResource LogTextBox}"/>
                     </Grid>
-                </Grid>
+                </Border>
             </Grid>
-
-            <!-- Log Panel -->
-            <Border Grid.Row="2" Margin="24,0,24,16" BorderBrush="#0affffff" BorderThickness="1"
-                    CornerRadius="10" Background="#40000000">
-                <Grid Margin="12,8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="📋 Realtime Log" FontSize="13" FontWeight="Bold"
-                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                    <TextBox Grid.Row="1" Text="{Binding LogText, Mode=OneWay}"
-                             Style="{StaticResource LogTextBox}"/>
-                </Grid>
-            </Border>
-        </Grid>
         </Border>
     </Grid>
 </Window>

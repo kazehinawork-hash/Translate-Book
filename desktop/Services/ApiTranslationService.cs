@@ -21,7 +21,7 @@ public class ApiTranslationService
             ?? throw new Exception($"Provider '{providerName}' not configured");
 
         if (string.IsNullOrEmpty(config.ApiKey))
-            throw new Exception("Chua nhap API key");
+            throw new Exception("Chưa nhập API key");
 
         var prompt = BuildPrompt(text, glossary, context);
 
@@ -39,14 +39,14 @@ public class ApiTranslationService
         {
             var config = ConfigService.GetProvider(providerName);
             if (config == null || string.IsNullOrEmpty(config.ApiKey))
-                return (false, "Chua cau hinh API key");
+                return (false, "Chưa cấu hình API key");
 
             var result = await TranslateAsync("Say OK", providerName);
             return (true, $"OK — Model: {config.Model}");
         }
         catch (Exception ex)
         {
-            return (false, $"Loi: {ex.Message}");
+            return (false, $"Lỗi: {ex.Message}");
         }
     }
 

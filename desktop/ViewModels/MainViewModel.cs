@@ -72,7 +72,7 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
-        AppendLog($"Da tai {InputBooks.Count} input, {OutputBooks.Count} output");
+        AppendLog($"Đã tải {InputBooks.Count} input, {OutputBooks.Count} output");
     }
 
     [RelayCommand]
@@ -89,7 +89,7 @@ public partial class MainViewModel : ObservableObject
         else
         {
             IsApiOk = false;
-            AppendLog($"Loi — {provider}: {msg}", "error");
+            AppendLog($"Lỗi — {provider}: {msg}", "error");
         }
     }
 
@@ -117,10 +117,10 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task GitCommitAsync()
     {
-        AppendLog("Dang git add...");
+        AppendLog("Đang git add...");
         await _pipeline.RunGitCommandAsync("add -A");
         await _pipeline.RunGitCommandAsync($"commit -m \"update from desktop app\"");
-        AppendLog("Da commit");
+        AppendLog("Đã commit");
     }
 
     private void AppendLog(string msg, string level = "info")

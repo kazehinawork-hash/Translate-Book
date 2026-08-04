@@ -32,8 +32,10 @@ public partial class MainWindow : Window
             ? WindowState.Normal
             : WindowState.Maximized;
 
-    private void Nav_Click(object sender, RoutedEventArgs e)
+    private void Nav_Checked(object sender, RoutedEventArgs e)
     {
+        if (BooksPage == null || AudioPage == null || ApiPage == null) return;
+
         BooksPage.Visibility = Visibility.Collapsed;
         AudioPage.Visibility = Visibility.Collapsed;
         ApiPage.Visibility = Visibility.Collapsed;
@@ -47,7 +49,7 @@ public partial class MainWindow : Window
     {
         var provider = (ProviderCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)
             ?.Content?.ToString() ?? "deepseek";
-        ApiStatus.Text = "⏳ Dang test...";
+        ApiStatus.Text = "Dang test...";
         ApiStatus.Foreground = System.Windows.Media.Brushes.Yellow;
 
         _ = Task.Run(async () =>
@@ -56,7 +58,7 @@ public partial class MainWindow : Window
             var (ok, msg) = await service.TestConnectionAsync(provider);
             Dispatcher.Invoke(() =>
             {
-                ApiStatus.Text = ok ? $"✅ {msg}" : $"❌ {msg}";
+                ApiStatus.Text = ok ? $"OK: {msg}" : $"Loi: {msg}";
                 ApiStatus.Foreground = ok
                     ? System.Windows.Media.Brushes.LightGreen
                     : System.Windows.Media.Brushes.LightCoral;
