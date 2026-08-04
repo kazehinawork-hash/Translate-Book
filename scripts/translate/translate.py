@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding, PROJECT_ROOT  # noqa: E402
 
 setup_encoding()
@@ -644,7 +645,7 @@ def buoc_6_cai_dat():
         if hoi_yes_no("Tạo .venv và cài packages?"):
             subprocess.run([sys.executable, '-m', 'venv', '.venv'], cwd=PROJECT_ROOT, check=True)
             pip_path = PROJECT_ROOT / ".venv" / "Scripts" / "pip.exe"
-            subprocess.run([str(pip_path), 'install', '-r', 'scripts/requirements.txt'], cwd=PROJECT_ROOT, check=True)
+            subprocess.run([str(pip_path), 'install', '-r', 'requirements.txt'], cwd=PROJECT_ROOT, check=True)
             in_thanh_cong("Đã tạo .venv + cài packages")
 
     in_thuong("\n3. Git:")

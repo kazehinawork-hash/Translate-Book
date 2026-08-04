@@ -40,7 +40,7 @@ Không bắt buộc nếu bạn không cần EPUB — script vẫn chạy bình 
 
 ```bash
 # Một lệnh duy nhất: prompt → đợi dịch → save → commit → next
-python scripts/translate_helper.py --interactive \
+python scripts/translate/translate_helper.py --interactive \
     --chunks-dir "working/chunks/mybook" \
     --progress-dir "working/progress/mybook" \
     --glossary "glossary/mybook.csv" \
@@ -52,13 +52,13 @@ python scripts/translate_helper.py --interactive \
 
 ```bash
 # Pipeline đầy đủ (tự động extract → chunk → glossary prompt)
-python scripts/run_pipeline.py --book "MyBook" --input "input/mybook.pdf" --lang en
+python scripts/pipeline/run_pipeline.py --book "MyBook" --input "input/mybook.pdf" --lang en
 
 # Agent dịch từng chunk:
-python scripts/translate_helper.py --interactive --chunks-dir "working/chunks/mybook" --progress-dir "working/progress/mybook" --glossary "glossary/mybook.csv"
+python scripts/translate/translate_helper.py --interactive --chunks-dir "working/chunks/mybook" --progress-dir "working/progress/mybook" --glossary "glossary/mybook.csv"
 
 # QA và Merge tự động:
-python scripts/run_pipeline.py --book "MyBook" --from-step 5
+python scripts/pipeline/run_pipeline.py --book "MyBook" --from-step 5
 ```
 
 > Dùng `run_pipeline.py` cho trải nghiệm tốt nhất để tự động hóa toàn bộ quá trình.
@@ -67,24 +67,24 @@ python scripts/run_pipeline.py --book "MyBook" --from-step 5
 
 ```bash
 # Một lệnh duy nhất — không cần nhớ thêm flag nào
-python scripts/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang auto
+python scripts/pipeline/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang auto
 
 # Kết quả:
-#   - Sách ZH → output/ten-sach_trilingual.md (tam ngữ: gốc/pinyin/dịch)
-#              → output/ten-sach_trilingual.epub (tự động, nếu có pandoc)
-#   - Sách EN → output/ten-sach/ten-sach-vi.md (song ngữ EN+VI căn chỉnh đoạn)
-#              → output/ten-sach/ten-sach-vi.epub (tự động, nếu có pandoc)
+#   - Sách ZH → output/books/ten-sach/final/tamngu.md (tam ngữ)
+#              → output/books/ten-sach/trilingual.epub (tự động, nếu có pandoc)
+#   - Sách EN → output/books/ten-sach/final/vi.md (thuần Việt)
+#              → output/books/ten-sach/trilingual.epub (tự động, nếu có pandoc)
 ```
 
 **Workflow tổng quan:**
 
 ```
-Bước 1: Extract   → scripts/mineru_extract.py (PDF/DOCX/ảnh) hoặc scripts/epub_extract.py (EPUB)
-Bước 2: Chunk     → scripts/chunk_text.py (smart chunking, JSON output)
-Bước 3: Gen Glossary → scripts/generate_glossary.py (tạo prompt → Agent tạo CSV)
+Bước 1: Extract   → scripts/extract/mineru_extract.py (PDF/DOCX/ảnh) hoặc scripts/extract/epub_extract.py (EPUB)
+Bước 2: Chunk     → scripts/process/chunk_text.py (smart chunking, JSON output)
+Bước 3: Gen Glossary → scripts/process/generate_glossary.py (tạo prompt → Agent tạo CSV)
 Bước 4: Translate → Agent đọc từng chunk + glossary → ghi vào working/progress/
-Bước 5: QA        → scripts/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
-Bước 6: Merge     → scripts/merge_chunks.py (gộp → output/{book}/{book}-vi.md; sách ZH: output/{book}_trilingual.md)
+Bước 5: QA        → scripts/qa/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
+Bước 6: Merge     → scripts/output/merge_chunks.py (gộp → output/books/<slug>/final/)
 Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub; sách ZH: output/{book}_trilingual.epub)
 Bước 8: Audiobook → clone giọng từ reference → scripts/audiobook_long.py → WAV 48kHz (sách ZH)
 ```

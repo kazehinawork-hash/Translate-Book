@@ -18,7 +18,13 @@
       "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book' -Directory | Select-Object Name\")",
       "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book' -File | Select-Object Name, @{N='SizeKB';E={[math]::Round($_.Length/1KB,1)}}\")",
       "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\scripts' -File | Select-Object Name, @{N='SizeKB';E={[math]::Round($_.Length/1KB,1)}} | Sort-Object Name | Format-Table -AutoSize\")",
-      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\docs\\archive' -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\requirements.txt' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\translate.bat' -Force -ErrorAction SilentlyContinue\")"
+      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\docs\\archive' -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\requirements.txt' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\translate.bat' -Force -ErrorAction SilentlyContinue\")",
+      "Shell(mkdir:*)",
+      "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\scripts' -Directory | Select-Object Name; Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\scripts' -File | Select-Object Name\")",
+      "Shell(powershell -Command \"(Get-Content 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\pipeline\\run_pipeline.py' -Encoding UTF8) -replace \\\"run_script\\('opencc_normalize.py'\\\", \\\"run_script('process/opencc_normalize.py'\\\" -replace \\\"run_script\\('chunk_text.py'\\\", \\\"run_script('process/chunk_text.py'\\\" -replace \\\"run_script\\('generate_glossary.py'\\\", \\\"run_script('process/generate_glossary.py'\\\" -replace \\\"run_script\\('merge_chunks.py'\\\", \\\"run_script('output/merge_chunks.py'\\\" -replace \\\"run_script\\('make_bilingual.py'\\\", \\\"run_script('output/make_bilingual.py'\\\" -replace \\\"run_script\\('make_epub.py'\\\", \\\"run_script('output/make_epub.py'\\\" | Set-Content 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\pipeline\\run_pipeline.py' -Encoding UTF8\")",
+      "Shell(findstr:*)",
+      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\core' -Recurse -Force -ErrorAction SilentlyContinue\")",
+      "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\scripts' | Select-Object Name, @{N='Type';E={if($_.PSIsContainer){'DIR'}else{'FILE'}}} | Format-Table -AutoSize\")"
     ],
     "deny": [],
     "defaultMode": "default"

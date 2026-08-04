@@ -10,12 +10,14 @@ Usage:
         --progress-dir "working\progress\zuo-yi-ge-you-feng-gu-de-nu-zi"
 """
 
+import os
 import argparse
 import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding
 from add_pinyin import process_text
 

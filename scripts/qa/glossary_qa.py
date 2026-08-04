@@ -18,6 +18,7 @@ Ví dụ:
         --report "working\qa\$slug\chunk-001-qa.md"
 """
 
+import os
 import argparse
 import csv
 import re
@@ -26,6 +27,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding  # noqa: E402
 
 # Cố gắng dùng pandas cho CSV (đẹp hơn); fallback về csv module nếu chưa cài

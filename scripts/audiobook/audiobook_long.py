@@ -29,7 +29,7 @@ import soundfile as sf
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Config
 MAX_CHARS = 240          # chars per chunk (VieNeu limit ~256)
@@ -699,7 +699,7 @@ def main():
         import vieneu
         tts = vieneu.Vieneu()
 
-        sys.path.insert(0, os.path.join(PROJECT_ROOT, "scripts"))
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from manage_voice import resolve_voice, get_voice_path
         if args.voice:
             ref_path = get_voice_path(args.voice)
@@ -786,7 +786,7 @@ def main():
     import vieneu
     tts = vieneu.Vieneu()
 
-    sys.path.insert(0, os.path.join(PROJECT_ROOT, "scripts"))
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from manage_voice import resolve_voice, get_voice_path
     if args.voice:
         ref_path = get_voice_path(args.voice)

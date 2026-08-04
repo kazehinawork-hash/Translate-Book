@@ -11,11 +11,13 @@ Ví dụ:
         --config t2s
 """
 
+import os
 import argparse
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding  # noqa: E402
 
 try:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 run_pipeline.py - Orchestrator chạy toàn bộ pipeline cho 1 cuốn sách
 
 Pipeline:
@@ -43,16 +43,18 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from glossary_qa import qa_sach_text, doc_glossary
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from qa.glossary_qa import qa_sach_text, doc_glossary
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding, PROJECT_ROOT  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).parent
+SCRIPTS_ROOT = SCRIPT_DIR.parent  # scripts/ directory
 
 
 def run_script(script_name: str, args: list[str], step_label: str = '') -> bool:
-    script_path = SCRIPT_DIR / script_name
+    script_path = SCRIPTS_ROOT / script_name
     if not script_path.exists():
         print(f"  [L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y script: {script_path}", file=sys.stderr)
         return False
@@ -94,7 +96,7 @@ def step_extract(args, slug: str) -> Path | None:
         print("  \u26a0\ufe0f B\u1ecf qua: kh\u00f4ng c\u00f3 --input")
         return raw_md if raw_md.exists() else None
 
-    ok = run_script('mineru_extract.py', [
+    ok = run_script('extract/mineru_extract.py', [
         '--input', str(args.input),
         '--output', str(raw_md),
         '--lang', args.lang if args.lang != 'auto' else 'en',
@@ -110,7 +112,7 @@ def step_qc(slug: str, lang: str) -> bool:
         print("  \u26a0\ufe0f Kh\u00f4ng t\u00ecm th\u1ea5y raw.md, b\u1ecf qua QC")
         return True
     qa_report = PROJECT_ROOT / "working" / "qa" / slug / "extract-qc.md"
-    return run_script('post_extract_qc.py', [
+    return run_script('process/post_extract_qc.py', [
         '--input', str(raw_md),
         '--report', str(qa_report),
         '--lang', lang,
@@ -141,7 +143,7 @@ def step_opencc(slug: str, ngon_ngu: str) -> Path:
     raw_md = PROJECT_ROOT / "working" / "extracted" / slug / "raw.md"
     raw_hans = raw_md.parent / 'raw-hans.md'
     print_step(4, 'OpenCC', 'Chuy\u1ec3n Ph\u1ed3n th\u1ec3 \u2192 Gi\u1ea3n th\u1ec3')
-    if run_script('opencc_normalize.py', [
+    if run_script('process/opencc_normalize.py', [
         '--input', str(raw_md),
         '--output', str(raw_hans),
         '--config', 't2s',
@@ -178,7 +180,7 @@ def step_chunk(slug: str, lang: str, strategy: str = 'smart') -> bool:
         cmd_args.extend(['--min-chars', str(min_chars), '--max-chars', str(max_chars),
                          '--overlap-chars', '200', '--respect-headings'])
 
-    return run_script('chunk_text.py', cmd_args, '5. Chia chunk')
+    return run_script('process/chunk_text.py', cmd_args, '5. Chia chunk')
 
 
 def step_glossary(slug: str, auto: bool) -> bool:
@@ -194,12 +196,12 @@ def step_glossary(slug: str, auto: bool) -> bool:
         if not extracted_dir.exists():
             print("  \u26a0\ufe0f Kh\u00f4ng t\u00ecm th\u1ea5y source text. B\u1ecf qua.")
             return True
-        run_script('generate_glossary.py', [
+        run_script('process/generate_glossary.py', [
             '--source', str(extracted_dir / 'raw.md'),
             '--book-name', slug,
         ], '6. Generate glossary prompt')
     else:
-        run_script('generate_glossary.py', [
+        run_script('process/generate_glossary.py', [
             '--source-dir', str(chunks_dir),
             '--book-name', slug,
         ], '6. Generate glossary prompt')
@@ -311,7 +313,7 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
         ]
         if force:
             merge_args.append('--force')
-        ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (trilingual)')
+        ok = run_script('output/merge_chunks.py', merge_args, '9. Merge chunks (trilingual)')
         
         # Merge thuần Việt
         merge_args_vi = [
@@ -321,7 +323,7 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
         ]
         if force:
             merge_args_vi.append('--force')
-        run_script('merge_chunks.py', merge_args_vi, '9. Merge chunks (thuần Việt)')
+        run_script('output/merge_chunks.py', merge_args_vi, '9. Merge chunks (thuần Việt)')
         
         if not ok:
             return False
@@ -353,7 +355,7 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
         ]
         if force:
             merge_args.append('--force')
-        ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (bilingual)')
+        ok = run_script('output/merge_chunks.py', merge_args, '9. Merge chunks (bilingual)')
         if not ok:
             return False
         # Ki\u1ec3m tra file t\u1ea1m
@@ -370,7 +372,7 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
         if raw_md.exists():
             print(f"  Ghép song ngữ: {raw_md.name} + {temp_output.name}")
             song_ngu_file = output_dir / f'{slug}-songngu.md'
-            ok2 = run_script('make_bilingual.py', [
+            ok2 = run_script('output/make_bilingual.py', [
                 '--source', str(raw_md),
                 '--translation', str(temp_output),
                 '--output', str(song_ngu_file),
@@ -401,7 +403,7 @@ def step_merge(slug: str, force: bool, ngon_ngu: str) -> bool:
         ]
         if force:
             merge_args.append('--force')
-        ok = run_script('merge_chunks.py', merge_args, '9. Merge chunks (bilingual)')
+        ok = run_script('output/merge_chunks.py', merge_args, '9. Merge chunks (bilingual)')
         if not ok:
             return False
         # Di chuy\u1ec3n v\u1ec1 output cu\u1ed1i
@@ -536,7 +538,7 @@ def main():
                 epub_args.extend(['--resource-path', os.pathsep.join(res_paths)])
                 if args.author:
                     epub_args.extend(['--author', args.author])
-                run_script('make_epub.py', [str(final_md)] + epub_args, '10. Make EPUB')
+                run_script('output/make_epub.py', [str(final_md)] + epub_args, '10. Make EPUB')
             else:
                 print(f"  \u26a0\ufe0f B\u1ecf qua EPUB: pandoc ch\u01b0a c\u00e0i \u0111\u1eb7t.")
                 print(f"    C\u00e0i pandoc t\u1ea1i https://pandoc.org/installing.html")

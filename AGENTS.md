@@ -36,17 +36,17 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
   - `dich` — tự động dịch trọn một cuốn sách: chỉ cần file PDF/EPUB trong `input/`, lệnh chạy toàn bộ pipeline (extract → QC → detect lang → chunk → glossary → skeleton → dịch bằng AI chat → QA → merge → EPUB) rồi trả kết quả trong `output/<slug>/`. Nếu sách đã có chunk/progress thì dịch tiếp phần còn thiếu. Người dùng không phải làm bước thủ công nào.
 
 ## VÒNG LẶP DỊCH SÁCH (pipeline)
-1. **Extract**: `run_pipeline.py` (MinerU cho PDF, epub_extract cho EPUB) → `working/extracted/<slug>/raw.md`
-2. **QC**: `post_extract_qc.py`
+1. **Extract**: `scripts/pipeline/run_pipeline.py` (MinerU cho PDF, epub_extract cho EPUB) → `working/extracted/<slug>/raw.md`
+2. **QC**: `scripts/process/post_extract_qc.py`
 3. **Detect lang** + **OpenCC t2s** (nếu zh-Hant)
-4. **Chunk**: `chunk_text.py` strategy smart (ZH: min 1500/max 3000 chữ)
-5. **Glossary**: `generate_glossary.py` → CSV `glossary/<slug>.csv` (cột `source,target` bắt buộc)
-6. **Skeleton trilingual**: `scripts/init_trilingual_skeleton.py --chunks-dir ... --progress-dir ...` → progress JSON `{chunk_id, total_chunks, chapter, source_text, translated_text, word_count_source, word_count_translated, mode:'trilingual', original_text, pinyin_text}`
+4. **Chunk**: `scripts/process/chunk_text.py` strategy smart (ZH: min 1500/max 3000 chữ)
+5. **Glossary**: `scripts/process/generate_glossary.py` → CSV `glossary/<slug>.csv` (cột `source,target` bắt buộc)
+6. **Skeleton trilingual**: `scripts/translate/init_trilingual_skeleton.py --chunks-dir ... --progress-dir ...` → progress JSON `{chunk_id, total_chunks, chapter, source_text, translated_text, word_count_source, word_count_translated, mode:'trilingual', original_text, pinyin_text}`
 7. **Dịch**: subagent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng BẰNG nhau), giữ heading `#`/`##`, giữ nguyên dòng `![...]` ảnh, bỏ `///` OCR dư, dùng glossary, `translated_at="2026-07-31T00:00:00"`, ghi `json.dumps(ensure_ascii=False, indent=2)` utf-8. (KHÔNG dùng Local AI — chất lượng kém, đã bỏ.)
-8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
-9. **Merge**: `merge_chunks.py --format trilingual --force` → `output/<slug>_trilingual.md`
-10. **EPUB**: `make_epub.py` (cần pandoc)
-11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `<slug>-vi.md` (bản dịch thuần Việt)
+8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `scripts/qa/glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
+9. **Merge**: `scripts/output/merge_chunks.py --format trilingual --force` → `output/books/<slug>/final/tamngu.md`
+10. **EPUB**: `scripts/output/make_epub.py` (cần pandoc)
+11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `output/books/<slug>/final/vi.md` (bản dịch thuần Việt)
 
 ## BƯỚC 11 — TẠO AUDIOBOOK (VieNeu-TTS v3 Turbo)
 
@@ -60,8 +60,8 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 7. **MP3**: Tự động convert WAV → MP3 128kbps (xóa WAV trừ `--keep-wav`), kèm metadata title/album
 
 ### Scripts
-- `scripts/manage_voice.py` — Quản lý reference audio: extract (có `--auto` VAD), save WAV + metadata, list/info/delete/set-active/active, preview, validate chất lượng (duration/sample rate/peak)
-- `scripts/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, `--first`/`--chapter N`/`--sample`/`--force`/`--voice NAME`/`--temperature`/`--top-k`/`--bitrate`/`--no-read-titles`/`--keep-wav`, resume checkpoint (theo chapter + theo chunk), retry, auto MP3
+- `scripts/audiobook/manage_voice.py` — Quản lý reference audio: extract (có `--auto` VAD), save WAV + metadata, list/info/delete/set-active/active, preview, validate chất lượng (duration/sample rate/peak)
+- `scripts/audiobook/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, `--first`/`--chapter N`/`--sample`/`--force`/`--voice NAME`/`--temperature`/`--top-k`/`--bitrate`/`--no-read-titles`/`--keep-wav`/`--merge`, resume checkpoint (theo chapter + theo chunk), retry, auto MP3
 
 ### Env
 - venv: `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)

@@ -22,6 +22,7 @@ Ví dụ:
     python scripts/add_pinyin.py --input "working/chunks/mybook/chunk-000.json" --output "working/pinyin/chunk-000.json"
 """
 
+import os
 import argparse
 import json
 import re
@@ -29,6 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding
 
 try:

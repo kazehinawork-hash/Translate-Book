@@ -4,11 +4,13 @@ make_epub.py - Chuyển file .md đã merge sang .epub dùng pandoc
 Yêu cầu: pandoc (https://pandoc.org/installing.html)
 """
 
+import os
 import argparse
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 
 
 def main() -> None:

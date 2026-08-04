@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Đường dẫn gốc dự án (parent của scripts/)
 SCRIPT_DIR = Path(__file__).parent
-PROJECT_ROOT = SCRIPT_DIR.parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent  # scripts/common/ → scripts/ → project root
 
 
 def setup_encoding() -> None:
