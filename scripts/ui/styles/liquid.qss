@@ -1,0 +1,250 @@
+/* Liquid Glass QSS Stylesheet */
+
+/* === Global === */
+* {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #ffffff;
+}
+
+QMainWindow {
+    background-color: #0f0f1a;
+}
+
+QWidget {
+    background-color: transparent;
+}
+
+/* === Sidebar === */
+#sidebar {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    min-width: 200px;
+    max-width: 200px;
+}
+
+#sidebar QPushButton {
+    text-align: left;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 10px;
+    margin: 2px 8px;
+    font-size: 13px;
+    color: #a0a0c0;
+    background-color: transparent;
+}
+
+#sidebar QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+#sidebar QPushButton:checked {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 rgba(102, 126, 234, 0.3),
+        stop:1 rgba(118, 75, 162, 0.3));
+    color: #ffffff;
+}
+
+/* === Book Cards === */
+.book-card {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 rgba(255, 255, 255, 0.06),
+        stop:1 rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 8px;
+}
+
+.book-card:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 rgba(255, 255, 255, 0.10),
+        stop:1 rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* === Buttons === */
+.glass-btn {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 rgba(102, 126, 234, 0.4),
+        stop:1 rgba(118, 75, 162, 0.4));
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.glass-btn:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 rgba(102, 126, 234, 0.6),
+        stop:1 rgba(118, 75, 162, 0.6));
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.glass-btn:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 rgba(102, 126, 234, 0.8),
+        stop:1 rgba(118, 75, 162, 0.8));
+}
+
+.glass-btn-success {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 rgba(74, 222, 128, 0.3),
+        stop:1 rgba(34, 197, 94, 0.3));
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.glass-btn-danger {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 rgba(248, 113, 113, 0.3),
+        stop:1 rgba(239, 68, 68, 0.3));
+    border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+/* === Progress Bar === */
+QProgressBar {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    height: 12px;
+    text-align: center;
+    color: #ffffff;
+    font-size: 10px;
+}
+
+QProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #667eea,
+        stop:1 #764ba2);
+    border-radius: 5px;
+}
+
+/* === Line Edit === */
+QLineEdit {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #ffffff;
+    selection-background-color: rgba(102, 126, 234, 0.4);
+}
+
+QLineEdit:focus {
+    border: 1px solid rgba(102, 126, 234, 0.6);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* === Combo Box === */
+QComboBox {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #ffffff;
+    min-width: 120px;
+}
+
+QComboBox:hover {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 30px;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #a0a0c0;
+    margin-right: 10px;
+}
+
+QComboBox QAbstractItemView {
+    background: #1a1a2e;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    selection-background-color: rgba(102, 126, 234, 0.3);
+    color: #ffffff;
+    padding: 4px;
+}
+
+/* === Log Panel === */
+#log_panel {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 8px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+}
+
+/* === Scroll Bar === */
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* === Dialog === */
+QDialog {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #1a1a2e,
+        stop:1 #16213e);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+}
+
+/* === Label === */
+QLabel {
+    color: #ffffff;
+}
+
+QLabel[dim] {
+    color: #a0a0c0;
+}
+
+/* === Title Bar (custom) === */
+#title_bar {
+    background: transparent;
+    padding: 8px 16px;
+}
+
+#title_bar QLabel {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+#title_bar QPushButton {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 14px;
+    color: #a0a0c0;
+}
+
+#title_bar QPushButton:hover {
+    background: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
+}
