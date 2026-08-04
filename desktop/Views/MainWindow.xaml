@@ -76,7 +76,6 @@
                             <TextBlock FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="12,0">
                                 <Run Text="API: "/>
                                 <Run Text="{Binding ActiveProvider, Mode=OneWay}"/>
-                                <Run Text="{Binding IsApiOk, Converter={StaticResource ApiStatusConverter}, Mode=OneWay}"/>
                             </TextBlock>
                         </StackPanel>
                     </StackPanel>
@@ -136,7 +135,7 @@
                                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                             <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,16,0">
                                                                 <Run Text="EPUB: "/>
-                                                                <Run Text="{Binding HasEpub, Converter={StaticResource BoolTextConverter}, Mode=OneWay}"/>
+                                                                <Run Text="{Binding HasEpub, Mode=OneWay}"/>
                                                             </TextBlock>
                                                             <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
                                                                 <Run Text="Audio: "/>
