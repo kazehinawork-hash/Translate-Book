@@ -43,6 +43,22 @@ working/qa/*
 
 # Generated glossary prompts
 working/glossary_prompt*.txt
+# Chunk cache audiobook (WAV tạm) — tái tạo được, không commit
+working/progress_audio/chunks/
+# venv audiobook (VieNeu-TTS)
+working/venv-vieneu/
+
+# Audio mẫu + reference voices dùng chung — KHÔNG commit (có thể có bản quyền)
+core/
+
+# Công cụ (ffmpeg) — tải riêng, không commit
+tools/
+
+# WAV trung gian audiobook (48kHz, ~52MB/chương) — chỉ commit MP3
+output/**/*.wav
+
+# Thư mục test legacy edge-tts — không commit
+output/**/audio_test/
 
 # Logs
 *.log

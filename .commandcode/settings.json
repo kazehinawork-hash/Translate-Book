@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(.venvScriptspython.exe:*)",
+      "Shell(workingvenv-vieneuScriptspython.exe:*)",
+      "Shell(git:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

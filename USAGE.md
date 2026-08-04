@@ -874,32 +874,40 @@ pip install vieneu soundfile numpy
 
 ### 12.2. Chuẩn bị reference audio
 
-Đặt file audiobook mẫu (MP3/WAV) vào `core/`. Script sẽ tự trích 5-10s đoạn sạch làm reference.
-
-### 12.3. Test clone giọng nhanh
+Đặt file audiobook mẫu (MP3/WAV) vào `core/`. Trích 5-10s đoạn sạch làm reference:
 
 ```powershell
-.\working\venv-vieneu\Scripts\Activate.ps1
-python scripts/clone_voice_test.py
+.\working\venv-vieneu\Scripts\python.exe scripts\manage_voice.py extract --name my_voice --source "core\<file>.mp3" --auto
+.\working\venv-vieneu\Scripts\python.exe scripts\manage_voice.py list
 ```
 
-Output: `output/voice_clone_test/` — 7 file WAV test (clone + emotion + style)
+(`--auto` dùng energy VAD tự tìm đoạn giọng sạch; không cần chỉ `--start`.)
+
+### 12.3. Test giọng nhanh (sample/preview)
+
+```powershell
+.\working\venv-vieneu\Scripts\python.exe scripts\manage_voice.py preview --name my_voice
+.\working\venv-vieneu\Scripts\python.exe scripts\audiobook_long.py --slug <slug> --sample
+```
+
+Output preview: `output/voice_preview/`; sample: `output/<slug>/<slug>-sample.wav`
 
 ### 12.4. Tạo audio chapter đầy đủ
 
 ```powershell
-.\working\venv-vieneu\Scripts\Activate.ps1
-python scripts/audiobook_long.py
+.\working\venv-vieneu\Scripts\python.exe scripts\audiobook_long.py --slug <slug>
 ```
 
 Script tự động:
-- Đọc `output/<slug>_trilingual.md`
-- Trích dòng Việt bằng regex `<p class="vi">`
-- Chunk ≤240 ký tự (giữ nguyên câu)
-- Generate từng đoạn (voice clone + style `doc_truyen`)
-- Join + silence 0.4-0.8s + normalize → WAV 48kHz
+- Đọc `output/<slug>/<slug>-vi.md` (bản dịch thuần Việt từ Merge)
+- Tự phát hiện chapters theo heading `# N Tên chương`
+- Chunk ≤240 ký tự (paragraph-aware, giữ nguyên câu)
+- Generate từng đoạn (voice clone + style `doc_truyen`), checkpoint theo chunk → resume nhanh
+- Join + silence 0.4-0.8s + normalize → WAV 48kHz → convert MP3 128kbps (cần ffmpeg)
 
-Output: `output/voice_clone_test/chapter01_suso_hiep.wav` (~9 phút, ~52 MB)
+Output: `output/<slug>/<slug>-ch01.mp3` (~9 phút, ~9 MB/chương)
+
+Resume: chạy lại cùng lệnh sẽ bỏ qua chương đã có audio (dựa trên `working/progress_audio/<slug>.json` hoặc dò file trong `output/<slug>/`). Dùng `--force` để chạy lại từ đầu.
 
 ### 12.5. Hiệu suất
 
@@ -913,9 +921,12 @@ Output: `output/voice_clone_test/chapter01_suso_hiep.wav` (~9 phút, ~52 MB)
 
 ### 12.6. Tùy chỉnh
 
-- **Thay đổi style**: sửa `style="doc_truyen"` thành `style="tu_nhien"` hoặc `style="tin_tuc"`
-- **Thay đổi giọng**: dùng `voice="Ngọc Linh"` (preset) hoặc clone giọng mới
-- **Thay đổi chapter**: sửa `chapter_start` và `chapter_end` trong script
+- **Style**: mặc định `doc_truyen` (đọc truyện). Trong `audiobook_long.py` đổi `style="doc_truyen"` thành `"tu_nhien"`/`"tin_tuc"` nếu cần
+- **Giọng**: `manage_voice.py list` để xem giọng clone đã lưu; chọn bằng `--voice <name>` hoặc mặc định dùng voice active
+- **Chương cụ thể**: `--chapter 1 2 3` / `--first` (chương đầu) / `--sample` (đoạn ngắn)
+- **Chạy lại từ đầu**: `--force`
+- **Bitrate MP3**: `--bitrate 64k` (nhỏ hơn, ~5MB/chương)
+- **Không đọc tên chương**: `--no-read-titles`
 - **Emotion tags**: thêm `[cười]`, `[thở dài]`, `[hắng giọng]` trong text
 
 ---

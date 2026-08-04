@@ -99,7 +99,8 @@ Sau khi có bản dịch `-vi.md` (thuần Việt từ bước 9 Merge), có th�
 
 ```bash
 # 1. Clone giọng từ audiobook mẫu (cần 5-10s reference audio)
-python scripts/clone_voice_test.py
+python scripts/manage_voice.py extract --name my_voice --source "<file.mp3>" --auto
+python scripts/manage_voice.py preview --name my_voice   # (tùy chọn) test giọng
 
 # 2. Tạo audio chapter đầy đủ (~9 phút, ~4 phút gen trên CPU)
 python scripts/audiobook_long.py

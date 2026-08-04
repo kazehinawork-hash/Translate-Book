@@ -51,17 +51,17 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 ## BƯỚC 11 — TẠO AUDIOBOOK (VieNeu-TTS v3 Turbo)
 
 ### Pipeline
-1. **Trích reference audio**: `manage_voice.py extract` — lấy 5-10s giọng đọc sạch từ file audiobook mẫu, save WAV + metadata vào `core/voices/` (chỉ cần làm 1 lần)
+1. **Trích reference audio**: `manage_voice.py extract` — lấy 5-10s giọng đọc sạch từ file audiobook mẫu, save WAV + metadata vào `core/voices/` (chỉ cần làm 1 lần). Dùng `--auto` để tự tìm đoạn giọng sạch bằng energy VAD (không cần chỉ `--start`)
 2. **Clone giọng**: `tts.add_voice(name, ref_path)` — tự extract speaker embedding (192-d x-vector) + MOSS code tokens
-3. **Đọc text Việt**: Đọc trực tiếp `<slug>-vi.md` (bản dịch thuần Việt từ bước 9 Merge)
-4. **Smart chunk**: Chia text ≤240 ký tự/đoạn (VieNeu limit ~256), giữ nguyên câu
-5. **Generate**: `tts.infer(chunk, voice=name, style="doc_truyen")` từng đoạn
-6. **Join**: `np.concatenate(all_audio)` + silence 0.4-0.8s giữa các đoạn → normalize → WAV 48kHz
+3. **Đọc text Việt**: Đọc trực tiếp `<slug>-vi.md` (bản dịch thuần Việt từ bước 9 Merge). Text được làm sạch markdown (bảng/link/chú thích/ảnh), đọc cả tên chapter (tắt bằng `--no-read-titles`)
+4. **Smart chunk**: Chia text ≤240 ký tự/đoạn (VieNeu limit ~256), giữ nguyên câu, giữ biên đoạn văn (paragraph-aware) → silence dài hơn giữa các đoạn
+5. **Generate**: `tts.infer(chunk, voice=name, style="doc_truyen")` từng đoạn. Checkpoint theo chunk (resume nhanh giữa chừng), retry 3 lần
+6. **Join**: `np.concatenate(all_audio)` + silence 0.4-0.8s giữa các đoạn → normalize từng chunk (0.95) + fade 10ms + master normalize (0.92) → WAV 48kHz
+7. **MP3**: Tự động convert WAV → MP3 128kbps (xóa WAV trừ `--keep-wav`), kèm metadata title/album
 
 ### Scripts
-- `scripts/manage_voice.py` — Quản lý reference audio: extract từ MP3, save WAV + metadata, list/info/delete
-- `scripts/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, --first/--chapter N, output vào `output/<slug>/`
-- `scripts/audiobook_from_trilingual.py` — Tạo audio sample ngắn (~23s) từ -vi.md
+- `scripts/manage_voice.py` — Quản lý reference audio: extract (có `--auto` VAD), save WAV + metadata, list/info/delete/set-active/active, preview, validate chất lượng (duration/sample rate/peak)
+- `scripts/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, `--first`/`--chapter N`/`--sample`/`--force`/`--voice NAME`/`--temperature`/`--top-k`/`--bitrate`/`--no-read-titles`/`--keep-wav`, resume checkpoint (theo chapter + theo chunk), retry, auto MP3
 
 ### Env
 - venv: `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)
@@ -70,14 +70,17 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - Voice clone cần 3-8s reference audio sạch
 
 ### Output
-- `output/<slug>/<slug>-ch01.wav` — audio chapter (mỗi file ~50MB/9min)
+- `output/<slug>/<slug>-ch01.mp3` — audio chapter (MP3 128kbps, ~10MB/chapter, kèm metadata title/album)
 - `output/<slug>/<slug>-vi.md` — bản dịch thuần Việt (từ bước 9 Merge)
-- Audio samples ngắn tại `output/voice_clone_test/`
+- Audio samples ngắn tại `output/voice_preview/`
+- Progress: `working/progress_audio/<slug>.json`
+- Chunk cache để resume: `working/progress_audio/chunks/<slug>/` (tự xóa sau khi chapter xong)
 
 ## CẤU TRÚC THƯ MỤC QUAN TRỌNG
 - `input/` — file gốc PDF/EPUB, **KHÔNG commit**
 - `working/extracted/`, `working/chunks/`, `working/qa/` — **KHÔNG commit**
 - `working/progress/<slug>/` — chunk đã dịch, **CÓ commit**
+- `working/progress_audio/<slug>.json` — progress audiobook, **CÓ commit**; cache chunk WAV trong `working/progress_audio/chunks/` thì **KHÔNG commit** (đã ignore)
 - `working/venv-vieneu/` — venv VieNeu-TTS, **KHÔNG commit**
 - `glossary/` — glossary cuốn, **có commit**
 - `output/` — bản dịch hoàn chỉnh (md + epub) + audiobook, **có commit**
