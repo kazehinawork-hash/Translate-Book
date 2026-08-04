@@ -50,12 +50,12 @@ Lặp qua từng file `working\progress\<slug>\chunk_<NNN>.json` có `translated
 - Nếu có `glossary\<slug>.csv` + progress đầy đủ: `.venv\Scripts\python.exe scripts\run_pipeline.py --book <book> --slug <slug> --from-step 8 --to-step 8` — BẮT BUỘC thêm `--to-step 8` để CHỈ chạy bước 8 (QA), tránh tự merge/EPUB luôn. In báo cáo cho người dùng; sửa các lỗi rõ ràng (Hán sót, mojibake) nếu dễ.
 
 ## I. Merge
-- ZH: `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug> --format trilingual --force` → `output\<slug>_trilingual.md`; rồi `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug> --force` → `output\<slug>_translated.md`. Tạo `output\<slug>\` và di chuyển thành `output\<slug>\<slug>-tamngu.md` + `output\<slug>\<slug>-vi.md`.
-- EN: `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug>-tmp --output-dir working\tmp\<slug> --force`, rồi `.venv\Scripts\python.exe scripts\make_bilingual.py --source <RAW> --translation working\tmp\<slug>\<slug>-tmp_translated.md --output output\<slug>\<slug>-songngu.md --lang en`; copy sang `output\<slug>\<slug>-vi.md`.
+- ZH: `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug> --format trilingual --force` → `output/books/<slug>/final/tamngu.md`; rồi `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug> --force` → `output/books/<slug>/final/vi.md`.
+- EN: `.venv\Scripts\python.exe scripts\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug>-tmp --output-dir working\tmp\<slug> --force`, rồi `.venv\Scripts\python.exe scripts\make_bilingual.py --source <RAW> --translation working\tmp\<slug>\<slug>-tmp_translated.md --output output/books/<slug>/final/songngu.md --lang en`; copy sang `output/books/<slug>/final/vi.md`.
 
 ## J. EPUB
-- Nếu người dùng muốn file EPUB (hoặc mặc định tạo): gọi pandoc tại `C:\Users\Admin\AppData\Local\Pandoc\pandoc.exe` qua `.venv\Scripts\python.exe scripts\make_epub.py output\<slug>\<slug>-vi.md --title "<Tên sách>" --author "<tác giả nếu biết>" --resource-path "output\<slug>;working\extracted\<slug>"` (nếu pandoc không nằm trong PATH, thử thêm `C:\Users\Admin\AppData\Local\Pandoc` vào PATH tạm hoặc gọi pandoc.exe trực tiếp).
+- Nếu người dùng muốn file EPUB (hoặc mặc định tạo): gọi pandoc tại `C:\Users\Admin\AppData\Local\Pandoc\pandoc.exe` qua `.venv\Scripts\python.exe scripts\make_epub.py output/books/<slug>/final/vi.md --title "<Tên sách>" --author "<tác giả nếu biết>" --resource-path "output/books/<slug>/images;working\extracted\<slug>"` (nếu pandoc không nằm trong PATH, thử thêm `C:\Users\Admin\AppData\Local\Pandoc` vào PATH tạm hoặc gọi pandoc.exe trực tiếp). File EPUB output: `output/books/<slug>/trilingual.epub`.
 
 ## K. Tổng kết
-- In đường dẫn đầy đủ các file output: bản tiếng Việt, tam ngữ (nếu ZH), EPUB.
+- In đường dẫn đầy đủ các file output: `output/books/<slug>/final/vi.md` (bản tiếng Việt), `output/books/<slug>/final/tamngu.md` (tam ngữ, nếu ZH), `output/books/<slug>/trilingual.epub` (EPUB).
 - KHÔNG tự commit/push (theo AGENTS.md) trừ khi người dùng yêu cầu. Hỏi người dùng có muốn commit/push không.
