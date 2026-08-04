@@ -1,3 +1,3 @@
 @echo off
-cd /d "%~dp0desktop"
+cd /d "%~dp0"
 dotnet run
