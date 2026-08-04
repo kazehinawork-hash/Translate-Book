@@ -46,9 +46,9 @@
                 <TextBlock Text="📚 Translate Book" FontSize="16" FontWeight="Bold"
                            Foreground="White" VerticalAlignment="Center" Margin="16,0"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Content="—" Click="Minimize_Click" Style="{StaticResource SidebarButton}" Width="40"/>
-                    <Button Content="□" Click="Maximize_Click" Style="{StaticResource SidebarButton}" Width="40"/>
-                    <Button Content="✕" Click="Close_Click" Style="{StaticResource SidebarButton}" Width="40"/>
+                    <Button Content="—" Click="Minimize_Click" Style="{StaticResource TitleBarButton}"/>
+                    <Button Content="□" Click="Maximize_Click" Style="{StaticResource TitleBarButton}"/>
+                    <Button Content="✕" Click="Close_Click" Style="{StaticResource TitleBarButton}"/>
                 </StackPanel>
             </Grid>
 
