@@ -187,7 +187,7 @@
 
                                 <TextBlock Text="API Key" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,4"/>
                                 <PasswordBox x:Name="ApiKeyBox" Width="400" HorizontalAlignment="Left"
-                                             Style="{StaticResource GlassTextBox}"/>
+                                             Style="{StaticResource GlassPasswordBox}"/>
 
                                 <TextBlock Text="Model" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,4"/>
                                 <TextBox x:Name="ModelBox" Width="400" HorizontalAlignment="Left"
