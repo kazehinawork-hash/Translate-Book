@@ -136,9 +136,16 @@ class BookCard(GlassFrame):
         super().__init__(parent)
         self.slug = slug
         self.status = status
+        source = status.get("source", "output")
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
+
+        # Source badge
+        if source == "input":
+            badge = QLabel("📁 INPUT")
+            badge.setStyleSheet(f"font-size: 10px; color: {INFO}; background: {INFO_BG}; padding: 2px 8px; border-radius: 4px; max-width: 60px;")
+            layout.addWidget(badge)
 
         # Title
         title = QLabel(slug)
@@ -148,21 +155,24 @@ class BookCard(GlassFrame):
 
         # Status
         if status.get("has_vi_md"):
-            status_text = "✓ Hoàn thành"
+            status_text = "✓ Hoan thanh"
             status_color = SUCCESS
+        elif source == "input":
+            status_text = "Chua dich — dat vao input/"
+            status_color = INFO
         elif status.get("progress_count", 0) > 0:
             pct = status["progress_count"] / max(status.get("total_chunks", 1), 1) * 100
-            status_text = f"Đang dịch {status['progress_count']}/{status.get('total_chunks', '?')} chunks ({pct:.0f}%)"
+            status_text = f"Dang dich {status['progress_count']}/{status.get('total_chunks', '?')} chunks ({pct:.0f}%)"
             status_color = WARNING
         else:
-            status_text = "Chưa bắt đầu"
+            status_text = "Chua bat dau"
             status_color = TEXT_DIM
 
         status_label = QLabel(status_text)
         status_label.setStyleSheet(f"font-size: 13px; color: {status_color};")
         layout.addWidget(status_label)
 
-        # Progress bar
+        # Progress bar (chi hien khi co progress)
         if status.get("total_chunks", 0) > 0:
             progress = QProgressBar()
             progress.setMaximum(status["total_chunks"])
@@ -183,25 +193,26 @@ class BookCard(GlassFrame):
             layout.addWidget(progress)
 
         # Stats row
-        stats = QHBoxLayout()
-        stats.setSpacing(16)
-
-        epub = QLabel(f"EPUB: {'✓' if status.get('has_epub') else '—'}")
-        epub.setStyleSheet(f"font-size: 12px; color: {TEXT_SECONDARY};")
-        stats.addWidget(epub)
-
-        audio = QLabel(f"Audio: {status.get('mp3_count', 0)} files")
-        audio.setStyleSheet(f"font-size: 12px; color: {TEXT_SECONDARY};")
-        stats.addWidget(audio)
-
-        stats.addStretch()
-        layout.addLayout(stats)
+        if source == "output":
+            stats = QHBoxLayout()
+            stats.setSpacing(16)
+            epub = QLabel(f"EPUB: {'checkmark' if status.get('has_epub') else '-'}")
+            epub.setStyleSheet(f"font-size: 12px; color: {TEXT_SECONDARY};")
+            stats.addWidget(epub)
+            audio = QLabel(f"Audio: {status.get('mp3_count', 0)} files")
+            audio.setStyleSheet(f"font-size: 12px; color: {TEXT_SECONDARY};")
+            stats.addWidget(audio)
+            stats.addStretch()
+            layout.addLayout(stats)
 
         # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        translate_btn = GlassButton("Dịch")
+        if source == "input":
+            translate_btn = GlassButton("Bat dau dich", "success")
+        else:
+            translate_btn = GlassButton("Dich")
         translate_btn.clicked.connect(lambda: self.translate_clicked.emit(slug))
         btn_layout.addWidget(translate_btn)
 
@@ -501,7 +512,10 @@ class MainWindow(QMainWindow):
             import re, json
             project_root = Path(__file__).parent.parent.parent
             books_dir = project_root / "output" / "books"
+            input_dir = project_root / "input"
             statuses = []
+
+            # Sách trong output/books/ (đã/x đang dịch)
             if books_dir.exists():
                 for d in sorted(books_dir.iterdir()):
                     if not d.is_dir():
@@ -532,11 +546,28 @@ class MainWindow(QMainWindow):
                         content = vi_md.read_text(encoding='utf-8')
                         total_chapters = len(re.findall(r'^# ', content, re.MULTILINE))
                     statuses.append({
-                        "slug": slug, "has_vi_md": vi_md.exists(), "has_epub": epub.exists(),
+                        "slug": slug, "source": "output",
+                        "has_vi_md": vi_md.exists(), "has_epub": epub.exists(),
                         "mp3_count": mp3_count, "total_chapters": total_chapters,
                         "progress_count": progress_count, "total_chunks": total_chunks,
                         "audio_done": len(audio_chapters), "audio_total": total_chapters,
                     })
+
+            # Sách trong input/ (chưa dịch)
+            known_slugs = {s["slug"] for s in statuses}
+            if input_dir.exists():
+                for f in sorted(input_dir.iterdir()):
+                    if f.suffix.lower() in ('.pdf', '.epub', '.docx'):
+                        slug = f.stem.lower().replace(' ', '-')
+                        if slug not in known_slugs:
+                            statuses.append({
+                                "slug": f.name, "slug_key": slug, "source": "input",
+                                "has_vi_md": False, "has_epub": False,
+                                "mp3_count": 0, "total_chapters": 0,
+                                "progress_count": 0, "total_chunks": 0,
+                                "audio_done": 0, "audio_total": 0,
+                            })
+
             self.books_page.load_books(statuses)
             self.log_panel.log(f"📚 Da tai {len(statuses)} cuon sach", "info")
         except Exception as e:
