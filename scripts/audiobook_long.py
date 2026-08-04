@@ -23,7 +23,7 @@ Usage:
     # Chạy lại từ đầu (bỏ qua progress)
     python scripts/audiobook_long.py --force
 """
-import sys, os, re, time, argparse, json
+import sys, os, re, time, argparse, json, shutil
 import numpy as np
 import soundfile as sf
 
@@ -35,6 +35,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_CHARS = 240          # chars per chunk (VieNeu limit ~256)
 SILENCE_BETWEEN = 0.4    # seconds silence between chunks
 SILENCE_PARA = 0.8       # seconds silence between paragraphs
+SILENCE_CHAPTER_END = 1.5 # seconds silence cuối chapter (trước khi chapter mới bắt đầu)
 SAMPLE_RATE = 48000
 MAX_RETRIES = 3          # retries per chunk on TTS failure
 FADE_MS = 10             # fade in/out ở đầu/cuối chapter (tránh click khi start/stop)
@@ -63,20 +64,38 @@ def _apply_fade(audio, fade_ms=FADE_MS):
 
 
 def find_vi_md(slug: str = None) -> tuple:
-    """Tìm file -vi.md. Trả về (path, slug)."""
-    output_dir = os.path.join(PROJECT_ROOT, "output")
-    if slug:
-        path = os.path.join(output_dir, slug, f"{slug}-vi.md")
-        if os.path.exists(path):
-            return path, slug
-        raise FileNotFoundError(f"File not found: {path}")
+    """Tìm file -vi.md. Trả về (path, slug).
 
-    # Auto-detect: tìm -vi.md trong output/.
-    # Nếu có NHIỀU sách → liệt kê và yêu cầu --slug để tránh chọn nhầm.
+    Tìm theo thứ tự:
+    1. output/books/<slug>/final/vi.md (cấu trúc mới)
+    2. output/<slug>/<slug>-vi.md (cấu trúc cũ, backward compat)
+    """
+    books_dir = os.path.join(PROJECT_ROOT, "output", "books")
+    output_dir = os.path.join(PROJECT_ROOT, "output")
+
+    if slug:
+        # Thử cấu trúc mới trước
+        new_path = os.path.join(books_dir, slug, "final", "vi.md")
+        if os.path.exists(new_path):
+            return new_path, slug
+        # Fallback cấu trúc cũ
+        old_path = os.path.join(output_dir, slug, f"{slug}-vi.md")
+        if os.path.exists(old_path):
+            return old_path, slug
+        raise FileNotFoundError(f"File not found: {new_path}")
+
+    # Auto-detect: tìm -vi.md trong books/ và output/
     candidates = []
+    # Cấu trúc mới: output/books/<slug>/final/vi.md
+    if os.path.isdir(books_dir):
+        for d in sorted(os.listdir(books_dir)):
+            vi_path = os.path.join(books_dir, d, "final", "vi.md")
+            if os.path.exists(vi_path):
+                candidates.append((vi_path, d))
+    # Cấu trúc cũ: output/<slug>/<slug>-vi.md
     for d in sorted(os.listdir(output_dir)):
         vi_path = os.path.join(output_dir, d, f"{d}-vi.md")
-        if os.path.exists(vi_path):
+        if os.path.exists(vi_path) and (vi_path, d) not in candidates:
             candidates.append((vi_path, d))
 
     if len(candidates) == 1:
@@ -84,11 +103,11 @@ def find_vi_md(slug: str = None) -> tuple:
     if len(candidates) > 1:
         book_list = ", ".join(f"'{slug}'" for _, slug in candidates)
         raise FileNotFoundError(
-            f"Có {len(candidates)} sách trong output/ ({book_list}). "
+            f"Có {len(candidates)} sách ({book_list}). "
             "Hãy chỉ định --slug để tránh chọn nhầm."
         )
 
-    raise FileNotFoundError(f"No *-vi.md found in {output_dir}")
+    raise FileNotFoundError(f"No *-vi.md found in output/")
 
 
 def detect_chapters(md_path: str) -> list:
@@ -171,9 +190,8 @@ def cleanup_markdown(text: str) -> str:
 def extract_chapter_text(lines: list, start: int, end: int, include_title: bool = True) -> list:
     """Trích xuất text Việt thành các đoạn văn (paragraphs).
 
-    Trả về list of paragraphs (mỗi paragraph là 1 chuỗi text liền mạch).
-    Paragraph được phân tách bằng dòng trống trong file md.
-    Nếu include_title=True, tên chapter được chèn làm paragraph đầu tiên.
+    Trả về list of (paragraph_text, ends_paragraph).
+    ends_paragraph=True nếu paragraph kế tiếp là heading hoặc end of chapter.
     """
     paragraphs = []
     current = []
@@ -187,20 +205,20 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
         if not stripped:
             # Dòng trống → kết thúc 1 paragraph
             if current:
-                paragraphs.append(" ".join(current))
+                paragraphs.append((" ".join(current), False))
                 current = []
             continue
         if stripped.startswith("#"):
-            # Heading: kết thúc paragraph hiện tại, thêm heading text
+            # Heading: kết thúc paragraph hiện tại, đánh dấu section end
             if current:
-                paragraphs.append(" ".join(current))
+                paragraphs.append((" ".join(current), True))
                 current = []
             heading = re.sub(r"^#+\s*", "", stripped)
             # Chuyển full-width parentheses → ASCII trước khi kiểm tra
             heading = heading.replace("（", "(").replace("）", ")")
             heading = re.sub(r"^\(\d+\)\s*", "", heading)  # bỏ (01) prefix
             if include_title and heading and len(heading) > 2:
-                paragraphs.append(heading)
+                paragraphs.append((heading, False))
             continue
         # Cleanup markdown
         text = cleanup_markdown(stripped)
@@ -210,39 +228,40 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
         if re.match(r'^[\s"\'""\'\'!,.?…—–\-*~()（）\-–—\[\]【】{}]+$', text):
             continue
         current.append(text)
+    # Paragraph cuối cùng → section end
     if current:
-        paragraphs.append(" ".join(current))
+        paragraphs.append((" ".join(current), True))
     return paragraphs
 
 
 def _split_sentences(text: str) -> list:
     """Tách text thành danh sách câu hoàn chỉnh.
 
-    Giữ nguyên dấu câu ở cuối mỗi câu. Tách tại: . ! ? … ; " và tổ hợp.
+    Tách tại: . ! ? … ; theo sau bởi space hoặc cuối chuỗi.
+    Xử lý quote đóng: ". "? "! "? → giữ nguyên trong cùng câu.
     """
-    # Thêm sentinel cuối để regex bắt được câu cuối cùng
     text = text.strip()
     if not text:
         return []
-    # Tách tại dấu câu theo sau bởi space hoặc cuối chuỗi
-    # Giữ lại dấu câu ở cuối câu (không nuốt)
-    parts = re.split(r'(?<=[.!?…;])\s+', text)
+    # Tách tại dấu câu结束 (không tách nếu trước đó là quote mở)
+    # Pattern: dấu câu + space hoặc cuối chuỗi, KHÔNG có quote mở ngay trước
+    parts = re.split(r'(?<=[.!?…])\s+', text)
     return [p.strip() for p in parts if p.strip()]
 
 
 def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
     """Chunk paragraphs thành các đoạn <= max_chars, ưu tiên giữ nguyên câu.
 
+    paragraphs: list of (text, ends_paragraph) từ extract_chapter_text.
     Chiến lược: tách paragraph thành câu → gộp câu liền kề vào chunk
-    cho đến khi vượt max_chars → bắt chunk mới. Chỉ split câu khi
-    một câu duy nhất dài hơn max_chars (hiếm gặp).
+    cho đến khi vượt max_chars → bắt chunk mới.
 
     Trả về list of (text, ends_paragraph).
     """
     chunks = []
 
-    for para_idx, para in enumerate(paragraphs):
-        para = re.sub(r"\s+", " ", para).strip()
+    for para_idx, (para_text, para_section_end) in enumerate(paragraphs):
+        para = re.sub(r"\s+", " ", para_text).strip()
         if not para:
             continue
 
@@ -251,7 +270,6 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
             sentences = [para]
 
         current = ""
-        is_last_para = (para_idx == len(paragraphs) - 1)
 
         for sent_idx, sent in enumerate(sentences):
             sent = sent.strip()
@@ -273,17 +291,14 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
 
             # Câu mới quá dài → phải split
             if len(sent) > max_chars:
-                # Split câu dài tại dấu câu phụ (dấu phẩy, chấm phẩy) hoặc space
                 remaining = sent
                 while len(remaining) > max_chars:
-                    # Tìm dấu câu phụ gần max_chars
                     split_pos = -1
                     for sep in [", ", "; ", ": ", " — ", " – "]:
                         pos = remaining.rfind(sep, 0, max_chars)
                         if pos > split_pos:
                             split_pos = pos + len(sep)
                     if split_pos <= 0:
-                        # Không có dấu → split tại space
                         space_pos = remaining.rfind(" ", 0, max_chars)
                         if space_pos > max_chars // 3:
                             split_pos = space_pos
@@ -295,17 +310,16 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
             else:
                 current = sent
 
-        # Lưu chunk cuối cùng của paragraph
+        # Lưu chunk cuối cùng của paragraph → đánh dấu section end nếu paragraph là section end
         if current.strip():
-            chunks.append((current.strip(), True))
+            chunks.append((current.strip(), para_section_end))
 
     # Gộp chunk cuối cùng vào chunk trước nếu cả 2 đều nhỏ
-    # (tránh chunk cuối quá ngắn gây "hết hơi")
     if len(chunks) >= 2:
         last_text, last_para = chunks[-1]
         prev_text, prev_para = chunks[-2]
         if len(prev_text) + len(last_text) + 1 <= max_chars:
-            chunks[-2] = (prev_text + " " + last_text, last_para)
+            chunks[-2] = (prev_text + " " + last_text, last_para or prev_para)
             chunks.pop()
 
     return chunks
@@ -314,20 +328,20 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
 def find_nice_passage(paragraphs, min_chars=200, max_chars=800):
     """Tìm đoạn văn hay, liền mạch trong text Việt.
 
+    paragraphs: list of (text, ends_paragraph) từ extract_chapter_text.
     Ưu tiên paragraph vừa đủ (min-max). Nếu không có, cắt paragraph dài
-    tại biên câu gần max_chars. Nếu vẫn không, nối paragraph ngắn.
+    tại biên câu gần max_chars.
     """
     # 1. Tìm paragraph có độ dài vừa phải
-    for p in paragraphs:
-        p = re.sub(r"\s+", " ", p).strip()
+    for p_text, _ in paragraphs:
+        p = re.sub(r"\s+", " ", p_text).strip()
         if min_chars <= len(p) <= max_chars:
             return p
 
     # 2. Không có đoạn vừa → cắt paragraph dài đầu tiên >= min_chars
-    for p in paragraphs:
-        p = re.sub(r"\s+", " ", p).strip()
+    for p_text, _ in paragraphs:
+        p = re.sub(r"\s+", " ", p_text).strip()
         if len(p) >= min_chars:
-            # Cắt tại biên câu gần max_chars
             separators = ["... ", "! ", "? ", ". ", "; "]
             cut_pos = -1
             for sep in separators:
@@ -340,8 +354,8 @@ def find_nice_passage(paragraphs, min_chars=200, max_chars=800):
 
     # 3. Nối các paragraph ngắn
     passage = ""
-    for p in paragraphs:
-        p = re.sub(r"\s+", " ", p).strip()
+    for p_text, _ in paragraphs:
+        p = re.sub(r"\s+", " ", p_text).strip()
         if not p:
             continue
         if len(passage) + len(p) + 1 > max_chars:
@@ -427,7 +441,7 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
 
         raw_chunks.append(audio)
 
-    # 2. Ghép: chèn silence GIỮA các chunk (không thêm sau chunk cuối)
+    # 2. Ghép: chèn silence GIỮA các chunk, + silence cuối chapter
     combined = []
     for i, audio in enumerate(raw_chunks):
         combined.append(audio)
@@ -437,6 +451,8 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
             is_para_end = ends_para or chunk_text.rstrip().endswith((".", "!", "?", '"', "…"))
             silence_dur = SILENCE_PARA if is_para_end else SILENCE_BETWEEN
             combined.append(make_silence(silence_dur))
+    # Silence cuối chapter (tránh chuyển chapter đột ngột)
+    combined.append(make_silence(SILENCE_CHAPTER_END))
 
     final = np.concatenate(combined)
     # 3. Normalize toàn chapter (giữ nguyên dynamic range)
@@ -525,19 +541,23 @@ def save_progress(slug: str, progress: dict):
 
 
 def reconcile_existing_outputs(slug: str) -> list:
-    """Quét output/<slug>/ tìm file chương đã tồn tại (*-chNN.mp3 hoặc *.wav).
+    """Quét output寻找 file chương đã tồn tại.
 
-    Trả về list chapter number đã có file audio — dùng để resume khi file
-    progress JSON bị mất hoặc chưa được tạo (vd: lần chạy trước bị gián đoạn).
+    Tìm trong output/books/<slug>/audiobook/ (mới) và output/<slug>/ (cũ).
+    Trả về list chapter number đã có file audio.
     """
-    out_dir = os.path.join(PROJECT_ROOT, "output", slug)
     found = []
-    if os.path.isdir(out_dir):
-        pattern = re.compile(rf"^{re.escape(slug)}-ch(\d+)\.(?:mp3|wav)$")
-        for fn in os.listdir(out_dir):
-            m = pattern.match(fn)
-            if m:
-                found.append(int(m.group(1)))
+    # Cấu trúc mới
+    new_dir = os.path.join(PROJECT_ROOT, "output", "books", slug, "audiobook")
+    # Cấu trúc cũ
+    old_dir = os.path.join(PROJECT_ROOT, "output", slug)
+    for out_dir in [new_dir, old_dir]:
+        if os.path.isdir(out_dir):
+            pattern = re.compile(rf"^(?:{re.escape(slug)}-)?ch(\d+)\.(?:mp3|wav)$")
+            for fn in os.listdir(out_dir):
+                m = pattern.match(fn)
+                if m:
+                    found.append(int(m.group(1)))
     return sorted(set(found))
 
 
@@ -565,8 +585,17 @@ def merge_all_chapters(slug: str, out_dir: str, chapters: list):
     mp3_files = []
     wav_files = []
     for ch in sorted(chapters, key=lambda c: c["num"]):
-        mp3 = os.path.join(out_dir, f"{slug}-ch{ch['num']:02d}.mp3")
-        wav = os.path.join(out_dir, f"{slug}-ch{ch['num']:02d}.wav")
+        mp3 = os.path.join(out_dir, f"ch{ch['num']:02d}.mp3")
+        wav = os.path.join(out_dir, f"ch{ch['num']:02d}.wav")
+        # Fallback: cấu trúc cũ <slug>-chNN.mp3
+        if not os.path.exists(mp3):
+            mp3_old = os.path.join(out_dir, f"{slug}-ch{ch['num']:02d}.mp3")
+            if os.path.exists(mp3_old):
+                mp3 = mp3_old
+        if not os.path.exists(wav):
+            wav_old = os.path.join(out_dir, f"{slug}-ch{ch['num']:02d}.wav")
+            if os.path.exists(wav_old):
+                wav = wav_old
         if os.path.exists(mp3):
             mp3_files.append(mp3)
         elif os.path.exists(wav):
@@ -692,8 +721,11 @@ def main():
                           apply_watermark=False)
         elapsed = time.time() - t0
         audio = audio.squeeze()
+        # Normalize + fade (giống chapter mode để nghe nhất quán)
+        audio = _normalize(audio, NORM_MASTER)
+        audio = _apply_fade(audio)
 
-        out_dir = os.path.join(PROJECT_ROOT, "output", slug)
+        out_dir = os.path.join(PROJECT_ROOT, "output", "samples")
         os.makedirs(out_dir, exist_ok=True)
         wav_path = os.path.join(out_dir, f"{slug}-sample.wav")
         sf.write(wav_path, audio, SAMPLE_RATE)
@@ -714,8 +746,8 @@ def main():
     else:
         selected = chapters
 
-    # Output dir: output/<slug>/
-    out_dir = os.path.join(PROJECT_ROOT, "output", slug)
+    # Output dir: output/books/<slug>/audiobook/
+    out_dir = os.path.join(PROJECT_ROOT, "output", "books", slug, "audiobook")
     os.makedirs(out_dir, exist_ok=True)
 
     # 3. Load progress
@@ -745,7 +777,6 @@ def main():
         print("🔄 Force mode — regenerating all chapters")
         progress = {"slug": slug, "completed_chapters": [], "total_gen_time": 0, "total_audio_time": 0}
         completed = set()
-        import shutil
         chunks_root = _chunks_root(slug)
         if os.path.isdir(chunks_root):
             shutil.rmtree(chunks_root, ignore_errors=True)
@@ -800,7 +831,7 @@ def main():
         # Extract text (paragraph-aware)
         paragraphs = extract_chapter_text(all_lines, start, end,
                                           include_title=args.read_titles)
-        total_chars = sum(len(p) for p in paragraphs)
+        total_chars = sum(len(p[0]) for p in paragraphs)
         print(f"   {len(paragraphs)} đoạn văn, {total_chars} ký tự")
 
         if not paragraphs:
@@ -809,6 +840,9 @@ def main():
 
         # Chunk
         chunks = smart_chunk(paragraphs)
+        if not chunks:
+            print("   ⚠️  No chunks generated, skipping")
+            continue
         print(f"   {len(chunks)} chunks (max {MAX_CHARS} chars)")
 
         # Generate (có checkpoint từng chunk → resume nhanh khi bị gián đoạn)
@@ -826,7 +860,7 @@ def main():
             return
 
         # Save WAV
-        wav_path = os.path.join(out_dir, f"{slug}-ch{num:02d}.wav")
+        wav_path = os.path.join(out_dir, f"ch{num:02d}.wav")
         sf.write(wav_path, audio, SAMPLE_RATE)
 
         # Lấy duration từ WAV trước khi convert (sf.info không hỗ trợ MP3 trên mọi hệ thống)
@@ -846,7 +880,6 @@ def main():
         audio_this_run += wav_duration
 
         # Dọn chunk cache sau khi chapter hoàn thành
-        import shutil
         if os.path.isdir(chunk_dir):
             shutil.rmtree(chunk_dir, ignore_errors=True)
 

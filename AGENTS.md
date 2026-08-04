@@ -70,9 +70,11 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - Voice clone cần 3-8s reference audio sạch
 
 ### Output
-- `output/<slug>/<slug>-ch01.mp3` — audio chapter (MP3 128kbps, ~10MB/chapter, kèm metadata title/album)
-- `output/<slug>/<slug>-vi.md` — bản dịch thuần Việt (từ bước 9 Merge)
-- Audio samples ngắn tại `output/voice_preview/`
+- `output/books/<slug>/audiobook/ch01.mp3` — audio chapter (MP3 128kbps, ~10MB/chapter, kèm metadata title/album)
+- `output/books/<slug>/final/vi.md` — bản dịch thuần Việt (từ bước 9 Merge)
+- `output/books/<slug>/final/tamngu.md` — bản tam ngữ
+- `output/books/<slug>/trilingual.epub` — epub tam ngữ
+- `output/books/<slug>/images/` — ảnh từ EPUB
 - Progress: `working/progress_audio/<slug>.json`
 - Chunk cache để resume: `working/progress_audio/chunks/<slug>/` (tự xóa sau khi chapter xong)
 
@@ -83,7 +85,11 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - `working/progress_audio/<slug>.json` — progress audiobook, **CÓ commit**; cache chunk WAV trong `working/progress_audio/chunks/` thì **KHÔNG commit** (đã ignore)
 - `working/venv-vieneu/` — venv VieNeu-TTS, **KHÔNG commit**
 - `glossary/` — glossary cuốn, **có commit**
-- `output/` — bản dịch hoàn chỉnh (md + epub) + audiobook, **có commit**
+- `output/books/<slug>/final/` — bản dịch hoàn chỉnh (md), **có commit**
+- `output/books/<slug>/audiobook/` — audio hoàn chỉnh (mp3), **có commit**
+- `output/books/<slug>/trilingual.epub` — epub tam ngữ, **có commit**
+- `output/samples/` — test samples, **KHÔNG commit**
+- `output/_archive/` — legacy, **KHÔNG commit**
 - `core/` — audio mẫu + reference voices dùng chung, **KHÔNG commit**
 - `core/voices/` — reference audio đã extract (WAV + JSON metadata), **KHÔNG commit**
 - Scripts chạy bằng `.venv\Scripts\python.exe` (Python 3.11)

@@ -3,7 +3,11 @@
     "allow": [
       "Shell(.venvScriptspython.exe:*)",
       "Shell(workingvenv-vieneuScriptspython.exe:*)",
-      "Shell(git:*)"
+      "Shell(git:*)",
+      "Shell(git commit -F - <<'EOF' ♻️ refactor(audiobook): cải tiến toàn diện pipeline tạo audio - scripts/audiobook_long.py: refactor chính • Fix convert_to_mp3: log lỗi, validate MP3, fix sf.info() trên MP3 • Fix progress accumulation: total_gen_time/total_audio_time cộng dồn khi resume • Fix --force: bỏ reconcile + reset completed set • Bỏ double normalize → chỉ normalize chapter-level (giữ dynamic range) • Fade chỉ ở đầu/cuối chapter (không fade giữa chunk) • smart_chunk mới: ưu tiên câu hoàn chỉnh, split tại dấu câu phụ • cleanup_markdown: full-width punctuation → ASCII, HTML entities, inline code • extract_chapter_text: lọc dòng chỉ có dấu câu, heading bỏ (01) prefix • detect_chapters: thêm Quyển/Phần/CHƯƠNG format • find_nice_passage: cắt paragraph dài tại biên câu • Thêm --merge option nối chapters thành 1 file • Đọc gender từ voice metadata (không hardcode) • resolve_voice: non-interactive mode - scripts/manage_voice.py: resolve_voice(non_interactive=True) - Xóa scripts legacy: audiobook_from_trilingual.py, clone_voice_test.py, make_audiobook.py 📌 9 files: +980 dòng thêm, -760 dòng xóa Co-authored-by: CommandCodeBot <noreply@commandcode.ai> EOF)",
+      "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\output' -Recurse -File | Group-Object Extension | Sort-Object Count -Descending | Select-Object Name, Count, @{N='TotalMB';E={[math]::Round(($_.Group | Measure-Object Length -Sum).Sum/1MB,2)}} | Format-Table -AutoSize\")",
+      "Shell(move:*)",
+      "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\output' -Recurse | ForEach-Object { $_.FullName.Replace('E:\\OneDrive\\onyx\\Translate Book\\output\\','') }\")"
     ],
     "deny": [],
     "defaultMode": "default"

@@ -209,7 +209,7 @@ def buoc_1_tao_du_an_moi():
     for sub in ['extracted', 'chunks', 'progress', 'summary', 'qa']:
         d = PROJECT_ROOT / "working" / sub / slug
         d.mkdir(parents=True, exist_ok=True)
-    (PROJECT_ROOT / "output" / slug).mkdir(parents=True, exist_ok=True)
+    (PROJECT_ROOT / "output" / "books" / slug / "final").mkdir(parents=True, exist_ok=True)
     in_thanh_cong("Đã tạo thư mục")
 
     # 5. Copy glossary
@@ -306,7 +306,7 @@ def sync_progress_to_output(slug):
     """
     import json, re
     progress_dir = PROJECT_ROOT / "working" / "progress" / slug
-    output_dir = PROJECT_ROOT / "output" / slug
+    output_dir = PROJECT_ROOT / "output" / "books" / slug / "final"
     if not progress_dir.exists():
         return 0
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -383,7 +383,7 @@ def buoc_2_tiep_tuc_du_an():
     chunks_json = _sort(list((chunks_root / slug).glob("chunk-*.json")))
     progress_dir = PROJECT_ROOT / "working" / "progress" / slug
     progress_files = _sort(list(progress_dir.glob("chunk_*.json"))) if progress_dir.exists() else []
-    output_dir = PROJECT_ROOT / "output" / slug
+    output_dir = PROJECT_ROOT / "output" / "books" / slug / "final"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Tìm chunk tiếp theo cần dịch (ưu tiên progress JSON — pipeline trilingual)
@@ -474,7 +474,7 @@ def buoc_3_chay_qa(slug=None):
 
     in_thuong(f"Đang chạy QA cho dự án: {slug}")
     # Tìm tất cả file chunk đã dịch
-    output_dir = PROJECT_ROOT / "output" / slug
+    output_dir = PROJECT_ROOT / "output" / "books" / slug / "final"
     qa_dir = PROJECT_ROOT / "working" / "qa" / slug
     qa_dir.mkdir(parents=True, exist_ok=True)
     glossary_csv = PROJECT_ROOT / "glossary" / f"{slug}.csv"
@@ -687,19 +687,19 @@ def buoc_7_song_ngu():
     """Tạo file song ngữ (gốc + dịch xen kẽ)."""
     in_noi_bat("📗 BƯỚC 7: TẠO FILE SONG NGỮ")
 
-    output_dir = PROJECT_ROOT / "output"
+    output_dir = PROJECT_ROOT / "output" / "books"
     if not output_dir.exists():
         in_loi("Chưa có output nào")
         return
 
     projects = sorted([d.name for d in output_dir.iterdir() if d.is_dir()])
     if not projects:
-        in_loi("Chưa có dự án nào trong output/")
+        in_loi("Chưa có dự án nào trong output/books/")
         return
 
     in_thuong("Dự án có bản dịch:")
     for i, p in enumerate(projects, 1):
-        vi_file = output_dir / p / f"{p}-vi.md"
+        vi_file = output_dir / p / "final" / "vi.md"
         exists = "✓" if vi_file.exists() else "✗"
         in_thuong(f"  {i}. {p}  [{exists}]")
 

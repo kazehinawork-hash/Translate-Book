@@ -57,6 +57,12 @@ tools/
 # WAV trung gian audiobook (48kHz, ~52MB/chương) — chỉ commit MP3
 output/**/*.wav
 
+# Thư mục test samples (tạo khi test giọng)
+output/samples/
+
+# Thư mục archive legacy
+output/_archive/
+
 # Thư mục test legacy edge-tts — không commit
 output/**/audio_test/
 
