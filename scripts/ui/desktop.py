@@ -497,13 +497,50 @@ class MainWindow(QMainWindow):
 
         # Load book statuses
         try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-            from ui.app import get_books_status
-            statuses = get_books_status()
+            from pathlib import Path
+            import re, json
+            project_root = Path(__file__).parent.parent.parent
+            books_dir = project_root / "output" / "books"
+            statuses = []
+            if books_dir.exists():
+                for d in sorted(books_dir.iterdir()):
+                    if not d.is_dir():
+                        continue
+                    slug = d.name
+                    vi_md = d / "final" / "vi.md"
+                    epub = d / "trilingual.epub"
+                    audiobook_dir = d / "audiobook"
+                    mp3_count = len(list(audiobook_dir.glob("ch*.mp3"))) if audiobook_dir.exists() else 0
+                    progress_count = 0
+                    total_chunks = 0
+                    progress_slug = project_root / "working" / "progress" / slug
+                    if progress_slug.exists():
+                        progress_count = len(list(progress_slug.glob("chunk_*.json")))
+                    chunks_slug = project_root / "working" / "chunks" / slug
+                    if chunks_slug.exists():
+                        total_chunks = len(list(chunks_slug.glob("chunk-*.json")))
+                    audio_chapters = []
+                    audio_progress = project_root / "working" / "progress_audio" / f"{slug}.json"
+                    if audio_progress.exists():
+                        try:
+                            ap = json.loads(audio_progress.read_text(encoding='utf-8'))
+                            audio_chapters = ap.get("completed_chapters", [])
+                        except Exception:
+                            pass
+                    total_chapters = 0
+                    if vi_md.exists():
+                        content = vi_md.read_text(encoding='utf-8')
+                        total_chapters = len(re.findall(r'^# ', content, re.MULTILINE))
+                    statuses.append({
+                        "slug": slug, "has_vi_md": vi_md.exists(), "has_epub": epub.exists(),
+                        "mp3_count": mp3_count, "total_chapters": total_chapters,
+                        "progress_count": progress_count, "total_chunks": total_chunks,
+                        "audio_done": len(audio_chapters), "audio_total": total_chapters,
+                    })
             self.books_page.load_books(statuses)
-            self.log_panel.log(f"📚 Đã tải {len(statuses)} cuốn sách", "info")
+            self.log_panel.log(f"📚 Da tai {len(statuses)} cuon sach", "info")
         except Exception as e:
-            self.log_panel.log(f"⚠️ Lỗi tải sách: {e}", "warning")
+            self.log_panel.log(f"Loi tai sach: {e}", "warning")
 
     def _on_translate(self, slug):
         self.log_panel.log(f"🚀 Bắt đầu dịch: {slug}", "info")
