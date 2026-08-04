@@ -1,4 +1,5 @@
 - Communicates in Vietnamese — user writes messages in Vietnamese, and expects responses in Vietnamese. Confidence: 0.9
+- All Vietnamese text in UI and code strings must use proper diacritical marks (dấu) — explicitly complained "toàn tiếng việt không dấu" (all Vietnamese without diacritics) as unacceptable; expects "Đã tải", "Lỗi", "Chưa nhập" not "Da tai", "Loi", "Chua nhap". Confidence: 0.9
 - Prefers thorough, evidence-backed code analysis over quick summaries — when reviewing code, expects actual source-file reading at relevant line ranges, verified file states (sizes, output), and prioritized breakdowns with severity levels rather than surface-level observations. Confidence: 0.85
 - Prefers systematic progress tracking for multi-step tasks — accepts and expects todo lists or checklists to track work across many fixes/features. Confidence: 0.8
 - Wants verification/testing after changes are made — explicitly asks to run tests or samples to confirm fixes work, doesn't just trust the code changes alone. Confidence: 0.8

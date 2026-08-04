@@ -49,7 +49,7 @@ public partial class MainWindow : Window
     {
         var provider = (ProviderCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)
             ?.Content?.ToString() ?? "deepseek";
-        ApiStatus.Text = "Dang test...";
+        ApiStatus.Text = "Đang test...";
         ApiStatus.Foreground = System.Windows.Media.Brushes.Yellow;
 
         _ = Task.Run(async () =>
@@ -58,7 +58,7 @@ public partial class MainWindow : Window
             var (ok, msg) = await service.TestConnectionAsync(provider);
             Dispatcher.Invoke(() =>
             {
-                ApiStatus.Text = ok ? $"OK: {msg}" : $"Loi: {msg}";
+                ApiStatus.Text = ok ? $"OK: {msg}" : $"Lỗi: {msg}";
                 ApiStatus.Foreground = ok
                     ? System.Windows.Media.Brushes.LightGreen
                     : System.Windows.Media.Brushes.LightCoral;

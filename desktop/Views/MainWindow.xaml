@@ -5,7 +5,7 @@
         xmlns:models="clr-namespace:TranslateBook.Models"
         Title="Translate Book" Width="1100" Height="750"
         WindowStartupLocation="CenterScreen"
-        Background="#0f0f1a"
+        Background="#202020"
         WindowStyle="None" AllowsTransparency="True">
 
     <Window.DataContext>
@@ -18,22 +18,15 @@
 
     <Grid>
         <Grid.Effect>
-            <DropShadowEffect BlurRadius="20" Opacity="0.3" ShadowDepth="0" Color="#000000"/>
+            <DropShadowEffect BlurRadius="15" Opacity="0.4" ShadowDepth="0" Color="#000000"/>
         </Grid.Effect>
 
-        <Border CornerRadius="16" ClipToBounds="True">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#1a1a2e" Offset="0"/>
-                    <GradientStop Color="#16213e" Offset="1"/>
-                </LinearGradientBrush>
-            </Border.Background>
-
+        <Border CornerRadius="8" ClipToBounds="True" Background="#202020" BorderBrush="#333333" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="48"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="200"/>
                 </Grid.RowDefinitions>
 
                 <!-- Title Bar -->
@@ -58,13 +51,13 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Sidebar -->
-                    <Border Grid.Column="0" Background="#0affffff" BorderBrush="#0affffff"
+                    <Border Grid.Column="0" Background="#1A1A1A" BorderBrush="#333333"
                             BorderThickness="0,0,1,0">
                         <StackPanel Margin="8,16">
                             <TextBlock Text="Translate Book" FontSize="15" FontWeight="Bold"
                                        Foreground="White" Margin="12,0,0,20"/>
 
-                            <RadioButton x:Name="NavBooks" Content="  Sach" IsChecked="True"
+                            <RadioButton x:Name="NavBooks" Content="  Sách" IsChecked="True"
                                          Style="{StaticResource SidebarButton}" Checked="Nav_Checked"/>
                             <RadioButton x:Name="NavAudio" Content="  Audio"
                                          Style="{StaticResource SidebarButton}" Checked="Nav_Checked"/>
@@ -88,25 +81,25 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Text="Danh sach sach" FontSize="24" FontWeight="Bold"
+                            <TextBlock Text="Danh sách sách" FontSize="24" FontWeight="Bold"
                                        Foreground="White" Margin="0,0,0,12"/>
                             <TabControl Grid.Row="1" Style="{StaticResource GlassTabControl}">
-                                <TabItem Header="Input (Chua dich)" Style="{StaticResource GlassTabItem}">
+                                <TabItem Header="Input (Chưa dịch)" Style="{StaticResource GlassTabItem}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
                                         <ItemsControl ItemsSource="{Binding InputBooks}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate DataType="{x:Type models:BookStatus}">
                                                     <Border Style="{StaticResource GlassCard}" Margin="8,4">
                                                         <StackPanel>
-                                                            <Border Background="#2660a5fa" CornerRadius="4"
+                                                            <Border Background="#1A60CDFF" CornerRadius="4"
                                                                     HorizontalAlignment="Left" Padding="8,2" Margin="0,0,0,8">
-                                                                <TextBlock Text="INPUT" FontSize="10" Foreground="#60a5fa" FontWeight="Bold"/>
+                                                                <TextBlock Text="INPUT" FontSize="10" Foreground="#60CDFF" FontWeight="Bold"/>
                                                             </Border>
                                                             <TextBlock Text="{Binding Slug}" FontSize="15" FontWeight="Bold"
                                                                        Foreground="White" TextWrapping="Wrap"/>
-                                                            <TextBlock Text="Chua dich - dat vao input/" FontSize="13"
+                                                            <TextBlock Text="Chưa dịch - đặt vào input/" FontSize="13"
                                                                        Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4"/>
-                                                            <Button Content="Bat dau dich" Style="{StaticResource GlassButtonSuccess}"
+                                                            <Button Content="Bắt đầu dịch" Style="{StaticResource GlassButtonSuccess}"
                                                                     HorizontalAlignment="Left" Margin="0,8,0,0"
                                                                     Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                     CommandParameter="{Binding}"/>
@@ -118,7 +111,7 @@
                                     </ScrollViewer>
                                 </TabItem>
 
-                                <TabItem Header="Output (Da dich)" Style="{StaticResource GlassTabItem}">
+                                <TabItem Header="Output (Đã dịch)" Style="{StaticResource GlassTabItem}">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
                                         <ItemsControl ItemsSource="{Binding OutputBooks}">
                                             <ItemsControl.ItemTemplate>
@@ -143,10 +136,10 @@
                                                                 </TextBlock>
                                                             </StackPanel>
                                                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                                                <Button Content="Dich" Style="{StaticResource GlassButton}" Margin="0,0,8,0"
+                                                                <Button Content="Dịch" Style="{StaticResource GlassButton}" Margin="0,0,8,0"
                                                                         Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                         CommandParameter="{Binding}"/>
-                                                                <Button Content="Tao audio" Style="{StaticResource GlassButtonSuccess}"
+                                                                <Button Content="Tạo audio" Style="{StaticResource GlassButtonSuccess}"
                                                                         Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                         CommandParameter="{Binding}"/>
                                                             </StackPanel>
@@ -204,8 +197,8 @@
                 </Grid>
 
                 <!-- Log Panel -->
-                <Border Grid.Row="2" Margin="24,0,24,16" BorderBrush="#0affffff" BorderThickness="1"
-                        CornerRadius="10" Background="#40000000">
+                <Border Grid.Row="2" Margin="24,0,24,16" BorderBrush="#333333" BorderThickness="1"
+                        CornerRadius="8" Background="#1A1A1A">
                     <Grid Margin="12,8">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
