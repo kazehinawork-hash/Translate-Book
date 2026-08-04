@@ -25,7 +25,8 @@
       "Shell(findstr:*)",
       "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\core' -Recurse -Force -ErrorAction SilentlyContinue\")",
       "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\scripts' | Select-Object Name, @{N='Type';E={if($_.PSIsContainer){'DIR'}else{'FILE'}}} | Format-Table -AutoSize\")",
-      "Shell(.venvScriptspip.exe:*)"
+      "Shell(.venvScriptspip.exe:*)",
+      "Shell(del:*)"
     ],
     "deny": [],
     "defaultMode": "default"
