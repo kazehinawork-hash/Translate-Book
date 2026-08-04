@@ -30,7 +30,8 @@
       "Shell(dotnet:*)",
       "Shell(rmdir:*)",
       "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\desktop.py','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\styles\\theme.py','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\styles\\liquid.qss','E:\\OneDrive\\onyx\\Translate Book\\desktop.bat' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\styles','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\widgets','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\workers' -Recurse -Force -ErrorAction SilentlyContinue\")",
-      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\__init__.py' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui' -Recurse -Force -ErrorAction SilentlyContinue\")"
+      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\__init__.py' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui' -Recurse -Force -ErrorAction SilentlyContinue\")",
+      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\api' -Recurse -Force\")"
     ],
     "deny": [],
     "defaultMode": "default"
