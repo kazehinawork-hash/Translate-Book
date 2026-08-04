@@ -263,50 +263,114 @@ class LogPanel(QFrame):
 
 
 class BooksPage(QWidget):
-    """Trang hiển thị danh sách sách."""
+    """Trang hiển thị danh sách sách — 2 tab: Input va Output."""
     translate_clicked = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 16, 24, 16)
+        layout.setSpacing(0)
 
-        header = QLabel("📖 Danh sách sách")
-        header.setStyleSheet(f"font-size: {FONT_SIZE_XL}px; font-weight: bold; color: {TEXT_PRIMARY}; margin-bottom: 8px;")
-        layout.addWidget(header)
+        # Tab widget
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: none;
+                background: transparent;
+            }}
+            QTabBar::tab {{
+                background: rgba(255,255,255,0.04);
+                color: {TEXT_SECONDARY};
+                padding: 10px 24px;
+                margin-right: 4px;
+                border: none;
+                border-bottom: 2px solid transparent;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QTabBar::tab:selected {{
+                color: {TEXT_PRIMARY};
+                border-bottom: 2px solid {PRIMARY};
+                background: rgba(255,255,255,0.06);
+            }}
+            QTabBar::tab:hover {{
+                color: {TEXT_PRIMARY};
+                background: rgba(255,255,255,0.06);
+            }}
+        """)
 
-        # Scroll area for book cards
+        # Tab Input
+        self.input_tab = self._create_tab("📁 Input (Chua dich)")
+        self.tabs.addTab(self.input_tab[0], "📁 Input")
+
+        # Tab Output
+        self.output_tab = self._create_tab("📖 Output (Da dich)")
+        self.tabs.addTab(self.output_tab[0], "📖 Output")
+
+        layout.addWidget(self.tabs)
+
+    def _create_tab(self, title: str) -> tuple:
+        """Tao 1 tab voi scroll area."""
+        widget = QWidget()
+        widget_layout = QVBoxLayout(widget)
+        widget_layout.setContentsMargins(0, 8, 0, 0)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
-        self.cards_widget = QWidget()
-        self.cards_layout = QVBoxLayout(self.cards_widget)
-        self.cards_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.cards_layout.setSpacing(12)
-        scroll.setWidget(self.cards_widget)
-        layout.addWidget(scroll)
+        cards_widget = QWidget()
+        cards_layout = QVBoxLayout(cards_widget)
+        cards_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        cards_layout.setSpacing(12)
+        scroll.setWidget(cards_widget)
+
+        widget_layout.addWidget(scroll)
+        return widget, cards_layout
 
     def load_books(self, statuses: list):
-        # Clear existing
-        while self.cards_layout.count():
-            child = self.cards_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        # Clear both tabs
+        for tab_layout in [self.input_tab[1], self.output_tab[1]]:
+            while tab_layout.count():
+                child = tab_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-        if not statuses:
-            empty = QLabel("Chưa có sách nào. Đặt file PDF/EPUB vào input/ rồi gõ /dich")
+        input_statuses = [s for s in statuses if s.get("source") == "input"]
+        output_statuses = [s for s in statuses if s.get("source") != "input"]
+
+        # Input tab
+        if input_statuses:
+            for s in input_statuses:
+                card = BookCard(s.get("slug", s.get("slug_key", "")), s)
+                card.translate_clicked.connect(self.translate_clicked.emit)
+                self.input_tab[1].addWidget(card)
+        else:
+            empty = QLabel("Khong co sach nao trong input/\nDat file PDF/EPUB vao thu muc input/")
             empty.setStyleSheet(f"color: {TEXT_DIM}; font-size: 14px; padding: 40px;")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.cards_layout.addWidget(empty)
-            return
+            self.input_tab[1].addWidget(empty)
+        self.input_tab[1].addStretch()
 
-        for s in statuses:
-            card = BookCard(s["slug"], s)
-            card.translate_clicked.connect(self.translate_clicked.emit)
-            self.cards_layout.addWidget(card)
+        # Update tab title with count
+        self.tabs.setTabText(0, f"📁 Input ({len(input_statuses)})")
 
-        self.cards_layout.addStretch()
+        # Output tab
+        if output_statuses:
+            for s in output_statuses:
+                card = BookCard(s["slug"], s)
+                card.translate_clicked.connect(self.translate_clicked.emit)
+                self.output_tab[1].addWidget(card)
+        else:
+            empty = QLabel("Chua co sach nao dich xong")
+            empty.setStyleSheet(f"color: {TEXT_DIM}; font-size: 14px; padding: 40px;")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.output_tab[1].addWidget(empty)
+        self.output_tab[1].addStretch()
+
+        # Update tab title with count
+        self.tabs.setTabText(1, f"📖 Output ({len(output_statuses)})")
 
 
 class APISettingsPage(QWidget):
