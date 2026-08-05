@@ -41,7 +41,7 @@ import soundfile as sf
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VOICES_DIR = os.path.join(PROJECT_ROOT, "core", "voices")
 ACTIVE_WAV = os.path.join(VOICES_DIR, "active.wav")
 ACTIVE_JSON = os.path.join(VOICES_DIR, "active.json")

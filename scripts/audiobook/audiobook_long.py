@@ -147,6 +147,24 @@ def detect_chapters(md_path: str) -> list:
                     "line_start": i,
                 })
 
+    # Fallback: nếu không có chương đánh số (sách essay không số hiệu) →
+    # dùng heading # / ## làm ranh giới chương (bỏ mục con đánh số + TOC).
+    if not chapters:
+        for i, line in enumerate(all_lines):
+            m = re.match(r"^#{1,2}\s+(.*)$", line)
+            if not m:
+                continue
+            title = m.group(1).strip()
+            if re.match(r"^[0-9()（）]", title):
+                continue
+            if "CONTENTS" in title.upper() or "Mục Lục" in title or "目录" in title:
+                continue
+            chapters.append({
+                "num": len(chapters) + 1,
+                "title": title,
+                "line_start": i,
+            })
+
     # Set line_end for each chapter
     for idx in range(len(chapters) - 1):
         chapters[idx]["line_end"] = chapters[idx + 1]["line_start"]

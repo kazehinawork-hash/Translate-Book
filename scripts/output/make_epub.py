@@ -46,11 +46,15 @@ def main() -> None:
     title = args.title or input_path.stem
     author = args.author or ''
 
+    css_here = Path(__file__).parent / 'epub_style.css'
+    css_common = Path(__file__).parent.parent / 'common' / 'epub_style.css'
+    css_path = css_here if css_here.exists() else css_common
+
     cmd = [
         pandoc_path,
         str(input_path),
         '-o', str(output_path),
-        '--css', str(Path(__file__).parent / 'epub_style.css'),
+        '--css', str(css_path),
         '--metadata', f'title={title}',
         '--toc',
     ]
