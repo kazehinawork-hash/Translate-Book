@@ -31,8 +31,11 @@ desktop.ini
 # File gốc - có thể có bản quyền, không cần version control
 input/
 
-# Working - CHỈ exclude 3 thư mục file to/tái tạo được
-# working/summary/ và working/progress/ là tài sản tích lũy, COMMIT vào git
+# Sản phẩm dịch + glossary — KHÔNG commit (repo chỉ giữ CODE). Giữ local/Drive.
+output/
+glossary/
+
+# Working — CHỈ exclude cac/to/tái tạo được + SẢN PHẨM trung gian
 working/extracted/
 working/chunks/
 working/qa/
@@ -40,11 +43,12 @@ working/qa/
 working/extracted/*
 working/chunks/*
 working/qa/*
+# Sản phẩm tích lũy (chunk đã dịch, progress, tiến độ audiobook) — KHÔNG commit
+working/progress/
+working/progress_audio/
 
 # Generated glossary prompts
 working/glossary_prompt*.txt
-# Chunk cache audiobook (WAV tạm) — tái tạo được, không commit
-working/progress_audio/chunks/
 # venv audiobook (VieNeu-TTS)
 working/venv-vieneu/
 

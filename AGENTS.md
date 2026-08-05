@@ -81,13 +81,11 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 ## CẤU TRÚC THƯ MỤC QUAN TRỌNG
 - `input/` — file gốc PDF/EPUB, **KHÔNG commit**
 - `working/extracted/`, `working/chunks/`, `working/qa/` — **KHÔNG commit**
-- `working/progress/<slug>/` — chunk đã dịch, **CÓ commit**
-- `working/progress_audio/<slug>.json` — progress audiobook, **CÓ commit**; cache chunk WAV trong `working/progress_audio/chunks/` thì **KHÔNG commit** (đã ignore)
+- `working/progress/<slug>/` — chunk đã dịch, **KHÔNG commit** (sản phẩm trung gian)
+- `working/progress_audio/` — progress + cache audiobook, **KHÔNG commit** (sản phẩm)
 - `working/venv-vieneu/` — venv VieNeu-TTS, **KHÔNG commit**
-- `glossary/` — glossary cuốn, **có commit**
-- `output/books/<slug>/final/` — bản dịch hoàn chỉnh (md), **có commit**
-- `output/books/<slug>/audiobook/` — audio hoàn chỉnh (mp3), **KHÔNG commit** (TEXT-ONLY — giữ local)
-- `output/books/<slug>/trilingual.epub` — epub tam ngữ, **KHÔNG commit** (đã ignore trong .gitignore)
+- `glossary/` — glossary cuốn, **KHÔNG commit** (sản phẩm)
+- `output/` — toàn bộ sản phẩm (final/*.md, ảnh, audiobook, epub), **KHÔNG commit**; giữ local/Drive
 - `output/samples/` — test samples, **KHÔNG commit**
 - `output/_archive/` — legacy, **KHÔNG commit**
 - `core/` — audio mẫu + reference voices dùng chung, **KHÔNG commit**
