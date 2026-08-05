@@ -19,6 +19,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _logText = "";
     [ObservableProperty] private string _activeProvider = "";
     [ObservableProperty] private bool _isApiOk;
+    
+    [ObservableProperty] private double _audioTemperature = 0.3;
+    [ObservableProperty] private int _audioTopK = 10;
+    
+    [ObservableProperty] private string _selectedProvider = "deepseek";
+    [ObservableProperty] private string _apiKeyInput = "";
+    [ObservableProperty] private string _modelInput = "";
+    [ObservableProperty] private string _baseUrlInput = "";
+
+    partial void OnSelectedProviderChanged(string value)
+    {
+        LoadApiConfigForSelectedProvider();
+    }
 
     public ObservableCollection<BookStatus> InputBooks { get; } = new();
     public ObservableCollection<BookStatus> OutputBooks { get; } = new();
@@ -76,6 +89,12 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void RefreshBooks()
+    {
+        LoadBooks();
+    }
+
+    [RelayCommand]
     private async Task TestApiConnectionAsync(string provider)
     {
         AppendLog($"Dang test {provider}...");
@@ -96,21 +115,25 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task StartTranslateAsync(BookStatus book)
     {
-        if (book == null) return;
+        if (book == null || book.IsBusy) return;
+        book.IsBusy = true;
         AppendLog($"Bat dau dich: {book.Slug}");
         var ok = await _pipeline.RunTranslateHelperAsync(
             $"working/chunks/{book.Slug}",
             $"working/progress/{book.Slug}",
             $"glossary/{book.Slug}.csv");
+        book.IsBusy = false;
         if (ok) AppendLog($"Hoan thanh: {book.Slug}");
     }
 
     [RelayCommand]
     private async Task GenerateAudiobookAsync(BookStatus book)
     {
-        if (book == null) return;
-        AppendLog($"Tao audio: {book.Slug}");
+        if (book == null || book.IsBusy) return;
+        book.IsBusy = true;
+        AppendLog($"Tao audio: {book.Slug} voi temp={AudioTemperature}, top_k={AudioTopK}");
         var ok = await _pipeline.RunAudiobookAsync(book.Slug);
+        book.IsBusy = false;
         if (ok) AppendLog($"Audio hoan thanh: {book.Slug}");
     }
 
@@ -179,10 +202,57 @@ public partial class MainViewModel : ObservableObject
         {
             var config = ConfigService.Load();
             ActiveProvider = config.ActiveProvider;
+            SelectedProvider = ActiveProvider;
             var providerConfig = ConfigService.GetProvider(config.ActiveProvider);
             IsApiOk = !string.IsNullOrEmpty(providerConfig?.ApiKey);
         }
         catch { }
+    }
+    
+    private void LoadApiConfigForSelectedProvider()
+    {
+        try
+        {
+            var config = ConfigService.GetProvider(SelectedProvider);
+            ModelInput = config?.Model ?? "";
+            BaseUrlInput = config?.BaseUrl ?? "";
+            ApiKeyInput = ""; // Khong hien thi mat khau cu
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    private async Task SaveApiConfigAsync()
+    {
+        AppendLog($"Lưu cấu hình API cho provider {SelectedProvider}...");
+        try
+        {
+            var config = ConfigService.Load();
+            if (!config.Providers.ContainsKey(SelectedProvider))
+            {
+                config.Providers[SelectedProvider] = new ProviderConfig();
+            }
+
+            var p = config.Providers[SelectedProvider];
+            
+            if (!string.IsNullOrWhiteSpace(ApiKeyInput))
+            {
+                p.ApiKey = ApiKeyInput;
+            }
+            
+            p.Model = ModelInput;
+            p.BaseUrl = BaseUrlInput;
+            config.ActiveProvider = SelectedProvider;
+
+            ConfigService.Save(config);
+            
+            LoadApiStatus();
+            AppendLog($"Đã lưu cấu hình {SelectedProvider}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Lỗi lưu cấu hình: {ex.Message}", "error");
+        }
     }
 
     private static string FindProjectRoot()
