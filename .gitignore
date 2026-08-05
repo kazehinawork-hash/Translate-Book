@@ -57,6 +57,10 @@ tools/
 # WAV trung gian audiobook (48kHz, ~52MB/chương) — chỉ commit MP3
 output/**/*.wav
 
+# Binary nặng — TEXT-ONLY: không commit audio/ebook, chỉ giữ text + tiến độ
+output/**/*.mp3
+output/**/*.epub
+
 # Thư mục test samples (tạo khi test giọng)
 output/samples/
 
