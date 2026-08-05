@@ -13,7 +13,7 @@ Push toàn bộ thay đổi hiện tại lên **một nhánh do người dùng c
      - Tự phân loại + chọn emoji theo đúng kiểu thay đổi:
        - `✨ feat:` — tính năng/script mới
        - `🐛 fix:` — sửa lỗi
-       - `📝 docs:` — tài liệu (README, USAGE...)
+        - `📝 docs:` — tài liệu (README, AGENTS...)
        - `🔧 config:` — cấu hình (opencode, env...)
        - `♻️ refactor:` — tái cấu trúc
        - `✅ test:` — test

@@ -5,6 +5,17 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 ## Ngôn ngữ giao tiếp
 - Trả lời bằng **tiếng Việt** (trừ khi người dùng dùng ngôn ngữ khác).
 
+## 🧠 BỘ NHỚ PHIÊN (session memory) — BẮT BUỘC
+- **ĐẦU PHIÊN** (trước khi làm bất kỳ việc gì khác): đọc và nắm bắt:
+  - `docs/STATE.md` — trạng thái sống (cuốn sách, việc đang làm, còn nợ, quyết định gần đây).
+  - 2 entry CUỐI của `docs/session_log.md` — việc gần nhất đã làm / còn dở.
+- **CUỐI PHIÊN / KHI XONG MỘT NHIỆM VỤ QUAN TRỌNG**:
+  - Cập nhật `docs/STATE.md` (giai đoạn sách, đang làm, còn nợ, quyết định).
+  - Thêm 1 entry mới vào CUỐI `docs/session_log.md` (ngày, đã làm, file đổi, còn dở, git).
+- Ràng buộc git: 2 file này **CÓ commit** (thuộc phạm vi docs — không chứa sản phẩm; không bỏ vào .gitignore).
+- Command hỗ trợ: `/start` (đọc + tóm tắt trạng thái), `/done` (nhắc ghi bộ nhớ + đề xuất commit).
+- Nguyên tắc: agent PHẢI tự đọc bộ nhớ khi bắt đầu — KHÔNG chờ người dùng nhắc.
+
 ## GIT — QUY TẮC BẮT BUỘC
 - **KHÔNG BAO GIỜ tự động push** lên GitHub (bất kỳ nhánh nào) **trừ khi người dùng ra lệnh rõ ràng**.
 - **KHÔNG tự commit** trừ khi được người dùng yêu cầu hoặc đồng ý rõ ràng.
@@ -13,7 +24,7 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
   - Tạo commit message có cấu trúc, nhiều dòng, phân loại theo emoji:
     - `✨ feat:` — tính năng/script mới
     - `🐛 fix:` — sửa lỗi
-    - `📝 docs:` — tài liệu (README, USAGE...)
+    - `📝 docs:` — tài liệu (README, AGENTS...)
     - `🔧 config:` — cấu hình (opencode, env...)
     - `♻️ refactor:` — tái cấu trúc
     - `✅ test:` — test

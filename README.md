@@ -6,18 +6,19 @@
 
 ## 🚀 Cách nhanh nhất cho người mới
 
-**Double-click `scripts\translate.bat`** → menu hiện ra → chọn số → làm theo hướng dẫn.
+1. **Cài đặt 1 lần**: Cài [Python](https://www.python.org/downloads/) (tick ✅ *Add to PATH*) và [Git](https://git-scm.com/download/win), rồi chạy `.git\setup.bat` — chờ script tự tạo venv + cài packages.
+2. **Copy file PDF/EPUB vào `input\`**.
+3. **Mở opencode, gõ `/dich`** và chọn file → pipeline (extract → QC → detect ngôn ngữ → chunk → glossary → dịch → QA → merge → EPUB) tự chạy hoàn toàn, kết quả ở `output/books/<slug>/`. Sách dịch dở thì chạy lại `/dich` để dịch tiếp phần còn thiếu.
 
-Không cần nhớ lệnh, không cần biết PowerShell. Đọc **[QUICKSTART.md](./QUICKSTART.md)** để bắt đầu trong 10 phút.
+Không cần nhớ lệnh, không cần biết PowerShell. (*Sách scan cần thêm `pip install -U mineru; mineru-models-download`.*)
 
 ---
 
 ## 📚 Tài liệu
 
-- **[QUICKSTART.md](./QUICKSTART.md)** — Hướng dẫn 1 trang cho non-tech (3 bước)
-- **[USAGE.md](./USAGE.md)** — Hướng dẫn sử dụng thực hành (copy-paste commands, 4 workflow: PDF EN, EPUB ZH, SRT, scan)
-- **[docs/archive/PLAN.md](./docs/archive/PLAN.md)** — Kế hoạch tổng thể, pipeline, công cụ, lộ trình (lưu trữ)
-- **[docs/archive/PROCESS.md](./docs/archive/PROCESS.md)** — Quy trình chi tiết từng bước, mẫu chat, xử lý sự cố (lưu trữ)
+- **[AGENTS.md](./AGENTS.md)** — Quy tắc làm việc cho AI (pipeline đầy đủ, quy tắc git, **bộ nhớ phiên**, cấu trúc thư mục, bước audiobook)
+- **[docs/STATE.md](./docs/STATE.md)** — Trạng thái sống của dự án (cuốn sách, việc đang làm, còn nợ, quyết định) — agent đọc/ghi mỗi phiên
+- **[docs/session_log.md](./docs/session_log.md)** — Nhật ký phiên (append-only) — xem việc gần nhất đã làm/còn dở
 
 ---
 
@@ -85,46 +86,59 @@ Bước 3: Gen Glossary → scripts/process/generate_glossary.py (tạo prompt �
 Bước 4: Translate → Agent đọc từng chunk + glossary → ghi vào working/progress/
 Bước 5: QA        → scripts/qa/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
 Bước 6: Merge     → scripts/output/merge_chunks.py (gộp → output/books/<slug>/final/)
-Bước 7: EPUB      → scripts/make_epub.py (tự động, dùng pandoc → output/{book}/{book}-vi.epub; sách ZH: output/{book}_trilingual.epub)
-Bước 8: Audiobook → clone giọng từ reference → scripts/audiobook_long.py → WAV 48kHz (sách ZH)
+Bước 7: EPUB      → scripts/output/make_epub.py (tự động, dùng pandoc → output/books/<slug>/trilingual.epub)
+Bước 8: Audiobook → scripts/audiobook/manage_voice.py (clone giọng) + scripts/audiobook/audiobook_long.py (→ MP3)
 ```
-
-Xem chi tiết trong **[USAGE.md](./USAGE.md)**.
 
 ---
 
-## 🎧 Tạo Audiobook (sách ZH)
+## 🎧 Tạo Audiobook (VieNeu-TTS v3 Turbo)
 
-Sau khi có bản dịch `-vi.md` (thuần Việt từ bước 9 Merge), có thể tạo audiobook bằng giọng clone:
+Sau khi có bản dịch thuần Việt `output/books/<slug>/final/vi.md`, có thể tạo audiobook bằng giọng clone:
 
 ```bash
-# 1. Clone giọng từ audiobook mẫu (cần 5-10s reference audio)
-python scripts/manage_voice.py extract --name my_voice --source "<file.mp3>" --auto
-python scripts/manage_voice.py preview --name my_voice   # (tùy chọn) test giọng
+# 1. Clone giọng từ audiobook mẫu (cần 3-8s reference audio sạch)
+python scripts/audiobook/manage_voice.py extract --name my_voice --source "<file.mp3>" --auto
+python scripts/audiobook/manage_voice.py list                    # xem các giọng đã có
+python scripts/audiobook/manage_voice.py set-active --name my_voice
 
-# 2. Tạo audio chapter đầy đủ (~9 phút, ~4 phút gen trên CPU)
-python scripts/audiobook_long.py
+# 2. Tạo audio toàn cuốn (auto-detect chương, resume dở chừng, tự động ra MP3)
+python scripts/audiobook/audiobook_long.py --slug <slug> --first   # thử 1 chương
+python scripts/audiobook/audiobook_long.py --slug <slug>          # toàn cuốn
 ```
 
-**Yêu cầu**: venv riêng `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)
+**Yêu cầu**: venv riêng `working/venv-vieneu/` (Python 3.11, `pip install vieneu`).
 
-**Quy trình**: Đọc `_trilingual.md` → regex lấy dòng Việt → chunk ≤240 chars → generate từng đoạn bằng VieNeu-TTS v3 Turbo (clone giọng + style `doc_truyen`) → join + normalize → WAV 48kHz
+**Quy trình**: Đọc `final/vi.md` → `detect_chapters` theo heading → làm sạch markdown → smart chunk ≤240 chữ (giữ câu, paragraph-aware) → `tts.infer(chunk, voice, style="doc_truyen")` từng đoạn → checkpoint/resume theo chương + chunk → join + silence + normalize → WAV 48kHz → tự chuyển MP3 128kbps (kèm metadata title/album).
 
-**Tham số**: RTF ~0.41 (nhanh hơn real-time 2.4x), chạy CPU, không cần GPU.
+**Tham số**: chạy CPU/ONNX, RTF ~0.4 (nhanh hơn real-time 2.5x), không cần GPU; 14 giọng preset + voice cloning.
 
 Xem chi tiết trong **[AGENTS.md](./AGENTS.md)** (Bước 11).
 
 ---
 
-## ✅ Thành tựu — 3 cuốn sách đã dịch hoàn thành
+## 🖥 App desktop (C# WPF)
 
-| STT | Slug | Tên sách (tạm dịch) | Ngôn ngữ gốc | Định dạng |
-|-----|------|---------------------|:------------:|:---------:|
-| 1 | `zuo-yi-ge-gang-gang-hao-de-nu-zi` | *Trở thành người phụ nữ vừa vặn* (做一个刚刚好的女子) — Khang Tĩnh Văn | ZH | EPUB |
-| 2 | `zuo-yi-ge-gang-gang-hao-de-nu-zi-3` | *Trở thành người phụ nữ vừa vặn — Tập 3* (做一个刚刚好的女子·第三卷) — Vi Dương | ZH | EPUB |
-| 3 | `zuo-yi-ge-you-feng-gu-de-nu-zi` | *Trở thành người phụ nữ có phong thái* (做一个有风骨的女子) — Vi Dương | ZH | EPUB |
+Thư mục `desktop/` chứa app Windows (C# WPF, .NET) để duyệt/xem bản dịch:
 
-Mỗi cuốn đều có bản dịch Markdown + EPUB hoàn chỉnh trong [`output/`](./output/), kèm glossary riêng và báo cáo QA.
+- `Views/MainWindow.xaml` — cửa sổ chính, chuyển đổi theme sáng/tối (`Themes/DarkTheme.xaml`, `LightTheme.xaml`)
+- `Views/EpubPreviewWindow.xaml` — xem trước nội dung EPUB/bản dịch
+- `Services/AcrylicWindowHelper.cs` — hiệu ứng kính mờ (acrylic) cho cửa sổ
+
+Chạy bằng Visual Studio / `dotnet run` từ `desktop/` (xem `desktop/TranslateBook.csproj`).
+
+---
+
+## ✅ Thành tựu — các cuốn sách đã hoàn thành
+
+| STT | Slug | Tên sách | Ngôn ngữ gốc | Định dạng |
+|-----|------|----------|:------------:|:---------:|
+| 1 | `zuo-yi-ge-gang-gang-hao-de-nu-zi` | *Trở thành người phụ nữ vừa vặn* (做一个刚刚好的女子) — Khang Tĩnh Văn | ZH | EPUB + audiobook |
+| 2 | `zuo-yi-ge-gang-gang-hao-de-nu-zi-3` | *Trở thành người phụ nữ vừa vặn — Tập 3* (做一个刚刚好的女子·第三卷) — Vi Dương | ZH | Đã dịch xong |
+| 3 | `zuo-yi-ge-you-feng-gu-de-nu-zi` | *Trở thành người phụ nữ có phong thái* (做一个有风骨的女子) — Vi Dương | ZH | EPUB + audiobook |
+| 4 | `ban-co-nam-cho-ngoi` | *Bạn Có Năm Chỗ Ngồi* — Nguyễn Nhật Ánh | VI | audiobook |
+
+Mỗi cuốn gồm bản dịch Markdown (`output/books/<slug>/final/`), EPUB tam ngữ (sách ZH), ảnh và audiobook MP3 — **giữ local/Drive, không đẩy lên git**.
 
 ---
 
@@ -132,28 +146,31 @@ Mỗi cuốn đều có bản dịch Markdown + EPUB hoàn chỉnh trong [`outpu
 
 ```
 Translate Book\
-├── input\              # File gốc (KHÔNG commit)
-├── output\             # Bản dịch hoàn chỉnh
+├── input\              # File gốc PDF/EPUB (KHÔNG commit - bản quyền)
+├── output\             # Sản phẩm dịch + audiobook (KHÔNG commit - giữ local/Drive)
+│   └── books\<slug>\   # final\ (vi.md, tamngu.md), trilingual.epub, images\, audiobook\
 ├── working\
 │   ├── extracted\      # Markdown gốc sau extract (KHÔNG commit)
 │   ├── chunks\         # Chunk JSON (KHÔNG commit)
-│   ├── progress\       # Chunk đã dịch (CÓ commit - tài sản tích lũy)
-│   ├── summary\        # Tóm tắt (CÓ commit)
-│   └── qa\             # Báo cáo QA (KHÔNG commit)
-├── glossary\
-│   └── genres\         # Glossary theo thể loại
+│   ├── progress\       # Chunk đã dịch (KHÔNG commit - sản phẩm)
+│   ├── progress_audio\ # Tiến độ + cache audiobook (KHÔNG commit)
+│   ├── qa\             # Báo cáo QA (KHÔNG commit)
+│   └── venv-vieneu\    # venv VieNeu-TTS (KHÔNG commit)
+├── glossary\           # Glossary cuốn + thể loại (KHÔNG commit - sản phẩm)
+├── core\               # Audio mẫu + reference voices (KHÔNG commit - bản quyền)
+├── desktop\            # App desktop C# WPF (CÓ commit - code)
+├── scripts\            # Python scripts (CÓ commit - code)
 ├── prompts\            # Prompt mẫu cho Agent dịch
-├── scripts\            # Python scripts
+├── docs\               # Trí nhớ phiên (CÓ commit)
+│   ├── STATE.md        # Trạng thái sống — agent đọc/ghi mỗi phiên
+│   └── session_log.md  # Nhật ký phiên (append-only)
+├── .opencode\          # Cấu hình opencode (command, agent) (CÓ commit)
 ├── .gitignore
 ├── README.md
-├── USAGE.md
-├── QUICKSTART.md
-├── docs/
-│   └── archive/
-│       ├── PLAN.md
-│       └── PROCESS.md
-└── ...
+└── AGENTS.md
 ```
+
+> **Chính sách git**: repo chỉ chứa **code** (`scripts/`, `desktop/`, `.opencode/`, config, docs). Toàn bộ sản phẩm (bản dịch, glossary, audiobook, EPUB, progress) **không commit** — giữ local/OneDrive/Drive.
 
 ---
 
@@ -175,7 +192,7 @@ wǒ míng tiān yě yào qù。
 Ngày mai tôi cũng sẽ đi。
 ```
 
-Dùng `scripts/merge_chunks.py --format trilingual` để gộp → `output/{book}_trilingual.md`.
+Dùng `scripts/output/merge_chunks.py --format trilingual` để gộp → `output/{book}_trilingual.md`.
 Pipeline tự động chuyển sang `.epub` (có cấu trúc HTML + CSS riêng cho từng dòng) nếu có pandoc.
 
 ---
@@ -196,6 +213,8 @@ Pipeline tự động chuyển sang `.epub` (có cấu trúc HTML + CSS riêng c
 | **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Script chạy toàn bộ pipeline tự động |
 | **pandoc** | Chuyển .md → .epub với CSS tùy chỉnh | Cài từ https://pandoc.org/installing.html |
 | **VieNeu-TTS v3 Turbo** | Tạo audiobook — clone giọng từ reference audio | CPU/ONNX, 48kHz, 14 giọng preset, voice cloning 3-8s |
+| **manage_voice.py** | Quản lý reference voice: extract (VAD auto), list/info/delete/set-active | `scripts/audiobook/` |
+| **audiobook_long.py** | Tạo audiobook toàn cuốn từ `final/vi.md`: detect chương, smart chunk, resume, auto MP3 | `scripts/audiobook/` |
 | **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
 | **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |
 | **git** | Version control | OneDrive không thay thế được |
@@ -227,7 +246,22 @@ Sau khi cài đúng bản GPU, script `--device auto` sẽ tự dùng GPU. Có t
 - **UTF-8 cho mọi file text** — tránh mojibake trên Windows
 - **Slug cho tên sách** — không dấu, không khoảng trắng
 - **QA tự động sau mỗi chunk** — bắt lỗi nhất quán glossary
-- **Git commit thường xuyên** — an toàn, dễ rollback
+- **Git chỉ giữ code** — sản phẩm (bản dịch, audiobook, EPUB, glossary, progress) để local/Drive, không đẩy binary nặng lên GitHub
+
+---
+
+## 🩹 Troubleshooting nhanh
+
+| Lỗi | Fix |
+|-----|-----|
+| `ModuleNotFoundError: No module named 'X'` | `pip install -r requirements.txt` (chạy lại `setup.bat`) |
+| PowerShell in ra `?\u1ebf?` | Thêm UTF-8 vào `$PROFILE`: `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8` |
+| EPUB lỗi "không tìm thấy ebooklib" | `pip install ebooklib beautifulsoup4 markdownify` |
+| QA báo nhiều Hán tự sót | Dịch chưa xong / glossary thiếu → bổ sung glossary |
+| `pandoc: command not found` | Cài pandoc: https://pandoc.org/installing.html |
+| Audiobook không tìm thấy giọng | `manage_voice.py set-active --name <giọng>` (giọng nằm `core\voices\`) |
+
+> Merge báo thiếu/empty chunk → dịch hết hoặc dùng `--allow-partial`/`--skip-missing`.
 
 ---
 
