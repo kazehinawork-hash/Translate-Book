@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -10,10 +11,12 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using TranslateBook.Models;
 using VersOne.Epub;
+using Wpf.Ui.Appearance;
+using Wpf.Ui.Controls;
 
 namespace TranslateBook.Views
 {
-    public partial class EpubPreviewWindow : Window
+    public partial class EpubPreviewWindow : FluentWindow
     {
         private string _epubFilePath;
         private string _tempExtractPath;
@@ -27,9 +30,10 @@ namespace TranslateBook.Views
         public EpubPreviewWindow(string epubFilePath)
         {
             InitializeComponent();
+            SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
             _epubFilePath = epubFilePath;
             _tempExtractPath = Path.Combine(Path.GetTempPath(), "TranslateBook_EpubPreview_" + Guid.NewGuid().ToString());
-            
+
             Loaded += EpubPreviewWindow_Loaded;
             Closed += EpubPreviewWindow_Closed;
         }
@@ -38,8 +42,25 @@ namespace TranslateBook.Views
         {
             try
             {
-                await WebView.EnsureCoreWebView2Async(null);
-                
+                var userDataFolder = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "TranslateBook", "WebView2");
+                Directory.CreateDirectory(userDataFolder);
+
+                // Set CreationProperties via reflection — CoreWebView2CreationProperties
+                // is not directly referenceable from this project but is available at runtime.
+                var webViewType = WebView.GetType();
+                var cpProp = webViewType.GetProperty("CreationProperties");
+                if (cpProp != null)
+                {
+                    var cp = Activator.CreateInstance(cpProp.PropertyType);
+                    var udfProp = cpProp.PropertyType.GetProperty("UserDataFolder");
+                    udfProp?.SetValue(cp, userDataFolder);
+                    cpProp.SetValue(WebView, cp);
+                }
+
+                await WebView.EnsureCoreWebView2Async();
+
                 // Read and extract EPUB
                 EpubBook book = await EpubReader.ReadBookAsync(_epubFilePath);
                 
@@ -118,12 +139,13 @@ namespace TranslateBook.Views
 
                 // Navigate to the full book
                 WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("translatebook.local", _tempExtractPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+                WebView.Source = new Uri("https://translatebook.local/fullbook.html");
 
                 InitAudioPlayer();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi mở EPUB: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Lỗi khi mở EPUB: {ex.Message}", "Lỗi", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
@@ -190,11 +212,17 @@ namespace TranslateBook.Views
         {
             if (e.IsSuccess)
             {
-                // Inject CSS for Dark Mode and Styling
-                string css = @"
-                    body {
-                        background-color: #202020 !important;
-                        color: #E0E0E0 !important;
+                var appBackground = Application.Current.Resources["ControlFillColorTertiaryBrush"] as SolidColorBrush;
+                var appForeground = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
+                var linkColor = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Colors.LightBlue;
+
+                var bgHex = appBackground != null ? ColorToHex(appBackground.Color) : "#1e1e1e";
+                var fgHex = appForeground != null ? ColorToHex(appForeground.Color) : "#e0e0e0";
+
+                string css = $@"
+                    body {{
+                        background-color: {bgHex} !important;
+                        color: {fgHex} !important;
                         font-family: 'Segoe UI', Arial, sans-serif !important;
                         line-height: 1.6 !important;
                         margin: 0 auto !important;
@@ -202,11 +230,11 @@ namespace TranslateBook.Views
                         overflow-y: auto !important;
                         overflow-x: hidden !important;
                         max-width: 800px !important;
-                    }
-                    a { color: #60CDFF !important; }
-                    img { max-width: 100% !important; height: auto !important; }
+                    }}
+                    a {{ color: {ColorToHex(linkColor)} !important; }}
+                    img {{ max-width: 100% !important; height: auto !important; }}
                 ";
-                
+
                 string injectScript = $@"
                     var style = document.createElement('style');
                     style.innerHTML = `{css}`;
@@ -217,37 +245,8 @@ namespace TranslateBook.Views
             }
         }
 
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ClickCount == 2)
-                ToggleMaximize();
-            else
-                DragMove();
-        }
-
-        private void BtnMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
-        
-        private void BtnMaximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
-        
-        private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
-
-        private void ToggleMaximize()
-        {
-            if (WindowState == WindowState.Maximized)
-            {
-                WindowState = WindowState.Normal;
-                BtnMaximize.Content = "☐";
-            }
-            else
-            {
-                WindowState = WindowState.Maximized;
-                BtnMaximize.Content = "❐";
-            }
-        }
-
-        // ==========================================
-        // AUDIO PLAYER LOGIC
-        // ==========================================
+        private static string ColorToHex(Color color) =>
+            "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
 
         private void InitAudioPlayer()
         {
@@ -306,7 +305,7 @@ namespace TranslateBook.Views
 
         private void MediaPlayer_MediaEnded(object? sender, EventArgs e)
         {
-            BtnAudioNext_Click(null, null);
+            BtnAudioNext_Click(this, new RoutedEventArgs());
         }
 
         private void Timer_Tick(object? sender, EventArgs e)
@@ -390,8 +389,12 @@ namespace TranslateBook.Views
         {
             try
             {
+                _timer?.Stop();
+
                 if (_mediaPlayer != null)
                 {
+                    _mediaPlayer.MediaEnded -= MediaPlayer_MediaEnded;
+                    _mediaPlayer.MediaOpened -= MediaPlayer_MediaOpened;
                     _mediaPlayer.Stop();
                     _mediaPlayer.Close();
                 }

@@ -32,7 +32,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Config
-MAX_CHARS = 240          # chars per chunk (VieNeu limit ~256)
+MAX_CHARS = 180          # chars per chunk (giảm từ 240 để tránh líu lưỡi)
 SILENCE_BETWEEN = 0.4    # seconds silence between chunks
 SILENCE_PARA = 0.8       # seconds silence between paragraphs
 SILENCE_CHAPTER_END = 1.5 # seconds silence cuối chapter (trước khi chapter mới bắt đầu)
@@ -205,6 +205,31 @@ def cleanup_markdown(text: str) -> str:
     return text.strip()
 
 
+# Cache VietNormalizer instance
+_viet_normalizer = None
+
+
+def normalize_vietnamese_text(text: str) -> str:
+    """Chuẩn hóa văn bản tiếng Việt cho TTS sử dụng VietNormalizer.
+
+    Chuyển đổi số thành chữ, chuẩn hóa ngày tháng, tiền tệ,
+    từ viết tắt, từ mượn.
+    """
+    global _viet_normalizer
+    try:
+        if _viet_normalizer is None:
+            from vietnormalizer import VietnameseNormalizer
+            _viet_normalizer = VietnameseNormalizer()
+        return _viet_normalizer.normalize(text)
+    except ImportError:
+        # VietNormalizer chưa được cài đặt, bỏ qua chuẩn hóa
+        return text
+    except Exception as e:
+        # Lỗi khi chuẩn hóa, trả về text gốc
+        print(f"   ⚠️  VietNormalizer error: {e}")
+        return text
+
+
 def extract_chapter_text(lines: list, start: int, end: int, include_title: bool = True) -> list:
     """Trích xuất text Việt thành các đoạn văn (paragraphs).
 
@@ -245,6 +270,8 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
         # Bỏ qua dòng chỉ có dấu câu hoặc ký tự vô nghĩa cho TTS
         if re.match(r'^[\s"\'""\'\'!,.?…—–\-*~()（）\-–—\[\]【】{}]+$', text):
             continue
+        # Chuẩn hóa văn bản tiếng Việt cho TTS
+        text = normalize_vietnamese_text(text)
         current.append(text)
     # Paragraph cuối cùng → section end
     if current:
@@ -265,6 +292,33 @@ def _split_sentences(text: str) -> list:
     # Pattern: dấu câu + space hoặc cuối chuỗi, KHÔNG có quote mở ngay trước
     parts = re.split(r'(?<=[.!?…])\s+', text)
     return [p.strip() for p in parts if p.strip()]
+
+
+def _ensure_sentence_ending(text: str) -> str:
+    """Đảm bảo text kết thúc bằng dấu câu để TTS ngắt nghỉ đúng cách.
+
+    Nếu text không kết thúc bằng dấu câu, thêm dấu phẩy hoặc dấu chấm.
+    """
+    text = text.strip()
+    if not text:
+        return text
+    # Nếu đã kết thúc bằng dấu câu, giữ nguyên
+    if text[-1] in ".!?…;:":
+        return text
+    # Nếu kết thúc bằng dấu phẩy, giữ nguyên
+    if text[-1] == ",":
+        return text
+    # Nếu kết thúc bằng dấu ngoặc đóng, giữ nguyên
+    if text[-1] in ")]}":
+        return text
+    # Nếu kết thúc bằng dấu ngoặc mở, thêm dấu chấm
+    if text[-1] in "([{":
+        return text + "."
+    # Nếu kết thúc bằng dấu gạch ngang, giữ nguyên
+    if text[-1] in "—–":
+        return text
+    # Mặc định: thêm dấu phẩy để TTS ngắt nghỉ
+    return text + ","
 
 
 def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
@@ -304,7 +358,8 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
 
             # Chunk hiện tại đã có nội dung → lưu lại, bắt chunk mới
             if current:
-                chunks.append((current.strip(), False))
+                # Đảm bảo chunk kết thúc bằng dấu câu
+                chunks.append((_ensure_sentence_ending(current.strip()), False))
                 current = ""
 
             # Câu mới quá dài → phải split
@@ -312,17 +367,44 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
                 remaining = sent
                 while len(remaining) > max_chars:
                     split_pos = -1
-                    for sep in [", ", "; ", ": ", " — ", " – "]:
+                    # Ưu tiên tách tại dấu câu kết thúc câu (. ! ? …)
+                    for sep in [". ", "! ", "? ", "… ", "…"]:
                         pos = remaining.rfind(sep, 0, max_chars)
                         if pos > split_pos:
                             split_pos = pos + len(sep)
+                    # Nếu không tìm thấy dấu câu kết thúc, tách tại dấu chấm phẩy
+                    if split_pos <= 0:
+                        for sep in ["; ", ";"]:
+                            pos = remaining.rfind(sep, 0, max_chars)
+                            if pos > split_pos:
+                                split_pos = pos + len(sep)
+                    # Nếu không tìm thấy dấu chấm phẩy, tách tại dấu hai chấm
+                    if split_pos <= 0:
+                        for sep in [": ", ":"]:
+                            pos = remaining.rfind(sep, 0, max_chars)
+                            if pos > split_pos:
+                                split_pos = pos + len(sep)
+                    # Nếu không tìm thấy dấu hai chấm, tách tại dấu phẩy
+                    if split_pos <= 0:
+                        for sep in [", ", ","]:
+                            pos = remaining.rfind(sep, 0, max_chars)
+                            if pos > split_pos:
+                                split_pos = pos + len(sep)
+                    # Nếu không tìm thấy dấu phẩy, tách tại dấu gạch ngang
+                    if split_pos <= 0:
+                        for sep in [" — ", " – ", "—", "–"]:
+                            pos = remaining.rfind(sep, 0, max_chars)
+                            if pos > split_pos:
+                                split_pos = pos + len(sep)
+                    # Nếu không tìm thấy dấu gạch ngang, tách tại dấu cách
                     if split_pos <= 0:
                         space_pos = remaining.rfind(" ", 0, max_chars)
                         if space_pos > max_chars // 3:
                             split_pos = space_pos
                         else:
                             split_pos = max_chars
-                    chunks.append((remaining[:split_pos].strip(), False))
+                    # Đảm bảo chunk kết thúc bằng dấu câu
+                    chunks.append((_ensure_sentence_ending(remaining[:split_pos].strip()), False))
                     remaining = remaining[split_pos:].strip()
                 current = remaining
             else:
@@ -330,7 +412,8 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
 
         # Lưu chunk cuối cùng của paragraph → đánh dấu section end nếu paragraph là section end
         if current.strip():
-            chunks.append((current.strip(), para_section_end))
+            # Đảm bảo chunk kết thúc bằng dấu câu
+            chunks.append((_ensure_sentence_ending(current.strip()), para_section_end))
 
     # Gộp chunk cuối cùng vào chunk trước nếu cả 2 đều nhỏ
     if len(chunks) >= 2:

@@ -1,23 +1,24 @@
-using Microsoft.Win32;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using Wpf.Ui.Appearance;
 
 namespace TranslateBook;
 
 public partial class App : Application
 {
+    private static readonly string LocalAppData = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "TranslateBook");
+
     public App()
     {
-        InitializeTheme();
-        SystemEvents.UserPreferenceChanged += (s, e) => {
-            if (e.Category == UserPreferenceCategory.General)
-                InitializeTheme();
-        };
-
+        Directory.CreateDirectory(LocalAppData);
         this.DispatcherUnhandledException += (s, e) =>
         {
-            File.AppendAllText("crash.log", $"[UI Thread] {DateTime.Now}\n{e.Exception}\n\n");
+            var logPath = Path.Combine(LocalAppData, "crash.log");
+            File.AppendAllText(logPath, $"[UI Thread] {DateTime.Now}\n{e.Exception}\n\n");
             e.Handled = true;
             MessageBox.Show($"Đã xảy ra lỗi:\n{e.Exception.Message}", "Lỗi hệ thống", MessageBoxButton.OK, MessageBoxImage.Error);
         };
@@ -25,32 +26,16 @@ public partial class App : Application
         {
             if (e.ExceptionObject is Exception ex)
             {
-                File.AppendAllText("crash.log", $"[App Domain] {DateTime.Now}\n{ex}\n\n");
+                var logPath = Path.Combine(LocalAppData, "crash.log");
+                File.AppendAllText(logPath, $"[App Domain] {DateTime.Now}\n{ex}\n\n");
             }
         };
     }
 
-    private void InitializeTheme()
+    protected override void OnStartup(StartupEventArgs e)
     {
-        bool isLight = false;
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            if (key?.GetValue("AppsUseLightTheme") is int val)
-            {
-                isLight = val > 0;
-            }
-        }
-        catch { }
-
-        string themeDict = isLight ? "Themes/LightTheme.xaml" : "Themes/DarkTheme.xaml";
-        
-        var dict = new ResourceDictionary { Source = new Uri(themeDict, UriKind.Relative) };
-        
-        // Cập nhật từ điển đầu tiên (do trong App.xaml ta để Theme ở index 0)
-        if (Current.Resources.MergedDictionaries.Count > 0)
-        {
-            Current.Resources.MergedDictionaries[0] = dict;
-        }
+        base.OnStartup(e);
+        // Đồng bộ giao diện với theme hệ thống (dark/light) một lần.
+        ApplicationThemeManager.ApplySystemTheme();
     }
 }

@@ -1,0 +1,104 @@
+<Page x:Class="TranslateBook.Views.AudioPage"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:models="clr-namespace:TranslateBook.Models"
+        Loaded="Page_Loaded">
+
+    <Grid Margin="12,8,16,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="Cấu hình Audio" FontSize="20" FontWeight="Bold"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,12"/>
+            <StackPanel Orientation="Horizontal">
+                <StackPanel Margin="0,0,24,0">
+                    <TextBlock Text="Temperature" FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                    <ui:NumberBox Width="110" Value="{Binding AudioTemperature, Mode=TwoWay}"
+                                  Minimum="0" Maximum="2" SmallChange="0.1"/>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="Top-K" FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                    <ui:NumberBox Width="110" Value="{Binding AudioTopK, Mode=TwoWay}"
+                                  Minimum="1" Maximum="100" SmallChange="1"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding OutputBooks.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Text="Chưa có sách nào."
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold"/>
+            </StackPanel>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding OutputBooks}" Margin="4">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:BookStatus}">
+                            <ui:Card Margin="6" Width="300">
+                                <StackPanel>
+                                     <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold" Height="42"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,8,0,0">
+                                        <Run Text="Audio chapters: "/><Run Text="{Binding Mp3Count, Mode=OneWay}"/>
+                                    </TextBlock>
+                                    <ui:Button Appearance="Primary" Content="Tạo / Cập nhật Audio"
+                                               Icon="{ui:SymbolIcon Headphones24}" Margin="0,12,0,0"
+                                               Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                               CommandParameter="{Binding}">
+                                        <ui:Button.Style>
+                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                        <Setter Property="Content" Value="Đang tạo audio..."/>
+                                                        <Setter Property="IsEnabled" Value="False"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:Button.Style>
+                                    </ui:Button>
+                                    <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}"
+                                               Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                               CommandParameter="{Binding}" Margin="0,8,0,0">
+                                        <ui:Button.Style>
+                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:Button.Style>
+                                    </ui:Button>
+                                </StackPanel>
+                            </ui:Card>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>

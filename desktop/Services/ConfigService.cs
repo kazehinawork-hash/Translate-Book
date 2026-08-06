@@ -16,8 +16,19 @@ public static class ConfigService
         Directory.CreateDirectory(ConfigDir);
         if (File.Exists(ConfigFile))
         {
-            var json = File.ReadAllText(ConfigFile);
-            return JsonSerializer.Deserialize<ApiConfig>(json) ?? new ApiConfig();
+            try
+            {
+                var json = File.ReadAllText(ConfigFile);
+                return JsonSerializer.Deserialize<ApiConfig>(json) ?? new ApiConfig();
+            }
+            catch
+            {
+                var backup = ConfigFile + ".bak." + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                try { File.Copy(ConfigFile, backup, overwrite: true); } catch { }
+                File.Delete(ConfigFile);
+                File.WriteAllText(ConfigFile, JsonSerializer.Serialize(new ApiConfig(), new JsonSerializerOptions { WriteIndented = true }));
+                return new ApiConfig();
+            }
         }
         return new ApiConfig();
     }

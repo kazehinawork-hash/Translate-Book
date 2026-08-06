@@ -1,0 +1,243 @@
+<Page x:Class="TranslateBook.Views.BooksPage"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:models="clr-namespace:TranslateBook.Models"
+        Loaded="Page_Loaded">
+
+    <Grid Margin="12,8,16,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Danh sách sách" FontSize="24" FontWeight="Bold"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox x:Name="SearchBox" Grid.Column="0" PlaceholderText="Tìm kiếm..."
+                                Icon="{ui:SymbolIcon Search24}" IconPlacement="Left"
+                                TextChanged="SearchBox_TextChanged" Margin="20,0,0,0" Height="36"/>
+                    <ui:Button Grid.Column="1" Width="36" Height="36"
+                               Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Làm mới" Cursor="Hand"
+                               Background="Transparent" BorderThickness="0" Margin="8,0,0,0"
+                               Command="{Binding RefreshBooksCommand}"/>
+                </Grid>
+            </StackPanel>
+        </Grid>
+
+        <TabControl Grid.Row="1">
+            <TabItem Header="Input (Chưa dịch)">
+                <Grid>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding InputBooks.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Chưa có sách nào để dịch."
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBlock Text="Copy file .pdf, .epub hoặc .docx vào thư mục input/ rồi bấm Làm mới."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   HorizontalAlignment="Center" FontSize="14"/>
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="InputItemsControl" ItemsSource="{Binding InputBooks}" Margin="4">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:BookStatus}">
+                                    <ui:Card Margin="6" Width="280" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="Chưa dịch - đặt vào input/" FontSize="12"
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                       Margin="0,8,0,12"/>
+                                            <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}"
+                                                       Content="Bắt đầu dịch" HorizontalAlignment="Stretch"
+                                                       Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                       CommandParameter="{Binding}">
+                                                <ui:Button.Style>
+                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                <Setter Property="Content" Value="Đang dịch..."/>
+                                                                <Setter Property="IsEnabled" Value="False"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:Button.Style>
+                                            </ui:Button>
+                                            <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}"
+                                                       Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                       CommandParameter="{Binding}" Margin="0,8,0,0">
+                                                <ui:Button.Style>
+                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:Button.Style>
+                                            </ui:Button>
+                                        </StackPanel>
+                                    </ui:Card>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Output (Đã dịch)">
+                <Grid>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding OutputBooks.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Chưa có sách nào được dịch xong."
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBlock Text="Chuyển sang tab Input để bắt đầu dịch sách mới."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   HorizontalAlignment="Center" FontSize="14"/>
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="OutputItemsControl" ItemsSource="{Binding OutputBooks}" Margin="4">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:BookStatus}">
+                                    <ui:Card Margin="6" Width="300">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold" Height="42"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+
+                                            <ui:InfoBadge HorizontalAlignment="Left" Margin="0,4,0,0">
+                                                <ui:InfoBadge.Style>
+                                                    <Style TargetType="ui:InfoBadge">
+                                                        <Setter Property="Value" Value="{Binding StatusText}"/>
+                                                        <Setter Property="Severity" Value="Informational"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                <Setter Property="Severity" Value="Caution"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding HasViMd}" Value="True">
+                                                                <Setter Property="Severity" Value="Success"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:InfoBadge.Style>
+                                            </ui:InfoBadge>
+
+                                            <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" Height="6" Margin="0,8,0,0"/>
+
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,16,0">
+                                                    <Run Text="EPUB: "/><Run Text="{Binding HasEpub, Mode=OneWay}"/>
+                                                </TextBlock>
+                                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                    <Run Text="Audio: "/><Run Text="{Binding Mp3Count, Mode=OneWay}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+
+                                            <Grid Margin="0,12,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="8"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="8"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ui:Button Grid.Column="0" Content="Dịch tiếp" Icon="{ui:SymbolIcon Edit24}"
+                                                           ToolTip="Dịch tiếp phần còn thiếu"
+                                                           Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:Button.Style>
+                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                    <Setter Property="Content" Value="Đang dịch..."/>
+                                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:Button.Style>
+                                                </ui:Button>
+                                                <ui:Button Grid.Column="2" Appearance="Primary" Content="Tạo audio"
+                                                           Icon="{ui:SymbolIcon Headphones24}"
+                                                           ToolTip="Tự động tạo Audiobook MP3"
+                                                           Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:Button.Style>
+                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                    <Setter Property="Content" Value="Đang tạo audio..."/>
+                                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:Button.Style>
+                                                </ui:Button>
+                                                <ui:Button Grid.Column="4" Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}"
+                                                           Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:Button.Style>
+                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:Button.Style>
+                                                </ui:Button>
+                                            </Grid>
+                                            <ui:Button Content="Đọc thử EPUB" Icon="{ui:SymbolIcon BookOpen24}"
+                                                       Margin="0,8,0,0" Click="PreviewEpub_Click"/>
+                                        </StackPanel>
+                                    </ui:Card>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Page>
