@@ -42,6 +42,23 @@ namespace TranslateBook.Views;
             tb.ScrollToEnd();
     }
 
+    private void ClearLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ViewModels.MainViewModel vm)
+            vm.LogText = "";
+    }
+
+    private void CopyLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (LogBox != null && !string.IsNullOrEmpty(LogBox.Text))
+            System.Windows.Clipboard.SetText(LogBox.Text);
+    }
+
+    public void NavigateToBooks()
+    {
+        NavView.Navigate(typeof(BooksPage));
+    }
+
     public void ShowSnackbar(string message, bool isError = false)
     {
         _snackbarService.Show(

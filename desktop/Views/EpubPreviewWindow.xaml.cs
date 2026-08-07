@@ -3,31 +3,41 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Controls;
 using TranslateBook.Models;
 using VersOne.Epub;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using HtmlAgilityPack;
 
 namespace TranslateBook.Views
 {
     public partial class EpubPreviewWindow : FluentWindow
     {
-        private string _epubFilePath;
-        private string _tempExtractPath;
-        
+        private string _epubFilePath = "";
+        private string _tempExtractPath = "";
+        private readonly List<string> _readingOrderPaths = new();
+        private string _fullBookHtmlPath = "";
+        private readonly Dictionary<string, int> _pathToChapterId = new();  // EPUB path → DOM chapter ID
+        private readonly List<TocItem> _flatToc = new();  // Flattened TOC for audio sync
+
         private MediaPlayer? _mediaPlayer;
         private DispatcherTimer? _timer;
         private List<string> _audioFiles = new();
         private int _currentTrackIndex = -1;
         private bool _isDraggingSlider = false;
 
-        public EpubPreviewWindow(string epubFilePath)
+        // Search state
+        private bool _isSearchHighlightActive = false;
+
+        public EpubPreviewWindow(string epubFilePath = "")
         {
             InitializeComponent();
             SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
@@ -36,6 +46,14 @@ namespace TranslateBook.Views
 
             Loaded += EpubPreviewWindow_Loaded;
             Closed += EpubPreviewWindow_Closed;
+        }
+
+        public void LoadEpubFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new ArgumentException("EPUB path cannot be empty.", nameof(path));
+
+            _epubFilePath = path;
         }
 
         private async void EpubPreviewWindow_Loaded(object sender, RoutedEventArgs e)
@@ -47,8 +65,7 @@ namespace TranslateBook.Views
                     "TranslateBook", "WebView2");
                 Directory.CreateDirectory(userDataFolder);
 
-                // Set CreationProperties via reflection — CoreWebView2CreationProperties
-                // is not directly referenceable from this project but is available at runtime.
+                // Set CreationProperties via reflection
                 var webViewType = WebView.GetType();
                 var cpProp = webViewType.GetProperty("CreationProperties");
                 if (cpProp != null)
@@ -60,25 +77,25 @@ namespace TranslateBook.Views
                 }
 
                 await WebView.EnsureCoreWebView2Async();
+                WebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
 
                 // Read and extract EPUB
                 EpubBook book = await EpubReader.ReadBookAsync(_epubFilePath);
-                
+
                 if (Directory.Exists(_tempExtractPath))
                     Directory.Delete(_tempExtractPath, true);
-                
+
                 ZipFile.ExtractToDirectory(_epubFilePath, _tempExtractPath);
 
+                // Build TOC
                 var toc = new List<TocItem>();
                 if (book.Navigation != null)
                 {
                     foreach (var navItem in book.Navigation)
-                    {
                         toc.Add(MapNavigationItem(navItem));
-                    }
                 }
-                
                 TocTreeView.ItemsSource = toc;
+                FlattenToc(toc);
 
                 // Build reading order
                 if (book.ReadingOrder != null)
@@ -86,66 +103,272 @@ namespace TranslateBook.Views
                     foreach (var roItem in book.ReadingOrder)
                     {
                         if (roItem != null && !string.IsNullOrEmpty(roItem.FilePath))
-                        {
                             _readingOrderPaths.Add(roItem.FilePath);
-                        }
                     }
                 }
 
-                // Generate fullbook.html
-                _fullBookHtmlPath = Path.Combine(_tempExtractPath, "fullbook.html");
-                var sb = new System.Text.StringBuilder();
-                sb.AppendLine("<!DOCTYPE html><html><head><meta charset='utf-8'></head><body>");
+                // Build CSS (embedded in HTML head — fixes FOUC)
+                string css = BuildEpubCss();
 
-                int chapterIndex = 0;
-                foreach (var relativePath in _readingOrderPaths)
+                // Generate fullbook.html with all content
+                _fullBookHtmlPath = Path.Combine(_tempExtractPath, "fullbook.html");
+                var sb = new StringBuilder();
+                sb.AppendLine("<!DOCTYPE html><html><head><meta charset='utf-8'>");
+                sb.AppendLine($"<style>{css}</style>");
+                sb.AppendLine("</head><body>");
+
+                // Build chapter content with proper ID mapping
+                _pathToChapterId.Clear();
+                int domChapterId = 0;
+
+                for (int i = 0; i < _readingOrderPaths.Count; i++)
                 {
+                    string relativePath = _readingOrderPaths[i];
                     string absolutePath = Path.GetFullPath(Path.Combine(_tempExtractPath, relativePath));
                     if (File.Exists(absolutePath))
                     {
-                        string html = File.ReadAllText(absolutePath);
-                        var match = System.Text.RegularExpressions.Regex.Match(html, @"<body[^>]*>(.*?)</body>", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-                        
-                        string body = match.Success ? match.Groups[1].Value : html;
-                        
-                        string fileDir = Path.GetDirectoryName(absolutePath)!;
-                        body = System.Text.RegularExpressions.Regex.Replace(body, @"(src|href)\s*=\s*['""]([^'""#:]+)['""]", m =>
-                        {
-                            string attr = m.Groups[1].Value;
-                            string val = m.Groups[2].Value;
-                            if (val.StartsWith("http", StringComparison.OrdinalIgnoreCase) || val.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-                                return m.Value;
-                            
-                            try
-                            {
-                                string targetAbsPath = Path.GetFullPath(Path.Combine(fileDir, val));
-                                string newRelativePath = Path.GetRelativePath(_tempExtractPath, targetAbsPath).Replace("\\", "/");
-                                return $"{attr}=\"{newRelativePath}\"";
-                            }
-                            catch
-                            {
-                                return m.Value;
-                            }
-                        });
+                        _pathToChapterId[relativePath] = domChapterId;
 
-                        sb.AppendLine($"<div id='chap_{chapterIndex}'>");
+                        string html = File.ReadAllText(absolutePath, Encoding.UTF8);
+                        string body = ExtractBodyContent(html);           // HtmlAgilityPack
+                        body = RewriteImagePaths(body, absolutePath, _tempExtractPath); // HtmlAgilityPack
+
+                        sb.AppendLine($"<div id='chap_{domChapterId}'>");
                         sb.AppendLine(body);
                         sb.AppendLine("</div>");
+
+                        domChapterId++;
                     }
-                    chapterIndex++;
                 }
+
                 sb.AppendLine("</body></html>");
-                File.WriteAllText(_fullBookHtmlPath, sb.ToString());
+                File.WriteAllText(_fullBookHtmlPath, sb.ToString(), Encoding.UTF8);
 
                 // Navigate to the full book
-                WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("translatebook.local", _tempExtractPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
-                WebView.Source = new Uri("https://translatebook.local/fullbook.html");
+                WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("translatebook.local", _tempExtractPath,
+                    Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+                WebView.CoreWebView2.Navigate($"https://translatebook.local/fullbook.html");
 
                 InitAudioPlayer();
             }
             catch (Exception ex)
             {
-                System.Windows.MessageBox.Show($"Lỗi khi mở EPUB: {ex.Message}", "Lỗi", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"Lỗi khi mở EPUB: {ex.Message}", "Lỗi", System.Windows.MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private string BuildEpubCss()
+        {
+            var bg = Application.Current.Resources["ControlFillColorTertiaryBrush"] as SolidColorBrush;
+            var fg = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
+            var fgSecondary = Application.Current.Resources["TextFillColorSecondaryBrush"] as SolidColorBrush;
+            var link = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Colors.LightBlue;
+
+            string bgHex = bg != null ? ColorToHex(bg.Color) : "#1e1e1e";
+            string fgHex = fg != null ? ColorToHex(fg.Color) : "#e0e0e0";
+            string fgSecondaryHex = fgSecondary != null ? ColorToHex(fgSecondary.Color) : "#b0b0b0";
+            string linkHex = ColorToHex(link);
+
+            return $@"
+                :root {{
+                    --bg-color: {bgHex};
+                    --fg-color: {fgHex};
+                    --fg-secondary-color: {fgSecondaryHex};
+                    --link-color: {linkHex};
+                    --font-size: 18px;
+                }}
+                body {{
+                    background-color: var(--bg-color);
+                    color: var(--fg-color);
+                    font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+                    line-height: 1.8;
+                    margin: 0 auto;
+                    padding: 24px;
+                    max-width: 800px;
+                    font-size: var(--font-size);
+                }}
+                h1, h2, h3, h4, h5, h6 {{
+                    color: var(--fg-color);
+                    margin: 1.2em 0 0.5em 0;
+                    line-height: 1.3;
+                    font-weight: 600;
+                }}
+                h1 {{ font-size: calc(var(--font-size) * 1.8); }}
+                h2 {{ font-size: calc(var(--font-size) * 1.5); }}
+                h3 {{ font-size: calc(var(--font-size) * 1.3); }}
+                h4 {{ font-size: calc(var(--font-size) * 1.15); }}
+                p {{ margin: 0 0 1em 0; }}
+                blockquote {{
+                    margin: 1em 0;
+                    padding: 0.5em 1.2em;
+                    border-left: 3px solid var(--link-color);
+                    background: rgba(128,128,128,0.08);
+                    font-style: italic;
+                    border-radius: 0 4px 4px 0;
+                }}
+                pre {{
+                    background: rgba(0,0,0,0.1);
+                    padding: 1em;
+                    overflow-x: auto;
+                    border-radius: 4px;
+                    margin: 1em 0;
+                }}
+                code {{
+                    font-family: 'Consolas', 'Courier New', monospace;
+                    font-size: 0.9em;
+                    padding: 0.1em 0.35em;
+                    border-radius: 2px;
+                    background: rgba(128,128,128,0.15);
+                    color: var(--fg-color);
+                }}
+                pre code {{
+                    padding: 0;
+                    background: none;
+                    display: block;
+                    overflow-x: auto;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 1em 0;
+                }}
+                th, td {{
+                    border: 1px solid {fgSecondaryHex};
+                    padding: 0.4em 0.6em;
+                    text-align: left;
+                }}
+                th {{ font-weight: 600; color: var(--fg-color); }}
+                ul, ol {{ margin: 0.5em 0; padding-left: 2em; }}
+                li {{ margin: 0.2em 0; }}
+                img {{
+                    max-width: 100%;
+                    height: auto;
+                    display: block;
+                    margin: 1.5em auto;
+                    border-radius: 4px;
+                }}
+                figcaption {{
+                    text-align: center;
+                    color: var(--fg-secondary-color);
+                    font-size: 0.9em;
+                    margin: 0.5em 0;
+                }}
+                a {{ color: var(--link-color); text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
+                ruby {{ ruby-position: under; ruby-align: auto; }}
+                rt {{ font-size: 0.7em; color: var(--fg-secondary-color); }}
+                div[id^='chap_'] {{ margin-bottom: 2.5em; }}
+                .search-highlight {{
+                    background-color: rgba(255, 230, 0, 0.4);
+                    scroll-margin-top: 24px;
+                }}
+                ::-webkit-scrollbar {{ width: 8px; }}
+                ::-webkit-scrollbar-track {{ background: rgba(128,128,128,0.1); border-radius: 4px; }}
+                ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.3); border-radius: 4px; }}
+                ::-webkit-scrollbar-thumb:hover {{ background: rgba(128,128,128,0.5); }}
+            ";
+        }
+
+        private string ExtractBodyContent(string html)
+        {
+            try
+            {
+                var doc = new HtmlDocument();
+                doc.LoadHtml(html);
+
+                var body = doc.DocumentNode.Descendants("body").FirstOrDefault();
+                if (body != null)
+                    return body.InnerHtml;
+
+                // Fallback: return content inside <html> or the whole doc
+                var htmlNode = doc.DocumentNode.Descendants("html").FirstOrDefault();
+                if (htmlNode != null && htmlNode.InnerHtml.Length > 0)
+                    return htmlNode.InnerHtml;
+
+                return html;
+            }
+            catch
+            {
+                // Ultimate fallback: regex
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    html, @"<body[^>]*>(.*?)</body\s*>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                    System.Text.RegularExpressions.RegexOptions.Singleline);
+                return match.Success ? match.Groups[1].Value : html;
+            }
+        }
+
+        private string RewriteImagePaths(string html, string fileDir, string basePath)
+        {
+            try
+            {
+                var doc = new HtmlDocument();
+                doc.LoadHtml(html);
+
+                foreach (var node in doc.DocumentNode.Descendants())
+                {
+                    string? attrName = null;
+
+                    if (node.Name == "img")
+                        attrName = "src";
+                    else if (node.Name == "a" || node.Name == "link")
+                        attrName = "href";
+
+                    if (attrName != null && node.Attributes.Contains(attrName))
+                    {
+                        string val = node.GetAttributeValue(attrName, "");
+
+                        // Skip absolute URLs, data URIs, and anchors
+                        if (val.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
+                            val.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+                            val.StartsWith("#") ||
+                            val.StartsWith("mailto:") ||
+                            val.StartsWith("tel:"))
+                            continue;
+
+                        // Split query string and fragment
+                        string pathPart = val;
+                        string queryPart = "";
+                        string fragmentPart = "";
+
+                        int queryIdx = val.IndexOf('?');
+                        int fragIdx = val.IndexOf('#');
+
+                        if (fragIdx >= 0)
+                        {
+                            fragmentPart = val.Substring(fragIdx);
+                            if (queryIdx < 0 || queryIdx > fragIdx)
+                                pathPart = val.Substring(0, fragIdx);
+                            else
+                            {
+                                pathPart = val.Substring(0, queryIdx);
+                                queryPart = val.Substring(queryIdx, fragIdx - queryIdx);
+                            }
+                        }
+                        else if (queryIdx >= 0)
+                        {
+                            pathPart = val.Substring(0, queryIdx);
+                            queryPart = val.Substring(queryIdx);
+                        }
+
+                        try
+                        {
+                            string targetAbsPath = Path.GetFullPath(Path.Combine(fileDir, pathPart));
+                            string newRelativePath = Path.GetRelativePath(basePath, targetAbsPath).Replace("\\", "/");
+                            node.SetAttributeValue(attrName, newRelativePath + queryPart + fragmentPart);
+                        }
+                        catch
+                        {
+                            // Keep original if path resolution fails
+                        }
+                    }
+                }
+
+                return doc.DocumentNode.InnerHtml;
+            }
+            catch
+            {
+                return html;
             }
         }
 
@@ -160,12 +383,20 @@ namespace TranslateBook.Views
             if (navItem.NestedItems != null)
             {
                 foreach (var nested in navItem.NestedItems)
-                {
                     item.NestedItems.Add(MapNavigationItem(nested));
-                }
             }
 
             return item;
+        }
+
+        private void FlattenToc(IEnumerable<TocItem> items)
+        {
+            foreach (var item in items)
+            {
+                _flatToc.Add(item);
+                if (item.NestedItems != null && item.NestedItems.Any())
+                    FlattenToc(item.NestedItems);
+            }
         }
 
         private void TocTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -173,11 +404,13 @@ namespace TranslateBook.Views
             if (e.NewValue is TocItem selectedItem && !string.IsNullOrEmpty(selectedItem.FilePath))
             {
                 ScrollToChapter(selectedItem.FilePath);
+                SyncAudioToChapter(selectedItem.FilePath);
             }
-        }
 
-        private List<string> _readingOrderPaths = new();
-        private string _fullBookHtmlPath = "";
+            // Clear search highlights on manual TOC navigation
+            if (_isSearchHighlightActive)
+                ClearSearchHighlights();
+        }
 
         private void ScrollToChapter(string tocFilePath)
         {
@@ -192,19 +425,46 @@ namespace TranslateBook.Views
                 anchor = parts[1];
             }
 
-            int idx = _readingOrderPaths.IndexOf(pathOnly);
-            if (idx >= 0)
+            if (_pathToChapterId.TryGetValue(pathOnly, out int chapterId))
             {
-                string js = "";
+                string js;
                 if (!string.IsNullOrEmpty(anchor))
                 {
-                    js = $"var el = document.getElementById('{anchor}'); if(el) el.scrollIntoView({{behavior: 'smooth', block: 'start'}}); else document.getElementById('chap_{idx}').scrollIntoView({{behavior: 'smooth', block: 'start'}});";
+                    js = $@"var el = document.getElementById('{EscapeJsString(anchor)}'); if(el) {{ el.scrollIntoView({{behavior: 'smooth', block: 'start'}}); }} else {{ document.getElementById('chap_{chapterId}').scrollIntoView({{behavior: 'smooth', block: 'start'}}); }}";
                 }
                 else
                 {
-                    js = $"document.getElementById('chap_{idx}').scrollIntoView({{behavior: 'smooth', block: 'start'}});";
+                    js = $"document.getElementById('chap_{chapterId}').scrollIntoView({{behavior: 'smooth', block: 'start'}});";
                 }
                 WebView.CoreWebView2.ExecuteScriptAsync(js);
+            }
+            else
+            {
+                // Fallback: search by reading order index
+                int idx = _readingOrderPaths.IndexOf(pathOnly);
+                if (idx >= 0)
+                {
+                    string js = $"var el = document.getElementById('chap_{idx}'); if(el) el.scrollIntoView({{behavior: 'smooth', block: 'start'}});";
+                    WebView.CoreWebView2.ExecuteScriptAsync(js);
+                }
+            }
+        }
+
+        private void SyncAudioToChapter(string filePath)
+        {
+            if (_audioFiles.Count == 0) return;
+
+            int tocIndex = _flatToc.FindIndex(t => t.FilePath == filePath);
+            if (tocIndex >= 0 && tocIndex < _audioFiles.Count)
+            {
+                _currentTrackIndex = tocIndex;
+                LoadTrack(tocIndex);
+                if (_timer?.IsEnabled == false)
+                {
+                    _mediaPlayer?.Play();
+                    _timer?.Start();
+                    BtnAudioPlay.Content = "\uE769"; // Pause icon
+                }
             }
         }
 
@@ -212,85 +472,377 @@ namespace TranslateBook.Views
         {
             if (e.IsSuccess)
             {
-                var appBackground = Application.Current.Resources["ControlFillColorTertiaryBrush"] as SolidColorBrush;
-                var appForeground = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
-                var linkColor = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Colors.LightBlue;
-
-                var bgHex = appBackground != null ? ColorToHex(appBackground.Color) : "#1e1e1e";
-                var fgHex = appForeground != null ? ColorToHex(appForeground.Color) : "#e0e0e0";
-
-                string css = $@"
-                    body {{
-                        background-color: {bgHex} !important;
-                        color: {fgHex} !important;
-                        font-family: 'Segoe UI', Arial, sans-serif !important;
-                        line-height: 1.6 !important;
-                        margin: 0 auto !important;
-                        padding: 20px !important;
-                        overflow-y: auto !important;
-                        overflow-x: hidden !important;
-                        max-width: 800px !important;
-                    }}
-                    a {{ color: {ColorToHex(linkColor)} !important; }}
-                    img {{ max-width: 100% !important; height: auto !important; }}
-                ";
-
-                string injectScript = $@"
-                    var style = document.createElement('style');
-                    style.innerHTML = `{css}`;
-                    document.head.appendChild(style);
-                ";
-
-                await WebView.CoreWebView2.ExecuteScriptAsync(injectScript);
+                // Re-apply theme CSS variables (for manual refresh)
+                ReapplyThemeColors();
+                // Inject keyboard navigation script
+                InjectKeyboardNavScript();
             }
+        }
+
+        private void ReapplyThemeColors()
+        {
+            var bg = Application.Current.Resources["ControlFillColorTertiaryBrush"] as SolidColorBrush;
+            var fg = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
+            var link = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Colors.LightBlue;
+
+            string bgHex = bg != null ? ColorToHex(bg.Color) : "#1e1e1e";
+            string fgHex = fg != null ? ColorToHex(fg.Color) : "#e0e0e0";
+            string linkHex = ColorToHex(link);
+
+            string js = $@"var root = document.documentElement; root.style.setProperty('--bg-color', '{bgHex}'); root.style.setProperty('--fg-color', '{fgHex}'); root.style.setProperty('--link-color', '{linkHex}');";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
         }
 
         private static string ColorToHex(Color color) =>
             "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
+
+        private void InjectKeyboardNavScript()
+        {
+            string js = @"
+                (function() {
+                    if (window.__keyNavInjected) return;
+                    window.__keyNavInjected = true;
+
+                    document.addEventListener('keydown', function(e) {
+                        var active = document.activeElement;
+                        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+
+                        if (e.key === 'ArrowDown') {
+                            window.chrome.webview.postMessage(JSON.stringify({action: 'nextChapter'}));
+                            e.preventDefault();
+                        } else if (e.key === 'ArrowUp') {
+                            window.chrome.webview.postMessage(JSON.stringify({action: 'prevChapter'}));
+                            e.preventDefault();
+                        } else if (e.key === ' ') {
+                            window.chrome.webview.postMessage(JSON.stringify({action: 'playPause'}));
+                            e.preventDefault();
+                        } else if (e.key === 'Escape') {
+                            window.chrome.webview.postMessage(JSON.stringify({action: 'escape'}));
+                            e.preventDefault();
+                        }
+                    });
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void WebView_WebMessageReceived(object sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                var msg = JsonSerializer.Deserialize<Dictionary<string, string>>(e.WebMessageAsJson);
+                if (msg != null && msg.TryGetValue("action", out string? action) && action != null)
+                {
+                    switch (action)
+                    {
+                        case "nextChapter":
+                            ScrollToNextChapter();
+                            break;
+                        case "prevChapter":
+                            ScrollToPrevChapter();
+                            break;
+                        case "playPause":
+                            BtnAudioPlayPause_Click(null, new RoutedEventArgs());
+                            break;
+                        case "escape":
+                            Close();
+                            break;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore malformed messages
+            }
+        }
+
+        private void ScrollToNextChapter()
+        {
+            string js = @"
+                (function() {
+                    var current = window.pageYOffset || document.documentElement.scrollTop;
+                    var chapters = document.querySelectorAll('div[id^=""chap_""]');
+                    var next = null;
+                    for (var i = 0; i < chapters.length; i++) {
+                        var rect = chapters[i].getBoundingClientRect();
+                        var offsetTop = rect.top + window.pageYOffset;
+                        if (offsetTop > current + 50) {
+                            next = chapters[i];
+                            break;
+                        }
+                    }
+                    if (next) next.scrollIntoView({behavior: 'smooth', block: 'start'});
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void ScrollToPrevChapter()
+        {
+            string js = @"
+                (function() {
+                    var current = window.pageYOffset || document.documentElement.scrollTop;
+                    var chapters = document.querySelectorAll('div[id^=""chap_""]');
+                    var prev = null;
+                    for (var i = chapters.length - 1; i >= 0; i--) {
+                        var rect = chapters[i].getBoundingClientRect();
+                        var offsetTop = rect.top + window.pageYOffset;
+                        if (offsetTop < current - 50) {
+                            prev = chapters[i];
+                        }
+                    }
+                    if (prev) prev.scrollIntoView({behavior: 'smooth', block: 'start'});
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Handled) return;
+
+            switch (e.Key)
+            {
+                case Key.F5:
+                    ReapplyThemeColors();
+                    ZoomPercent.Text = $"{(int)ZoomSlider.Value}%";
+                    e.Handled = true;
+                    break;
+            }
+        }
+
+        // --- Search ---
+
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string searchTerm = SearchBox.Text.Trim();
+            if (string.IsNullOrEmpty(searchTerm))
+            {
+                ClearSearchHighlights();
+                _isSearchHighlightActive = false;
+            }
+            else
+            {
+                HighlightSearchTerm(searchTerm);
+                _isSearchHighlightActive = true;
+            }
+        }
+
+        private void ClearSearchHighlights()
+        {
+            string js = @"
+                (function() {
+                    var highlights = document.querySelectorAll('.search-highlight');
+                    highlights.forEach(function(el) {
+                        var parent = el.parentNode;
+                        if (parent) {
+                            var text = document.createTextNode(el.textContent);
+                            while (el.firstChild) {
+                                text.appendChild(el.firstChild);
+                            }
+                            parent.replaceChild(text, el);
+                        }
+                    });
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void HighlightSearchTerm(string term)
+        {
+            ClearSearchHighlights();
+            string escaped = EscapeJsString(term);
+
+            string js = $@"
+                (function() {{
+                    var term = '{escaped}';
+                    if (!term) return;
+                    var safeTerm = term.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
+                    var regex = new RegExp(safeTerm, 'gi');
+                    var body = document.querySelector('body');
+                    if (!body) return;
+                    var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+                    var nodes = [];
+                    var node;
+                    while (node = walker.nextNode()) {{
+                        if (node.nodeValue && node.nodeValue.trim().length > 0 && regex.test(node.nodeValue))
+                            nodes.push(node);
+                    }}
+                    regex.lastIndex = 0;
+                    nodes.forEach(function(textNode) {{
+                        var content = textNode.nodeValue;
+                        var matches = [];
+                        var match;
+                        var re = new RegExp(safeTerm, 'gi');
+                        while (match = re.exec(content)) {{
+                            matches.push({{start: match.index, end: match.index + match[0].length}});
+                        }}
+                        if (matches.length === 0) return;
+
+                        var frag = document.createDocumentFragment();
+                        var lastIndex = 0;
+                        matches.forEach(function(m) {{
+                            if (m.start > lastIndex)
+                                frag.appendChild(document.createTextNode(content.slice(lastIndex, m.start)));
+                            var span = document.createElement('span');
+                            span.className = 'search-highlight';
+                            span.textContent = content.slice(m.start, m.end);
+                            frag.appendChild(span);
+                            lastIndex = m.end;
+                        }});
+                        if (lastIndex < content.length)
+                            frag.appendChild(document.createTextNode(content.slice(lastIndex)));
+                        textNode.parentNode.replaceChild(frag, textNode);
+                    }});
+                }})();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void BtnSearchNext_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isSearchHighlightActive) return;
+
+            string js = @"
+                (function() {
+                    var highlights = document.querySelectorAll('.search-highlight');
+                    if (highlights.length === 0) return;
+                    var current = window.pageYOffset || document.documentElement.scrollTop;
+                    var best = null;
+                    var bestDist = Infinity;
+                    for (var i = 0; i < highlights.length; i++) {
+                        var r = highlights[i].getBoundingClientRect();
+                        var offsetTop = r.top + window.pageYOffset;
+                        var dist = offsetTop - current;
+                        if (dist >= -50 && dist < bestDist) {
+                            bestDist = dist;
+                            best = highlights[i];
+                        }
+                    }
+                    if (!best) best = highlights[0];
+                    best.scrollIntoView({behavior: 'smooth', block: 'center'});
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void BtnSearchPrev_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isSearchHighlightActive) return;
+
+            string js = @"
+                (function() {
+                    var highlights = document.querySelectorAll('.search-highlight');
+                    if (highlights.length === 0) return;
+                    var current = window.pageYOffset || document.documentElement.scrollTop;
+                    var best = null;
+                    var bestDist = Infinity;
+                    for (var i = highlights.length - 1; i >= 0; i--) {
+                        var r = highlights[i].getBoundingClientRect();
+                        var offsetTop = r.top + window.pageYOffset;
+                        var dist = current - offsetTop;
+                        if (dist >= -50 && dist < bestDist) {
+                            bestDist = dist;
+                            best = highlights[i];
+                        }
+                    }
+                    if (!best) best = highlights[highlights.length - 1];
+                    best.scrollIntoView({behavior: 'smooth', block: 'center'});
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        // --- Zoom ---
+
+        private void ZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            int percent = (int)e.NewValue;
+            if (ZoomPercent != null)
+                ZoomPercent.Text = $"{percent}%";
+
+            if (WebView?.CoreWebView2 != null)
+            {
+                double fontSize = 18.0 * (percent / 100.0);
+                string js = $"document.documentElement.style.setProperty('--font-size', '{fontSize:F1}px');";
+                WebView.CoreWebView2.ExecuteScriptAsync(js);
+            }
+        }
+
+        private void BtnRefreshTheme_Click(object sender, RoutedEventArgs e)
+        {
+            if (WebView.CoreWebView2 != null && WebView.Source != null)
+                WebView.Reload();
+            else if (WebView.CoreWebView2 != null)
+                ReapplyThemeColors();
+        }
+
+        // --- Helper ---
+
+        private static string EscapeJsString(string s)
+        {
+            return s.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "");
+        }
+
+        // --- Audio Player ---
 
         private void InitAudioPlayer()
         {
             try
             {
                 var bookDir = Path.GetDirectoryName(_epubFilePath);
-                if (bookDir != null)
+                if (bookDir == null) return;
+
+                var audioDir = Path.Combine(bookDir, "audiobook");
+                if (Directory.Exists(audioDir))
                 {
-                    var audioDir = Path.Combine(bookDir, "audiobook");
-                    if (Directory.Exists(audioDir))
-                    {
-                        var files = Directory.GetFiles(audioDir, "*.mp3").OrderBy(f => f).ToList();
-                        if (files.Count > 0)
-                        {
-                            _audioFiles = files;
-                            
-                            _mediaPlayer = new MediaPlayer();
-                            _mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
-                            _mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
-                            
-                            _timer = new DispatcherTimer();
-                            _timer.Interval = TimeSpan.FromMilliseconds(500);
-                            _timer.Tick += Timer_Tick;
-                            
-                            AudioBar.Visibility = Visibility.Visible;
-                            VolumeSlider.Value = 0.8;
-                            _mediaPlayer.Volume = 0.8;
-                            
-                            LoadTrack(0);
-                        }
-                    }
+                    var files = Directory.GetFiles(audioDir, "*.mp3").OrderBy(f => f).ToList();
+                    if (files.Count > 0)
+                        _audioFiles = files;
                 }
+
+                if (_audioFiles.Count == 0) return;
+
+                _mediaPlayer = new MediaPlayer();
+                _mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
+                _mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
+
+                _timer = new DispatcherTimer();
+                _timer.Interval = TimeSpan.FromMilliseconds(500);
+                _timer.Tick += Timer_Tick;
+
+                AudioBar.Visibility = Visibility.Visible;
+                VolumeSlider.Value = 0.8;
+                _mediaPlayer.Volume = 0.8;
+
+                LoadTrack(0);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Audio init error: {ex.Message}");
+            }
         }
 
         private void LoadTrack(int index)
         {
-            if (index >= 0 && index < _audioFiles.Count && _mediaPlayer != null)
+            if (index < 0 || index >= _audioFiles.Count || _mediaPlayer == null) return;
+
+            _currentTrackIndex = index;
+
+            try
             {
-                _currentTrackIndex = index;
                 _mediaPlayer.Open(new Uri(_audioFiles[index]));
-                AudioChapterName.Text = Path.GetFileNameWithoutExtension(_audioFiles[index]);
                 AudioSlider.Value = 0;
+
+                // Use TOC title if available for display
+                if (index < _flatToc.Count)
+                    AudioChapterName.Text = _flatToc[index].Title;
+                else
+                    AudioChapterName.Text = Path.GetFileNameWithoutExtension(_audioFiles[index]);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading audio track {index}: {ex.Message}");
             }
         }
 
@@ -317,10 +869,10 @@ namespace TranslateBook.Views
             }
         }
 
-        private void BtnAudioPlayPause_Click(object sender, RoutedEventArgs e)
+        private void BtnAudioPlayPause_Click(object? sender, RoutedEventArgs e)
         {
             if (_mediaPlayer == null || _timer == null) return;
-            
+
             if (_timer.IsEnabled)
             {
                 _mediaPlayer.Pause();
@@ -341,7 +893,7 @@ namespace TranslateBook.Views
             {
                 bool wasPlaying = _timer?.IsEnabled ?? false;
                 LoadTrack(_currentTrackIndex - 1);
-                if (wasPlaying && _mediaPlayer != null) { _mediaPlayer.Play(); }
+                if (wasPlaying && _mediaPlayer != null) _mediaPlayer.Play();
             }
         }
 
@@ -351,7 +903,14 @@ namespace TranslateBook.Views
             {
                 bool wasPlaying = _timer?.IsEnabled ?? false;
                 LoadTrack(_currentTrackIndex + 1);
-                if (wasPlaying && _mediaPlayer != null) { _mediaPlayer.Play(); }
+                if (wasPlaying && _mediaPlayer != null) _mediaPlayer.Play();
+            }
+            else
+            {
+                // Reached the end of the book
+                if (_mediaPlayer != null) _mediaPlayer.Stop();
+                if (_timer?.IsEnabled == true) _timer.Stop();
+                BtnAudioPlay.Content = "\uE768"; // Play icon
             }
         }
 
@@ -364,25 +923,19 @@ namespace TranslateBook.Views
         {
             _isDraggingSlider = false;
             if (_mediaPlayer != null && _mediaPlayer.Source != null)
-            {
                 _mediaPlayer.Position = TimeSpan.FromSeconds(AudioSlider.Value);
-            }
         }
 
         private void AudioSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isDraggingSlider && _mediaPlayer != null)
-            {
                 AudioTimeCurrent.Text = TimeSpan.FromSeconds(AudioSlider.Value).ToString(@"mm\:ss");
-            }
         }
 
         private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_mediaPlayer != null)
-            {
                 _mediaPlayer.Volume = VolumeSlider.Value;
-            }
         }
 
         private void EpubPreviewWindow_Closed(object? sender, EventArgs e)
@@ -397,12 +950,16 @@ namespace TranslateBook.Views
                     _mediaPlayer.MediaOpened -= MediaPlayer_MediaOpened;
                     _mediaPlayer.Stop();
                     _mediaPlayer.Close();
+                    _mediaPlayer = null;
                 }
-                
+
                 if (Directory.Exists(_tempExtractPath))
                     Directory.Delete(_tempExtractPath, true);
             }
-            catch { }
+            catch
+            {
+                // Best effort cleanup
+            }
         }
     }
 }

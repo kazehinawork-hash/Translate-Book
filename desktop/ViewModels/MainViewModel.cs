@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -7,11 +8,13 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TranslateBook.Models;
 using TranslateBook.Services;
+using TranslateBook.Views;
 
 namespace TranslateBook.ViewModels;
 
@@ -26,6 +29,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _logText = "";
     [ObservableProperty] private string _activeProvider = "";
     [ObservableProperty] private bool _isApiOk;
+    [ObservableProperty] private bool _logExpanded = true;
+    [ObservableProperty] private string _globalSearchQuery = "";
 
     [ObservableProperty] private double _audioTemperature = 0.3;
     [ObservableProperty] private int _audioTopK = 10;
@@ -34,6 +39,36 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _apiKeyInput = "";
     [ObservableProperty] private string _modelInput = "";
     [ObservableProperty] private string _baseUrlInput = "";
+
+    // Pipeline properties
+    [ObservableProperty] private int _pipelineFromStep = 1;
+    [ObservableProperty] private int _pipelineToStep = 10;
+    [ObservableProperty] private string _selectedLang = "auto";
+    [ObservableProperty] private string _epubAuthor = "";
+    [ObservableProperty] private string _epubTitle = "";
+    [ObservableProperty] private bool _isPipelineBusy;
+
+    // Voice properties
+    [ObservableProperty] private ObservableCollection<string> _voiceList = new();
+    [ObservableProperty] private string _selectedVoice = "";
+    [ObservableProperty] private string _voiceName = "";
+    [ObservableProperty] private string _voiceGender = "";
+    [ObservableProperty] private string _voiceDescription = "";
+    [ObservableProperty] private bool _isVoiceBusy;
+    [ObservableProperty] private string _voicePreviewText = "Xin chào, đây là đoạn đọc thử giọng.";
+
+    // QA properties
+    [ObservableProperty] private string _qaReport = "";
+    [ObservableProperty] private bool _hasQaReport;
+    [ObservableProperty] private bool _isQaBusy;
+    [ObservableProperty] private bool _showQaReport;
+
+    // Audiobook extra properties
+    [ObservableProperty] private string _audioBitrate = "128k";
+    [ObservableProperty] private bool _audioReadTitles = true;
+    [ObservableProperty] private bool _audioMergeChapters;
+    [ObservableProperty] private bool _audioForceRegenerate;
+    [ObservableProperty] private string _audioChapterInput = "";
 
     private const int MaxLogLines = 2000;
     private CancellationTokenSource? _currentCts;
@@ -333,13 +368,18 @@ public partial class MainViewModel : ObservableObject
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
-        AppendLog($"Bắt đầu tạo audio: {book.Slug} (nhiệt độ={AudioTemperature}, top_k={AudioTopK})");
+        AppendLog($"Bắt đầu tạo audio: {book.Slug} (nhiệt độ={AudioTemperature}, top_k={AudioTopK}, bitrate={AudioBitrate})");
         try
         {
             var ok = await _pipeline.RunAudiobookAsync(
                 book.Slug,
                 AudioTemperature.ToString("0.0"),
                 AudioTopK.ToString(),
+                AudioBitrate,
+                AudioReadTitles,
+                AudioMergeChapters,
+                AudioForceRegenerate,
+                AudioChapterInput,
                 ct);
             if (ok) AppendLog($"Audio hoàn thành: {book.Slug}");
             else AppendLog($"[Lỗi] Tạo audio thất bại: {book.Slug}", "error");
@@ -382,20 +422,35 @@ public partial class MainViewModel : ObservableObject
             if (translated != book.ProgressCount)
                 book.ProgressCount = translated;
         }
+
+        // Check if any output book has a QA report
+        if (!HasQaReport)
+        {
+            foreach (var book in OutputBooks)
+            {
+                var reportPath = Path.Combine(_projectRoot, "working", "qa", $"{book.Slug}_report.md");
+                if (File.Exists(reportPath))
+                {
+                    HasQaReport = true;
+                    QaReport = File.ReadAllText(reportPath);
+                    break;
+                }
+            }
+        }
     }
 
     private void AppendLog(string msg, string level = "info")
     {
         var time = DateTime.Now.ToString("HH:mm:ss");
-        var prefix = level switch
+        // ANSI-style color markers for parsing in RichTextBox later
+        var colorTag = level switch
         {
             "error" => "[ERR]",
             "warning" => "[WARN]",
             _ => "[INFO]"
         };
-        LogText += $"[{time}] {prefix} {msg}\n";
+        LogText += $"[{time}] {colorTag} {msg}\n";
 
-        // Prevent unbounded growth — trim to last ~2000 lines
         if (LogText.Length > 80_000)
         {
             var lines = LogText.Split('\n');
@@ -516,6 +571,447 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             AppendLog($"Lỗi lưu cấu hình: {ex.Message}", "error");
+        }
+    }
+
+    // ==================== PIPELINE COMMANDS ====================
+
+    [RelayCommand]
+    private async Task RunPipelineAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        IsPipelineBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        AppendLog($"Bắt đầu chạy pipeline: {book.Slug} (bước {PipelineFromStep}→{PipelineToStep}, ngôn ngữ={SelectedLang})");
+        try
+        {
+            var ok = await _pipeline.RunPipelineAsync(
+                book.FilePath, book.Slug, SelectedLang,
+                PipelineFromStep, PipelineToStep, force: false,
+                author: EpubAuthor, ct: ct);
+
+            if (ok) AppendLog($"Pipeline hoàn thành: {book.Slug}");
+            else AppendLog($"[Lỗi] Pipeline thất bại: {book.Slug}", "error");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy pipeline: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            IsPipelineBusy = false;
+            _currentCts = null;
+            UpdateBookStatus(book);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExtractBookAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        AppendLog($"Bắt đầu trích xuất: {book.Slug}");
+        try
+        {
+            var ok = await _pipeline.RunExtractAsync(book.FilePath, book.Slug, SelectedLang, ct);
+            if (ok) AppendLog($"Trích xuất thành công: {book.Slug}");
+            else AppendLog($"[Lỗi] Trích xuất thất bại: {book.Slug}", "error");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy trích xuất: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            _currentCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private async Task GenerateGlossaryAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        var sourceDir = Path.Combine(_projectRoot, "working", "extracted", book.Slug);
+        if (!Directory.Exists(sourceDir))
+        {
+            AppendLog($"[Lỗi] Không tìm thấy extracted cho: {book.Slug}. Chạy Extract trước.", "error");
+            return;
+        }
+
+        book.IsBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        var glossaryPath = Path.Combine(_projectRoot, "glossary", $"{book.Slug}.csv");
+        AppendLog($"Bắt đầu tạo glossary: {book.Slug}");
+        try
+        {
+            var ok = await _pipeline.RunGlossaryAsync(sourceDir, book.Slug, glossaryPath, ct);
+            if (ok) AppendLog($"Glossary đã tạo: {glossaryPath}");
+            else AppendLog($"[Lỗi] Tạo glossary thất bại: {book.Slug}", "error");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy tạo glossary: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            _currentCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private async Task MergeChunksAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        var lang = ContainsChinese(File.Exists(book.FilePath) ? File.ReadAllText(book.FilePath) : book.Slug) ? "trilingual" : "bilingual";
+        AppendLog($"Bắt đầu gộp chunks: {book.Slug} (format={lang})");
+        try
+        {
+            var ok = await _pipeline.RunMergeAsync(book.Slug, lang, force: true, ct);
+            if (ok) AppendLog($"Gộp chunks thành công: {book.Slug}");
+            else AppendLog($"[Lỗi] Gộp chunks thất bại: {book.Slug}", "error");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy gộp chunks: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            _currentCts = null;
+            UpdateBookStatus(book);
+        }
+    }
+
+    [RelayCommand]
+    private async Task MakeEpubAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        var title = string.IsNullOrWhiteSpace(EpubTitle) ? book.DisplayTitle : EpubTitle;
+        AppendLog($"Bắt đầu tạo EPUB: {book.Slug} (title={title})");
+        try
+        {
+            var ok = await _pipeline.RunMakeEpubAsync(book.Slug, title, EpubAuthor, ct);
+            if (ok) AppendLog($"EPUB đã tạo: {book.Slug}");
+            else AppendLog($"[Lỗi] Tạo EPUB thất bại: {book.Slug}", "error");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy tạo EPUB: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            _currentCts = null;
+            UpdateBookStatus(book);
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenEpubPreviewAsync(BookStatus book)
+    {
+        if (book == null) return;
+
+        var epubPath = Path.Combine(_projectRoot, "output", "books", book.Slug, "trilingual.epub");
+        if (!File.Exists(epubPath))
+        {
+            AppendLog($"[Lỗi] Không tìm thấy file EPUB: {epubPath}", "error");
+            return;
+        }
+
+        await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var window = new EpubPreviewWindow();
+            window.Owner = Application.Current.MainWindow;
+            window.LoadEpubFile(epubPath);
+            window.Show();
+        });
+    }
+
+    // ==================== QA COMMAND ====================
+
+    [RelayCommand]
+    private async Task RunQaAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        var viMd = Path.Combine(_projectRoot, "output", "books", book.Slug, "final", "vi.md");
+        var sourceMd = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
+        if (!File.Exists(viMd))
+        {
+            AppendLog($"[Lỗi] Chưa có vi.md cho: {book.Slug}", "error");
+            return;
+        }
+        if (!File.Exists(sourceMd))
+        {
+            AppendLog($"[Lỗi] Chưa có source cho: {book.Slug}", "error");
+            return;
+        }
+
+        IsQaBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        var reportPath = Path.Combine(_projectRoot, "working", "qa", $"{book.Slug}_report.md");
+        Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+
+        var lang = ContainsChinese(File.ReadAllText(sourceMd)) ? "zh" : "en";
+        var glossaryPath = Path.Combine(_projectRoot, "glossary", $"{book.Slug}.csv");
+
+        AppendLog($"Chạy QA: {book.Slug}");
+        try
+        {
+            var ok = await _pipeline.RunQaAsync(sourceMd, viMd, lang,
+                File.Exists(glossaryPath) ? glossaryPath : "",
+                threshold: 5.0, reportPath: reportPath, ct);
+
+            if (File.Exists(reportPath))
+            {
+                QaReport = await File.ReadAllTextAsync(reportPath, ct);
+                HasQaReport = true;
+            }
+
+            if (ok) AppendLog($"QA OK: {book.Slug}");
+            else AppendLog($"QA phát hiện lỗi: {book.Slug} — xem report", "warning");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy QA: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            IsQaBusy = false;
+            _currentCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleQaReport(BookStatus? book)
+    {
+        if (ShowQaReport)
+        {
+            ShowQaReport = false;
+            return;
+        }
+
+        if (book == null) return;
+
+        // Try to load existing report
+        var reportPath = Path.Combine(_projectRoot, "working", "qa", $"{book.Slug}_report.md");
+        if (File.Exists(reportPath))
+        {
+            QaReport = File.ReadAllText(reportPath);
+            HasQaReport = true;
+        }
+
+        if (HasQaReport)
+            ShowQaReport = !ShowQaReport;
+    }
+
+    // ==================== VOICE COMMANDS ====================
+
+    [RelayCommand]
+    private async Task LoadVoicesAsync()
+    {
+        var voices = await _pipeline.GetVoiceListAsync();
+        VoiceList.Clear();
+        foreach (var v in voices) VoiceList.Add(v);
+        if (VoiceList.Count > 0 && string.IsNullOrEmpty(SelectedVoice))
+            SelectedVoice = VoiceList[0];
+        AppendLog($"Đã tải {VoiceList.Count} giọng");
+    }
+
+    [RelayCommand]
+    private async Task PreviewVoiceAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedVoice) || IsVoiceBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        IsVoiceBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+        var previewPath = Path.Combine(_projectRoot, "output", "voice_preview", $"preview_{SelectedVoice}.wav");
+
+        AppendLog($"Đang tạo bản đọc thử: {SelectedVoice}");
+        try
+        {
+            var escapedText = VoicePreviewText.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var args = $"preview \"{SelectedVoice}\" --text \"{escapedText}\"";
+            var ok = await _pipeline.RunManageVoiceAsync(args, ct);
+
+            if (!ok || !File.Exists(previewPath))
+            {
+                AppendLog($"[Lỗi] Không tạo được file đọc thử cho giọng: {SelectedVoice}", "error");
+                return;
+            }
+
+            AppendLog($"Đã tạo bản đọc thử: {previewPath}");
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = previewPath,
+                UseShellExecute = true,
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog("Đã hủy đọc thử giọng.", "warning");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] Đọc thử giọng: {ex.Message}", "error");
+        }
+        finally
+        {
+            IsVoiceBusy = false;
+            _currentCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SetActiveVoiceAsync()
+    {
+        if (string.IsNullOrEmpty(SelectedVoice)) return;
+        try
+        {
+            await _pipeline.RunManageVoiceAsync($"set-active \"{SelectedVoice}\"");
+            AppendLog($"Đã set giọng active: {SelectedVoice}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] Set active voice: {ex.Message}", "error");
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleLog()
+    {
+        LogExpanded = !LogExpanded;
+    }
+
+    [RelayCommand]
+    private void FocusSearchInBooks()
+    {
+        // The BooksPage owns the actual search control focus.
+    }
+
+    [RelayCommand]
+    private async Task RunPipelineFirstBookAsync()
+    {
+        if (InputBooks.Count == 0) return;
+        await RunPipelineCommand.ExecuteAsync(InputBooks[0]);
+    }
+
+    [RelayCommand]
+    private async Task ExtractVoiceAsync()
+    {
+        if (string.IsNullOrWhiteSpace(VoiceName)) return;
+        IsVoiceBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        AppendLog($"Trích xuất giọng: {VoiceName}");
+        try
+        {
+            var args = $"extract --name \"{VoiceName}\" --auto";
+            if (!string.IsNullOrWhiteSpace(VoiceGender)) args += $" --gender {VoiceGender}";
+            if (!string.IsNullOrWhiteSpace(VoiceDescription)) args += $" --description \"{VoiceDescription}\"";
+            var ok = await _pipeline.RunManageVoiceAsync(args, ct);
+            if (ok)
+            {
+                AppendLog($"Đã trích xuất giọng: {VoiceName}");
+                await LoadVoicesAsync();
+            }
+            else AppendLog($"[Lỗi] Trích xuất giọng thất bại", "error");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            IsVoiceBusy = false;
+            _currentCts = null;
         }
     }
 }

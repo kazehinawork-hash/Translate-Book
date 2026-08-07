@@ -3,10 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:models="clr-namespace:TranslateBook.Models"
-        Loaded="Page_Loaded">
+        Loaded="Page_Loaded"
+        ScrollViewer.CanContentScroll="False">
 
     <Grid Margin="12,8,16,0">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -14,23 +16,100 @@
         <StackPanel Margin="0,0,0,16">
             <TextBlock Text="Cấu hình Audio" FontSize="20" FontWeight="Bold"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,12"/>
-            <StackPanel Orientation="Horizontal">
-                <StackPanel Margin="0,0,24,0">
-                    <TextBlock Text="Temperature" FontSize="12"
+            <WrapPanel>
+                <StackPanel Margin="0,0,24,12">
+                    <TextBlock Text="Độ sáng tạo" FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
                     <ui:NumberBox Width="110" Value="{Binding AudioTemperature, Mode=TwoWay}"
-                                  Minimum="0" Maximum="2" SmallChange="0.1"/>
+                                  Minimum="0" Maximum="2" SmallChange="0.1" ToolTip="Giá trị thấp cho giọng đọc ổn định hơn"/>
                 </StackPanel>
-                <StackPanel>
+                <StackPanel Margin="0,0,24,12">
                     <TextBlock Text="Top-K" FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
                     <ui:NumberBox Width="110" Value="{Binding AudioTopK, Mode=TwoWay}"
-                                  Minimum="1" Maximum="100" SmallChange="1"/>
+                                  Minimum="1" Maximum="100" SmallChange="1" ToolTip="Giá trị thấp cho cách đọc nhất quán hơn"/>
                 </StackPanel>
-            </StackPanel>
+                <StackPanel Margin="0,0,24,12">
+                    <TextBlock Text="Chất lượng MP3" FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                    <ComboBox Width="100" SelectedValue="{Binding AudioBitrate, Mode=TwoWay}" SelectedValuePath="Content">
+                        <ComboBoxItem Content="96k"/>
+                        <ComboBoxItem Content="128k"/>
+                        <ComboBoxItem Content="192k"/>
+                        <ComboBoxItem Content="256k"/>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Margin="0,0,0,12" VerticalAlignment="Center">
+                    <CheckBox Content="Đọc tiêu đề chương" IsChecked="{Binding AudioReadTitles}" Margin="0,0,16,6"/>
+                    <CheckBox Content="Gộp thành một file" IsChecked="{Binding AudioMergeChapters}" Margin="0,0,16,6"/>
+                    <CheckBox Content="Tạo lại toàn bộ" IsChecked="{Binding AudioForceRegenerate}"/>
+                </StackPanel>
+            </WrapPanel>
         </StackPanel>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+            <ui:Card Grid.Column="0" Padding="12">
+                <StackPanel>
+                    <TextBlock Text="Quản lý giọng" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Giọng hiện tại:" VerticalAlignment="Center" Margin="0,0,8,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <ComboBox Width="160" ItemsSource="{Binding VoiceList}"
+                                  SelectedItem="{Binding SelectedVoice}" Margin="0,0,8,0"/>
+                        <ui:Button Content="Đặt làm giọng chính" Icon="{ui:SymbolIcon Checkmark24}" Height="32"
+                                   Command="{Binding SetActiveVoiceCommand}"/>
+                        <ui:Button Content="Nghe thử" Icon="{ui:SymbolIcon Play24}" Height="32"
+                                   Command="{Binding PreviewVoiceCommand}" Margin="8,0,0,0"/>
+                    </StackPanel>
+                    <ui:TextBox Style="{StaticResource InteractiveTextBox}"
+                                PlaceholderText="Câu đọc thử"
+                                Text="{Binding VoicePreviewText, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="Tải danh sách giọng" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                                   Command="{Binding LoadVoicesCommand}" Height="32"/>
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+            <ui:Card Grid.Column="2" Padding="12">
+                <StackPanel>
+                    <TextBlock Text="Trích xuất giọng mới" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="80"/>
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox Grid.Column="0" Style="{StaticResource InteractiveTextBox}" PlaceholderText="Tên giọng"
+                                    Text="{Binding VoiceName, UpdateSourceTrigger=PropertyChanged}"/>
+                        <ComboBox Grid.Column="2" SelectedValue="{Binding VoiceGender, Mode=TwoWay}" SelectedValuePath="Tag"
+                                  ToolTip="Giới tính dùng để chọn cách xử lý giọng phù hợp">
+                            <ComboBoxItem Content="Nữ" Tag="female"/>
+                            <ComboBoxItem Content="Nam" Tag="male"/>
+                        </ComboBox>
+                    </Grid>
+                    <ui:TextBox Style="{StaticResource InteractiveTextBox}" PlaceholderText="Mô tả (tùy chọn)"
+                                Text="{Binding VoiceDescription, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="Trích xuất" Style="{StaticResource InteractiveButton}" Icon="{ui:SymbolIcon ArrowDownload24}"
+                                   Command="{Binding ExtractVoiceCommand}" Height="32"/>
+                        <TextBlock Text="Chọn file audio mẫu trước khi trích xuất" FontSize="11"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+        </Grid>
+
+        <Grid Grid.Row="2">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
@@ -56,7 +135,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:BookStatus}">
-                            <ui:Card Margin="6" Width="300">
+                            <ui:Card Margin="6" Width="300" Style="{StaticResource InteractiveCard}">
                                 <StackPanel>
                                      <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold" Height="42"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
@@ -64,8 +143,11 @@
                                     <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,8,0,0">
                                         <Run Text="Audio chapters: "/><Run Text="{Binding Mp3Count, Mode=OneWay}"/>
                                     </TextBlock>
+                                    <ui:TextBox PlaceholderText="Chapters (VD: 1 2 3 hoặc để trống = tất cả)"
+                                                Text="{Binding DataContext.AudioChapterInput, RelativeSource={RelativeSource AncestorType={x:Type Window}}, UpdateSourceTrigger=PropertyChanged}"
+                                                Margin="0,8,0,0" Height="28"/>
                                     <ui:Button Appearance="Primary" Content="Tạo / Cập nhật Audio"
-                                               Icon="{ui:SymbolIcon Headphones24}" Margin="0,12,0,0"
+                                               Icon="{ui:SymbolIcon Headphones24}" Margin="0,8,0,0"
                                                Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                                CommandParameter="{Binding}">
                                         <ui:Button.Style>

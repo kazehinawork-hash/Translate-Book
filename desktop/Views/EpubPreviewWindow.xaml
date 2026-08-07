@@ -6,9 +6,12 @@
         xmlns:models="clr-namespace:TranslateBook.Models"
         Title="EPUB Preview" Height="700" Width="1000" MinWidth="800" MinHeight="600"
         WindowStartupLocation="CenterOwner"
-        WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round">
+        WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -16,7 +19,34 @@
 
         <ui:TitleBar Grid.Row="0" Title="Đọc thử Sách EPUB" Icon="{ui:SymbolIcon BookOpen24}"/>
 
-        <Grid Grid.Row="1">
+        <!-- Toolbar: search, zoom, theme refresh -->
+        <Border Grid.Row="1" Background="{DynamicResource ControlFillColorSecondaryBrush}" Padding="8">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <ui:Button x:Name="BtnRefreshTheme" Content="Làm mới theme" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                           Width="100" Height="32" Margin="0,0,8,0" Click="BtnRefreshTheme_Click"
+                           ToolTip="Cập nhật lại màu sắc theo theme hiện tại"/>
+
+                <TextBlock x:Name="ZoomPercent" Text="100%" FontSize="12" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,8,0"/>
+
+                <Slider x:Name="ZoomSlider" Width="100" Minimum="50" Maximum="200" Value="100"
+                        TickFrequency="10" IsSnapToTickEnabled="True"
+                        ValueChanged="ZoomSlider_ValueChanged"
+                        Margin="0,0,12,0"/>
+
+                <ui:TextBox x:Name="SearchBox" Width="200" Height="32" PlaceholderText="Tìm kiếm trong sách..."
+                             TextChanged="SearchBox_TextChanged"/>
+
+                <ui:Button x:Name="BtnSearchNext" Content="Tiếp" Icon="{ui:SymbolIcon ChevronDown24}"
+                           Width="70" Height="32" Margin="8,0,0,0" Click="BtnSearchNext_Click"
+                           ToolTip="Tìm chuỗi kế tiếp"/>
+                <ui:Button x:Name="BtnSearchPrev" Content="Trước" Icon="{ui:SymbolIcon ChevronUp24}"
+                           Width="70" Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click"
+                           ToolTip="Tìm chuỗi trước đó"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="250"/>
                 <ColumnDefinition Width="1"/>
@@ -36,12 +66,12 @@
             <Border Grid.Column="1" Background="{DynamicResource ControlFillColorSecondaryBrush}"/>
 
             <Grid Grid.Column="2">
-                <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="Transparent" NavigationCompleted="WebView_NavigationCompleted"/>
+                <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="Transparent" NavigationCompleted="WebView_NavigationCompleted" WebMessageReceived="WebView_WebMessageReceived"/>
             </Grid>
         </Grid>
 
         <!-- Audio Player Bar -->
-        <Border x:Name="AudioBar" Grid.Row="2" BorderThickness="0,1,0,0" Padding="16,8" Visibility="Collapsed"
+        <Border x:Name="AudioBar" Grid.Row="3" BorderThickness="0,1,0,0" Padding="16,8" Visibility="Collapsed"
                 Background="{DynamicResource ControlFillColorTertiaryBrush}" BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>

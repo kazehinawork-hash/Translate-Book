@@ -88,7 +88,9 @@ public class PythonPipelineService
     }
 
     public async Task<bool> RunAudiobookAsync(string slug, string temperature = "0.3",
-        string topK = "10", CancellationToken ct = default)
+        string topK = "10", string bitrate = "128k", bool readTitles = true,
+        bool merge = false, bool force = false, string chapters = "",
+        CancellationToken ct = default)
     {
         var vieneuPython = Path.Combine(_projectRoot, "working", "venv-vieneu", "Scripts", "python.exe");
         if (!File.Exists(vieneuPython))
@@ -97,7 +99,18 @@ public class PythonPipelineService
             return false;
         }
 
-        var args = $"--slug {slug} --temperature {temperature} --top-k {topK}";
+        var args = $"--slug {slug} --temperature {temperature} --top-k {topK} --bitrate {bitrate}";
+        if (!readTitles) args += " --no-read-titles";
+        if (merge) args += " --merge";
+        if (force) args += " --force";
+        if (!string.IsNullOrWhiteSpace(chapters))
+        {
+            var parts = chapters.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+            {
+                args += " --chapter " + string.Join(" ", parts);
+            }
+        }
         return await RunScriptAsync("audiobook/audiobook_long.py", args, ct, vieneuPython);
     }
 
@@ -106,6 +119,99 @@ public class PythonPipelineService
     {
         var args = $"--interactive --chunks-dir \"{chunksDir}\" --progress-dir \"{progressDir}\" --glossary \"{glossary}\"";
         return await RunScriptAsync("translate/translate_helper.py", args, ct);
+    }
+
+    public async Task<bool> RunPipelineAsync(string inputPath, string bookName, string lang = "auto",
+        int fromStep = 1, int toStep = 10, bool force = false, string author = "",
+        CancellationToken ct = default)
+    {
+        var args = $"--input \"{inputPath}\" --book \"{bookName}\" --lang {lang} " +
+                   $"--from-step {fromStep} --to-step {toStep}";
+        if (force) args += " --force";
+        if (!string.IsNullOrWhiteSpace(author)) args += $" --author \"{author}\"";
+        return await RunScriptAsync("pipeline/run_pipeline.py", args, ct);
+    }
+
+    public async Task<bool> RunExtractAsync(string inputPath, string slug, string lang = "auto",
+        CancellationToken ct = default)
+    {
+        var ext = Path.GetExtension(inputPath).ToLower();
+        if (ext == ".pdf")
+        {
+            var args = $"--input \"{inputPath}\" --output \"working/extracted/{slug}\" --lang {lang}";
+            return await RunScriptAsync("extract/mineru_extract.py", args, ct);
+        }
+        else if (ext == ".epub")
+        {
+            var args = $"--input \"{inputPath}\" --output \"working/extracted/{slug}/raw.md\"";
+            return await RunScriptAsync("extract/epub_extract.py", args, ct);
+        }
+        else
+        {
+            ErrorReceived?.Invoke($"Không hỗ trợ trích xuất file: {ext}");
+            return false;
+        }
+    }
+
+    public async Task<bool> RunGlossaryAsync(string sourceDir, string bookName,
+        string outputPath, CancellationToken ct = default)
+    {
+        var args = $"--source-dir \"{sourceDir}\" --book-name \"{bookName}\" --output \"{outputPath}\"";
+        return await RunScriptAsync("process/generate_glossary.py", args, ct);
+    }
+
+    public async Task<bool> RunMergeAsync(string slug, string format = "trilingual",
+        bool force = false, CancellationToken ct = default)
+    {
+        var args = $"--format {format}";
+        if (force) args += " --force";
+        return await RunScriptAsync("output/merge_chunks.py", args, ct);
+    }
+
+    public async Task<bool> RunMakeEpubAsync(string slug, string title = "",
+        string author = "", CancellationToken ct = default)
+    {
+        var args = $"--slug \"{slug}\"";
+        if (!string.IsNullOrWhiteSpace(title)) args += $" --title \"{title}\"";
+        if (!string.IsNullOrWhiteSpace(author)) args += $" --author \"{author}\"";
+        return await RunScriptAsync("output/make_epub.py", args, ct);
+    }
+
+    public async Task<bool> RunQaAsync(string source, string translation, string lang,
+        string glossary = "", double threshold = 5.0, string reportPath = "",
+        CancellationToken ct = default)
+    {
+        var args = $"--source \"{source}\" --translation \"{translation}\" --lang {lang} " +
+                   $"--threshold {threshold}";
+        if (!string.IsNullOrWhiteSpace(glossary)) args += $" --glossary \"{glossary}\"";
+        if (!string.IsNullOrWhiteSpace(reportPath)) args += $" --report \"{reportPath}\"";
+        return await RunScriptAsync("qa/glossary_qa.py", args, ct);
+    }
+
+    public async Task<bool> RunManageVoiceAsync(string subArgs, CancellationToken ct = default)
+    {
+        var vieneuPython = Path.Combine(_projectRoot, "working", "venv-vieneu", "Scripts", "python.exe");
+        if (!File.Exists(vieneuPython))
+        {
+            ErrorReceived?.Invoke("[Lỗi] Không tìm thấy working/venv-vieneu. Chạy: pip install vieneu");
+            return false;
+        }
+        return await RunScriptAsync("audiobook/manage_voice.py", subArgs, ct, vieneuPython);
+    }
+
+    public async Task<List<string>> GetVoiceListAsync()
+    {
+        var voices = new List<string>();
+        var voicesDir = Path.Combine(_projectRoot, "core", "voices");
+        if (!Directory.Exists(voicesDir)) return voices;
+
+        foreach (var d in Directory.GetDirectories(voicesDir).OrderBy(x => x))
+        {
+            var metaFile = Path.Combine(d, "metadata.json");
+            if (File.Exists(metaFile))
+                voices.Add(Path.GetFileName(d));
+        }
+        return voices;
     }
 
     public async Task<bool> RunGitCommandAsync(string command, CancellationToken ct = default)

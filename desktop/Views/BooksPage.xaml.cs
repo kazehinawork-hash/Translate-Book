@@ -42,23 +42,16 @@ public partial class BooksPage : Page
         }
     }
 
-    private void PreviewEpub_Click(object sender, RoutedEventArgs e)
+    private void TabInput_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is System.Windows.Controls.Button btn && btn.DataContext is BookStatus book)
-        {
-            var projectRoot = Services.ProjectHelper.FindProjectRoot();
-            var epubPath = System.IO.Path.Combine(projectRoot, "output", "books", book.Slug, "trilingual.epub");
-
-            if (System.IO.File.Exists(epubPath))
-            {
-                var previewWindow = new EpubPreviewWindow(epubPath) { Owner = Window.GetWindow(this) };
-                previewWindow.Show();
-            }
-            else
-            {
-                if (Window.GetWindow(this) is MainWindow mw)
-                    mw.ShowSnackbar($"Không tìm thấy file EPUB", true);
-            }
-        }
+        if (InputPanel != null) InputPanel.Visibility = Visibility.Visible;
+        if (OutputPanel != null) OutputPanel.Visibility = Visibility.Collapsed;
     }
+
+    private void TabOutput_Click(object sender, RoutedEventArgs e)
+    {
+        if (InputPanel != null) InputPanel.Visibility = Visibility.Collapsed;
+        if (OutputPanel != null) OutputPanel.Visibility = Visibility.Visible;
+    }
+
 }

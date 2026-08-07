@@ -8,9 +8,21 @@
         WindowStartupLocation="CenterScreen"
         WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round">
 
+    <ui:FluentWindow.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </ui:FluentWindow.Resources>
+
     <ui:FluentWindow.DataContext>
         <vm:MainViewModel/>
     </ui:FluentWindow.DataContext>
+
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Key="R" Modifiers="Ctrl" Command="{Binding RefreshBooksCommand}"/>
+        <KeyBinding Key="F" Modifiers="Ctrl" Command="{Binding FocusSearchInBooksCommand}"/>
+        <KeyBinding Key="Oem2" Modifiers="Ctrl" Command="{Binding ToggleLogCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding RunPipelineFirstBookCommand}"/>
+    </ui:FluentWindow.InputBindings>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -19,12 +31,18 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="Translate Book" Icon="{ui:SymbolIcon Library24}"/>
+        <ui:TitleBar Grid.Row="0" Title="Translate Book" Icon="{ui:SymbolIcon Library24}">
+            <ui:TitleBar.Header>
+                <ui:TextBox Width="260" Height="30" Margin="16,0,0,0"
+                            PlaceholderText="Tìm kiếm toàn bộ..."
+                            Text="{Binding GlobalSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                            Style="{StaticResource InteractiveTextBox}"/>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
 
         <ui:NavigationView Grid.Row="1" x:Name="NavView"
                            IsPaneOpen="True" OpenPaneLength="220" PaneDisplayMode="Left"
                            Margin="0,0,0,4">
-
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Sách" IsActive="True"
                                        TargetPageType="{x:Type views:BooksPage}"
@@ -32,7 +50,6 @@
                 <ui:NavigationViewItem Content="Audio" TargetPageType="{x:Type views:AudioPage}"
                                        Icon="{ui:SymbolIcon Headphones24}"/>
             </ui:NavigationView.MenuItems>
-
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem IsHitTestVisible="False">
                     <StackPanel Margin="0,6">
@@ -46,12 +63,40 @@
             </ui:NavigationView.FooterMenuItems>
         </ui:NavigationView>
 
-        <ui:CardExpander Grid.Row="2" Header="Realtime Log" Icon="{ui:SymbolIcon Bug24}"
-                         IsExpanded="False" Margin="0,0,0,4">
-            <TextBox x:Name="LogBox" Text="{Binding LogText, Mode=OneWay}"
-                     TextChanged="LogTextBox_TextChanged"
-                     Style="{StaticResource LogTextBox}" MaxHeight="140"/>
-        </ui:CardExpander>
+        <Grid Grid.Row="2" MinHeight="40" MaxHeight="180" Margin="0,0,0,4">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="{DynamicResource ControlFillColorSecondaryBrush}" Padding="8,2">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                    <ToggleButton Grid.Column="1" Content="▾" Margin="12,0,0,0" Padding="6,2"
+                                  IsChecked="{Binding LogExpanded}" ToolTip="Expand/Collapse" Cursor="Hand"/>
+                    <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="12,0,12,0" Height="22"
+                                PlaceholderText="Lọc..." Style="{StaticResource InteractiveTextBox}" FontSize="10"/>
+                    <Button Grid.Column="3" Content="Xóa" FontSize="10" Padding="8,2" Cursor="Hand"
+                            Click="ClearLogButton_Click" Visibility="{Binding LogExpanded, Converter={StaticResource BoolToVisibility}}"/>
+                    <Button Grid.Column="4" Content="↑" FontSize="11" Padding="6,2" Width="28" Cursor="Hand"
+                            ToolTip="Sao chép log" Click="CopyLogButton_Click"/>
+                </Grid>
+            </Border>
+            <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
+                          Visibility="{Binding LogExpanded, Converter={StaticResource BoolToVisibility}}"
+                          VerticalScrollBarVisibility="Auto">
+                <TextBox x:Name="LogBox" Text="{Binding LogText, Mode=OneWay}"
+                         TextChanged="LogTextBox_TextChanged" Style="{StaticResource LogTextBox}"
+                         FontFamily="Consolas" FontSize="11" IsReadOnly="True" TextWrapping="Wrap"/>
+            </ScrollViewer>
+        </Grid>
 
         <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Grid.RowSpan="3" Margin="0,0,12,12"
                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="380"/>
