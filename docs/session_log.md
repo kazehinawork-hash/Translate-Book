@@ -11,7 +11,7 @@
 ### Đã làm
 - **Docs rút gọn**: README trở thành tài liệu duy nhất; gộp nội dung `QUICKSTART.md` + `USAGE.md` vào README rồi xoá cả 2 file (tổng −1.121 dòng). Thêm bảng Troubleshooting.
 - **README cập nhật** cho hợp hiện trạng: bảng thành tựu (4 cuốn + audiobook), cấu trúc thư mục đánh dấu commit/không-commit, chính sách git code-only, mục App desktop (C# WPF), path script audiobook, `/dich`.
-- **Dọn lịch sử git** (phiên trước): `git filter-branch` bóc toàn bộ sản phẩm khỏi mọi commit → repo ~717MB → 0.4MB; force-push `main`. 129→58 commit.
+- **Dọn lịch sử git** (phiên trước): `git filter-branch` bóc toàn bộ sản phẩm khỏi mọi commit → repo ~717MB → 0.4MB, không còn binary. 129→58 commit.
 - **Triển khai Memory Bank**: tạo `docs/STATE.md` + `docs/session_log.md`, cập nhật `AGENTS.md`, thêm command `/start` + `/done`.
 
 ### File đổi
@@ -68,8 +68,6 @@
 ### Git
 - Trạng thái: nhiều thay đổi chưa commit (thêm mới + xoá + sửa) trên `main`. Commit chờ người dùng duyệt message.
 
----
-
 ## 2026-08-06 — Fix lỗi app desktop (bắn bug nghiêm trọng)
 
 ### Đã làm
@@ -82,24 +80,349 @@
 - **Timer progress**: `DispatcherTimer` 3s gọi `RefreshBookProgress()` cập nhật tiến độ realtime.
 - **Cap LogText**: giới hạn ~2000 dòng tránh O(n²) khi log dài.
 - **Sửa chuỗi log**: "Bat dau dich" → "Bắt đầu dịch", "Dang test" → "Đang kiểm tra", "Hoan thanh" → "Hoàn thành", "Khong tim thay" → "Không tìm thấy".
-- **WebView2 user-data-folder**: dùng reflection để set `CreationProperties.UserDataFolder = %LocalAppData%\TranslateBook\WebView2` (type `CoreWebView2CreationProperties` không resolve ở compile-time).
-- **EpubPreviewWindow CSS**: đọc `TextFillColorPrimaryBrush`/`TextFillColorSecondaryBrush`/`AccentFillColorDefaultBrush` từ theme resources thay vì hardcode màu tối.
-- **Dọn dẹp**: xóa `GitCommitAsync` (không UI gọi), `FindProjectRoot` duplikat → dùng `ProjectHelper.FindProjectRoot()`, sửa `TestApi_Click` dùng `ComboBoxItem.Content` thay `SelectedValue`, `ConfigService` đã có try/catch + backup.
+- **WebView2 user-data-folder**: dùng reflection để set `CreationProperties.UserDataFolder = %LocalAppData%\TranslateBook\WebView2`.
+- **EpubPreviewWindow CSS**: đọc brush từ theme resources thay vì hardcode màu tối.
+- **Dọn dẹp**: xóa `GitCommitAsync`, `FindProjectRoot` trùng, sửa `TestApi_Click`, và dọn unused exception.
 
 ### File đổi
-- `desktop/Services/ApiTranslationService.cs` (thêm `LoadGlossary`, `sourceLang`/`targetLang`/`trilingual` params)
-- `desktop/ViewModels/MainViewModel.cs` (rewrite StartTranslateAsync, GenerateAudiobookAsync, thêm Cancel, timer, cap log)
-- `desktop/Services/PythonPipelineService.cs` (audiobook Python + error message)
-- `desktop/Views/MainWindow.xaml.cs` (Closing → KillCurrentProcess)
-- `desktop/Views/ApiPage.xaml.cs` (TestApi_Click fix)
-- `desktop/Views/BooksPage.xaml.cs` (dùng ProjectHelper.FindProjectRoot)
-- `desktop/Views/EpubPreviewWindow.xaml.cs` (CSS theme + WebView2 user-data-folder)
-- `desktop/Services/ConfigService.cs` (bỏ unused `ex`)
-- `docs/STATE.md`, `docs/session_log.md`
+- Các file service, view model, code-behind desktop và docs liên quan.
 
 ### Còn dở
 - Chưa kiểm thử runtime (API key chưa có) — chờ user test.
-- `translate_helper.py --interactive` vẫn còn trong PythonPipelineService nhưng không được gọi từ app.
 
 ### Git
 - Trạng thái: thay đổi code chưa commit trên `main`. Đang chờ người dùng duyệt.
+
+## 2026-08-06 — Phân tích và điều chỉnh đề xuất tăng hiệu suất dịch
+
+### Đã làm
+- Đọc pipeline Python, chunking, workflow AI Agent, desktop, QA, README và requirements.
+- Xác nhận luồng dịch thực tế là AI Agent đọc/ghi progress trực tiếp; API trong desktop chỉ phục vụ hướng phát triển tương lai.
+- Điều chỉnh trọng tâm: giảm số lượt trao đổi và số lần đọc/ghi file bằng batch 2–4 chunk hoặc theo nhóm chương; ghi progress từng chunk để resume; giao nhiều nhóm chương độc lập cho Agent song song khi phù hợp.
+
+### File đổi
+- `docs/STATE.md`, `docs/session_log.md` — cập nhật quyết định và đề xuất.
+
+### Còn dở
+- Chưa triển khai batch workflow cho AI Agent; cần chọn cách giao batch trong prompt/command trước khi sửa script.
+
+### Git
+- Trạng thái: nhiều thay đổi desktop chưa commit trên `main`; không tự commit.
+
+## 2026-08-06 — Triển khai batch Agent và ổn định audiobook
+
+### Đã làm
+- Thêm `scripts/translate/batch_manifest.py`, `scripts/qa/batch_qa.py`; mở rộng merge validation và checkpoint audiobook.
+- Cập nhật `.opencode/command/dich.md` cho batch manifest, QA sau batch và giới hạn Agent song song không trùng chunk.
+- Kiểm tra compile, smoke test và diagnostics đạt; pytest chưa chạy được vì môi trường thiếu pytest.
+
+### File đổi
+- Scripts translate/QA/output/audiobook, `.opencode/command/dich.md`, README, tests và docs.
+
+### Còn dở
+- Cài pytest vào Python 3.14 hoặc tạo lại `.venv`; chưa benchmark TTS song song.
+
+### Git
+- Nhiều thay đổi chưa commit trên `main`; không tự commit.
+
+## 2026-08-06 — QA audiobook và rà soát tổng thể
+
+### Đã làm
+- Thêm `scripts/qa/audio_qa.py`; QA coverage/chất lượng đạt cho các audiobook hiện có.
+- Cập nhật fingerprint audio, `/dich`, README và tests.
+- Rà soát tổng thể: restore + build desktop đạt; diagnostics, diff check, compile và smoke test đạt.
+
+### File đổi
+- `scripts/qa/audio_qa.py`, `scripts/audiobook/audiobook_long.py`, `.opencode/command/dich.md`, `README.md`, tests và docs.
+
+### Còn dở
+- Cài pytest để chạy test chính thức; app desktop chờ runtime test với API key.
+
+### Git
+- Nhiều thay đổi chưa commit trên `main`; không tự commit.
+
+## 2026-08-07 - Hoan thanh audiobook la-nam-trong-la + tạo lại venv VieNeu từ Python 3.11
+
+### Đã làm
+- Hoàn tất audiobook `la-nam-trong-la` đủ 9/9 chương sau khi tạo lại venv VieNeu từ Python 3.11.9.
+
+### File đổi
+- `working\venv-vieneu`, progress/audio local và `docs/STATE.md`.
+
+### Còn dở
+- Slug orphan `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` tạm bỏ qua.
+
+### Git
+- Không tự commit.
+
+## 2026-08-07 — Triển khai Multi-Agent Phase 1 MVP
+
+### Đã làm
+- Tạo `.commandcode/agents/analyzer.md`: analyzer read-only, model `gpt-5.6-luna`, structured analysis/review marker.
+- Tạo `.commandcode/agents/executor.md`: executor model `poolside/laguna-s-2.1-free`, giới hạn file scope, baseline preservation và shell guard.
+- Tạo `.opencode/command/dual-Agent.md`: Phase 1 analyze → baseline → execute → git check → review 1, không loop; giới hạn payload và không retry.
+- Kiểm tra `git diff --check` và xác nhận đúng ba file mới.
+
+### File đổi
+- `.commandcode/agents/analyzer.md`
+- `.commandcode/agents/executor.md`
+- `.opencode/command/dual-Agent.md`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Test dispatch custom agent qua task tool bị từ chối quyền trước khi analyzer trả output; chưa xác nhận E2E runtime.
+- Phase 2 (một lần sửa + Review 2) chưa triển khai.
+
+### Git
+- Không tự commit/push; các file mới đang untracked, thay đổi docs có sẵn trên `main`.
+
+## 2026-08-07 — Sửa vị trí Command Code custom command
+
+### Đã làm
+- Xác định Command Code quét project commands tại `.commandcode/commands/`, không phải `.opencode/command/`.
+- Tạo `.commandcode/commands/dual-Agent.md`; giữ nguyên `.opencode/command/dual-Agent.md` cho workflow OpenCode cũ.
+- Xác nhận file command mới có đúng tên `dual-Agent.md` để gọi bằng `/dual-Agent`.
+
+### File đổi
+- `.commandcode/commands/dual-Agent.md`, `docs/STATE.md`, `docs/session_log.md`.
+
+### Còn dở
+- Cần reload Command Code rồi kiểm tra `/dual-Agent` trong menu.
+- Runtime dispatch custom agent chưa E2E vì lần thử trước bị từ chối quyền.
+
+### Git
+- Không tự commit/push; file command mới đang untracked.
+
+## 2026-08-07 — Xác minh Dual-Agent Phase 1 E2E
+
+### Đã làm
+- Sửa quyền runtime: thêm `Read(*)` vào `.commandcode/settings.json`; analyzer và executor dùng `permissionMode: auto-accept` với giới hạn `maxTurns`.
+- Chạy E2E: analyzer tạo plan → executor tạo `scratchpad/dual-agent-test.txt` với nội dung `X` → Git check không phát sinh thay đổi trong repo → analyzer Review 1.
+- Analyzer review trả `FINAL_STATUS: APPROVED`.
+
+### File đổi
+- `.commandcode/settings.json`, `.commandcode/agents/analyzer.md`, `.commandcode/agents/executor.md`, `docs/STATE.md`, `docs/session_log.md`.
+- File test nằm ngoài repo: `scratchpad/dual-agent-test.txt`.
+
+### Còn dở
+- Phase 2 (một lần sửa + Review 2) chưa triển khai.
+
+### Git
+- Không tự commit/push; working tree giữ nguyên các thay đổi baseline.
+
+## 2026-08-07 — Tối ưu Dual-Agent cân bằng chất lượng và chi phí
+
+### Đã làm
+- Analyzer được hướng dẫn đọc có mục tiêu, không quét toàn repo.
+- Executor chỉ nhận plan, success criteria, file scope, context trực tiếp và test cần chạy; report ngắn gọn.
+- Review 1 giữ diff đầy đủ trong scope + test evidence; Review 2 chỉ nhận feedback, diff sau sửa, test liên quan và criteria bị ảnh hưởng.
+- Giữ giới hạn cứng hai vòng: review 1; nếu `NEEDS_CHANGES` thì sửa một lần và review 2 rồi kết thúc.
+- E2E task scratchpad `dual-agent-quality-test.txt` tạo đúng nội dung `quality-ok`; analyzer Review 1 trả `FINAL_STATUS: APPROVED`.
+
+### File đổi
+- `.commandcode/agents/analyzer.md`
+- `.commandcode/agents/executor.md`
+- `.commandcode/commands/dual-Agent.md`
+- `.opencode/command/dual-Agent.md`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Chưa ép test thực tế nhánh Review 1 `NEEDS_CHANGES` → Review 2.
+- Một lần executor bị permission chặn ở hậu kiểm Git dù đã tạo file thành công; cần theo dõi nếu tái diễn.
+
+### Git
+- Không tự commit/push; working tree giữ nguyên các thay đổi baseline.
+
+## 2026-08-07 — Ổn định permission Dual-Agent
+
+### Đã làm
+- Chuyển analyzer sang `permissionMode: dont-ask`, chỉ giữ tool đọc.
+- Chuyển executor sang `permissionMode: dont-ask`, chỉ giữ `read_file`, `write_file`, `edit_file`, `grep`, `glob`; loại `shell_command` để tránh permission deny ở hậu kiểm và giảm blast radius.
+- Thêm allowlist `Write(*)` và `Edit(*)` trong `.commandcode/settings.json`.
+- Test analyzer đọc `README.md` thành công; test executor tạo và đọc `permission-stable-test.txt` trong scratchpad thành công.
+
+### File đổi
+- `.commandcode/agents/analyzer.md`
+- `.commandcode/agents/executor.md`
+- `.commandcode/settings.json`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Cần chạy lại E2E command `/dual-Agent` tạo file trong `input` sau khi reload phiên.
+- Chưa ép test thực tế nhánh `NEEDS_CHANGES` → Review 2.
+
+### Git
+- Không tự commit/push; working tree giữ nguyên các thay đổi baseline.
+
+## 2026-08-07 — Chốt giới hạn hai vòng Dual-Agent
+
+### Đã làm
+- Đồng bộ `.commandcode/commands/dual-Agent.md` và `.opencode/command/dual-Agent.md` sang workflow hai vòng:
+  - Vòng 1: analyzer plan → executor implement → analyzer review 1.
+  - Nếu `FINAL_STATUS: NEEDS_CHANGES`: executor chỉ sửa một lần → analyzer review 2.
+  - Sau review 2 bắt buộc kết thúc, không executor sửa lần hai và không review lần ba.
+- Kiểm tra marker `review_count`, nhánh `NEEDS_CHANGES` và `git diff --check`.
+
+### File đổi
+- `.commandcode/commands/dual-Agent.md`
+- `.opencode/command/dual-Agent.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Chưa chạy E2E nhánh `NEEDS_CHANGES`; Phase 1 trước đó đã chạy thành công với `APPROVED`.
+- Chưa áp dụng mô hình task-spec/archive của dự án tham khảo.
+
+### Git
+- Không tự commit/push; working tree giữ nguyên các thay đổi baseline.
+
+## 2026-08-07 — Tối ưu Dual-Agent cân bằng chất lượng và chi phí
+
+### Đã làm
+- Analyzer được hướng dẫn đọc có mục tiêu, không quét toàn repo.
+- Executor chỉ nhận plan, success criteria, file scope, context trực tiếp và test cần chạy; report ngắn gọn.
+- Review 1 giữ diff đầy đủ trong scope + test evidence; Review 2 chỉ nhận feedback, diff sau sửa, test liên quan và criteria bị ảnh hưởng.
+- Giữ giới hạn cứng hai vòng: review 1; nếu `NEEDS_CHANGES` thì sửa một lần và review 2 rồi kết thúc.
+- E2E task scratchpad `dual-agent-quality-test.txt` tạo đúng nội dung `quality-ok`; analyzer Review 1 trả `FINAL_STATUS: APPROVED`.
+
+### File đổi
+- `.commandcode/agents/analyzer.md`
+- `.commandcode/agents/executor.md`
+- `.commandcode/commands/dual-Agent.md`
+- `.opencode/command/dual-Agent.md`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Chưa ép test thực tế nhánh Review 1 `NEEDS_CHANGES` → Review 2.
+- Một lần executor bị permission chặn ở hậu kiểm Git dù đã tạo file thành công; cần theo dõi nếu tái diễn.
+
+### Git
+- Không tự commit/push; working tree giữ nguyên các thay đổi baseline.
+
+## 2026-08-07 — Kiểm tra chức năng Dual-Agent (E2E hai vòng)
+
+### Đã làm
+- Xác nhận cấu hình `.commandcode/agents/analyzer.md` + `executor.md` khớp format chuẩn Command Code (name/description/tools/model hợp lệ; model `gpt-5.6-luna`, `poolside/laguna-s-2.1-free` có trong catalog; thêm `permissionMode`/`maxTurns` ngoài spec nhưng registry nhận).
+- E2E luồng chính: analyzer plan (đủ `# Implementation Plan`/`# Success Criteria`/`# Files to Modify/Create`/`# Review Focus Areas`) → executor implement (`FINAL_STATUS: COMPLETED`, tạo file đúng nội dung, trung thực báo lệch giả định gitignore) → analyzer review 1 (`FINAL_STATUS: NEEDS_CHANGES`).
+- Ép nhánh `NEEDS_CHANGES` → executor sửa đúng 1 lần (đặt file vào `working/qa/` được ignore) → analyzer review 2 (`FINAL_STATUS: APPROVED`). Vòng 2 kết thúc đúng quy tắc giới hạn.
+- Xác nhận permission/scope: analyzer read-only (không có write/shell), executor không có shell tool — đúng thiết kế.
+- Phát hiện: (1) executor không có shell tool nên không tự chạy được `git status` như plan yêu cầu → nên giao git check cho orchestrator; (2) `.gitignore` chỉ ignore các thư mục con cụ thể của `working/`, KHÔNG ignore toàn bộ — file test đặt ngoài các thư mục đó hiện untracked.
+
+### File đổi
+- Không thay đổi file sản phẩm; chỉ test tạm (đã dọn sạch). Cập nhật `docs/STATE.md` + `docs/session_log.md`.
+
+### Còn dở
+- Cân nhắc bổ sung quy tắc vào `dual-Agent.md`: giao việc `git status --short`/git check cho orchestrator (không phải executor) vì executor không có shell.
+- Có thể thêm rule ignore `working/e2e_test/` hoặc dùng đúng `working/qa/` cho file test tạm.
+
+### Git
+- Không tự commit/push; working tree giữ nguyên các thay đổi baseline.
+
+
+## 2026-08-07 — Dịch batch 1 sách EU-BIM-Task-Group-Handbook v2.1 (chunk 1)
+
+### Đã làm
+- Claim batch 1 (worker h-batch1) bằng `batch_manifest.py` -> slug `eu-bim-task-group-handbook-v2-1` (9 chunk).
+- Dịch chunk 1 (chapter: 2.2 Circular Economy Action Plan / chính sách khí hậu EU): 95 dòng nguồn -> 95 dòng dịch tiếng Việt (4786 từ), giữ heading/##/blockquote/URL, giữ tiêu chuẩn (EN 15978, EN 15804), áp glossary, dọn mojibake (CO, -> CO₂, "metrid" -> "thước đo"). Ghi `translated_at=2026-08-07T00:00:00`.
+- QA `batch_qa.py` chunk 1: 0 lỗi (ok:true).
+- `batch_manifest.py complete` batch 1: status -> complete.
+
+### File đổi
+- `working/progress/eu-bim-task-group-handbook-v2-1/chunk_001.json` (sản phẩm, không commit). Cập nhật docs/STATE.md + session_log.md.
+
+### Còn dở
+- Dịch tiếp chunk 2..8 còn trống.
+
+### Git
+- Không tự commit/push.
+
+## 2026-08-07 — Batch 4 (chunk 4) cuốn eu-bim-task-group-handbook-v2-1
+
+### Đã làm
+- Claim batch 4 (worker w-batch4) chunk 4, chapter "DPP DATA REQUIREMENTS".
+- Dịch chunk_004.json EN→VI hoàn chỉnh: giữ 84 dòng/cấu trúc, 6 heading, 1 ảnh, glossary EU BIM Task Group; dọn mojibake.
+- QA `batch_qa.py` chunk 4: 0 lỗi (ok:true).
+- `batch_manifest.py complete` batch 4: status -> complete.
+
+### File đổi
+- `working/progress/eu-bim-task-group-handbook-v2-1/chunk_004.json` (sản phẩm, không commit). Cập nhật docs/STATE.md + session_log.md.
+
+### Còn dở
+- Dịch tiếp chunk 5..8 còn trống.
+
+### Git
+- Không tự commit/push.
+
+## 2026-08-07 — Dịch batch 8 (chunk 8) sách eu-bim-task-group-handbook-v2-1
+
+### Đã làm
+- Claim batch 8 (worker w-batch8) bằng `batch_manifest.py` -> chunk-id 8, chapter "REFERENCES".
+- Dịch chunk_008.json EN→VI: 68 dòng nguồn → 68 dòng (1:1). Gồm 26 từ viết tắt (giữ acronym, dịch phần mở rộng sang tiếng Việt, ví dụ LCA→Đánh giá vòng đời), heading `## REFERENCES`→`## TÀI LIỆU THAM KHẢO`, 41 citation thư mục giữ nguyên như nguồn (chỉ dọn lỗi OCR khoảng trắng trong URL: `https:// cirpass2.eu`→`cirpass2.eu`, `madaster. com`, `woningpas. vlaanderen`, `j. dibe`, `\_`→`_`), giữ ảnh `![](...)`. word_count_translated = 1146. Ghi `translated_at=2026-08-07T00:00:00`, UTF-8.
+- QA `batch_qa.py` chunk 8: 0 lỗi (ok:true).
+- `batch_manifest.py complete` batch 8: status → complete.
+
+### File đổi
+- `working/progress/eu-bim-task-group-handbook-v2-1/chunk_008.json` (sản phẩm, không commit). Cập nhật docs/STATE.md + session_log.md.
+
+### Còn dở
+- Dịch tiếp chunk 2,3,5,6,7 còn trống; hiện đã xong chunk 1,4,8.
+
+### Git
+- Không tự commit/push.
+
+## 2026-08-07 — Dịch batch 7 (chunk 7) sách eu-bim-task-group-handbook-v2-1
+
+### Đã làm
+- Claim `batch_manifest.py` (worker w-batch6): chunk 6 đang bị claim bởi worker khác (w-batch7) vào 09:49:59, nên claim nhận batch 7 → chunk 7, chapter "PUBLIC PROCUREMENT AS A LEVER FOR MARKET TRANSFORMATION".
+- Dịch chunk_007.json EN→VI: 143 dòng nguồn → 143 dòng (1:1). Giữ 10 heading `#`/`##`, giữ 5 blockquote `>` (mục khuyến nghị cấp EU & quốc gia), dọn OCR (`Al`→`AI`, `reguires`→bỏ), áp glossary (BIM, Twin Transition, built environment, whole-life carbon, Digital Building Logbook...), giữ chuẩn/URL/acronym (EN ISO 19650, IFC, EPBD, CPR, DPP, DBL, CEN, EN 15978). Danh sách 33 acronym giữ tên viết tắt, dịch phần mở rộng sang tiếng Việt. word_count_translated = 4751. Ghi `translated_at=2026-08-07T00:00:00`, UTF-8.
+- QA `batch_qa.py` chunk 7: 0 lỗi (ok:true).
+- `batch_manifest.py complete` batch 7: status → complete.
+
+### File đổi
+- `working/progress/eu-bim-task-group-handbook-v2-1/chunk_007.json` (sản phẩm, không commit). Cập nhật docs/STATE.md + session_log.md.
+
+### Còn dở
+- Dịch tiếp chunk 2,3,5,6 (chunk 6 đã claim bởi worker khác) còn trống; hiện đã xong chunk 1,4,7,8.
+
+### Git
+- Không tự commit/push.
+
+
+## 2026-08-07 - Batch 6 (chunk 6) cuon eu-bim-task-group-handbook-v2-1
+
+### Đa lam
+- Claim batch 6 (worker w-batch7) chunk 6, chapter "CALL TO REALITY". Luu y: lenh claim tu-dong nhan batch 6 vi batch 7 da bi w-batch6 claim truoc (worker song song).
+- Dich chunk_006.json EN->VI hoan chinh: 87 dong/cau truc gi-ven, 14 heading ##, blockquote, thu-tuc (EN ISO 19650, IFC, MEAT, Horizon Europe, Digital Europe, Erasmus+, New European Bauhaus), dia diem chuong trinh (BIM Deutschland, Plan BIM 2022, KIRA-digi). Dọn mojibake B|M->BIM. Ghi translated_at=2026-08-07T00:00:00, word_count_translated=4952 (source 3001).
+- QA batch_qa.py chunk 6: 0 loi (ok:true).
+- batch_manifest.py complete batch 6: status -> complete.
+
+### File đoi
+- working/progress/eu-bim-task-group-handbook-v2-1/chunk_006.json (san pham, khong commit). Cap nhat docs/STATE.md + session_log.md.
+
+### Can dư
+- Dich chunk 2,3 con lai (batch 0-1, 5,6,7,8 da complete 08-07).
+
+### Git
+- Khong tu commit/push; co the tu-dong commit luc cac worker song song trong-nhau STATE.md.
+
+
+## 2026-08-07 - Dich xong EU-BIM-Task-Group-Handbook-V2.1 (EN->VI)
+
+### Đã làm
+- Dich cuon 'EU-BIM-Task-Group-Handbook-V2.1.pdf' (EN, 9.6MB) -> slug eu-bim-task-group-handbook-v2-1.
+- Extract MinerU (CPU) -> raw.md (172KB/1091 dong), QC OK, detect lang = en.
+- Chunk 9 (EN, 3000-8000). Glossary 32 thuật ngữ (BIM, Twin Transition=Chuyển đổi kép, LCA, EPD, DPP, DBL, ESPR, CPR...).
+- Skeleton bilingual (init_trilingual_skeleton.py lỗi vi chuyen cho ZH -> tao skeleton thu công chuong chuong).
+- Dịch 9/9 chunk bang subagent song song, batch_manifest verify ok: 9/9, 0 thieu, 0 trung.
+- QA glossary_qa: ok; còn sót EN tai các sách SX/quy dịnh/chuander/references (chap nhan). 27% remnant do giu nguyên tư kỹ thuật + thư mục TG nhự gióa. Mojibake 1 dòng là false positive.
+- Merge song ngữ (make_bilingual) + vi.md. EPUB (make_epub) co image: vi.epub 816KB (resource-path = output/books/<slug> vì md ghi sẵn images/).
+- Output: output/books/eu-bim-task-group-handbook-v2-1/final/{songngu.md, vi.md, vi.epub} + images/ (20 jpg).
+- Chưa làm audiobook (sách tài liệu kỹ thuật, optional).
+
+### File
+- working/extracted, working/chunks, working/progress, working/tmp/<slug>, working/qa/<slug>; output/books/<slug>/final; glossary/eu-bim-task-group-handbook-v2-1.csv.
+
+### Còn dở
+- Audiobook cho sách này nếu user muốn (cần --slug; giọng active.wav).
+
+### Git
+- Không tự commit.

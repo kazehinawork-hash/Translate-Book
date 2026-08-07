@@ -83,11 +83,13 @@ python scripts/pipeline/run_pipeline.py --input "input/sach.pdf" --book "Ten Sac
 Bước 1: Extract   → scripts/extract/mineru_extract.py (PDF/DOCX/ảnh) hoặc scripts/extract/epub_extract.py (EPUB)
 Bước 2: Chunk     → scripts/process/chunk_text.py (smart chunking, JSON output)
 Bước 3: Gen Glossary → scripts/process/generate_glossary.py (tạo prompt → Agent tạo CSV)
-Bước 4: Translate → Agent đọc từng chunk + glossary → ghi vào working/progress/
-Bước 5: QA        → scripts/qa/glossary_qa.py (kiểm tra nhất quán thuật ngữ)
+Bước 4: Translate → Agent đọc batch manifest + glossary → ghi từng chunk vào working/progress/
+Bước 5: QA        → scripts/qa/glossary_qa.py (kiểm tra nhất quán thuật ngữ và alignment)
 Bước 6: Merge     → scripts/output/merge_chunks.py (gộp → output/books/<slug>/final/)
 Bước 7: EPUB      → scripts/output/make_epub.py (tự động, dùng pandoc → output/books/<slug>/trilingual.epub)
 Bước 8: Audiobook → scripts/audiobook/manage_voice.py (clone giọng) + scripts/audiobook/audiobook_long.py (→ MP3)
+
+Khi dịch bằng AI Agent, `batch_manifest.py` tạo batch 2–4 chunk theo chương tại `working/progress/<slug>/batches/`. Agent claim batch riêng, chạy `batch_qa.py`, rồi ghi từng progress JSON trước khi đánh dấu hoàn tất. Audiobook lưu checkpoint nguyên tử, fingerprint cả `vi.md` và chỉ dùng lại cache WAV khi fingerprint text/voice/tham số khớp. Sau khi tạo audio, chạy `audio_qa.py` để kiểm tra đủ chapter và chất lượng file.
 ```
 
 ---
@@ -209,12 +211,15 @@ Pipeline tự động chuyển sang `.epub` (có cấu trúc HTML + CSS riêng c
 | **chunk_text.py** | Chunking với 4 strategy (smart/paragraph/line/fixed) | JSON output + neighbor context |
 | **generate_glossary.py** | Tạo prompt để Agent sinh glossary CSV | Không gọi API |
 | **translate_helper.py** | Hỗ trợ Agent dịch (interactive/prepare/save/status/next/auto-commit) | Interactive mode tự động lặp |
-| **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | |
+| **batch_manifest.py** | Điều phối batch Agent, claim/complete/fail/verify chunk | Ngăn trùng/sót khi dịch theo batch |
+| **merge_chunks.py** | Gộp chunk đã dịch → file hoàn chỉnh | Có validation thiếu/trùng/tổng chunk |
 | **run_pipeline.py** | Orchestrator chính (--from-step/--to-step/--auto) | Script chạy toàn bộ pipeline tự động |
 | **pandoc** | Chuyển .md → .epub với CSS tùy chỉnh | Cài từ https://pandoc.org/installing.html |
 | **VieNeu-TTS v3 Turbo** | Tạo audiobook — clone giọng từ reference audio | CPU/ONNX, 48kHz, 14 giọng preset, voice cloning 3-8s |
 | **manage_voice.py** | Quản lý reference voice: extract (VAD auto), list/info/delete/set-active | `scripts/audiobook/` |
-| **audiobook_long.py** | Tạo audiobook toàn cuốn từ `final/vi.md`: detect chương, smart chunk, resume, auto MP3 | `scripts/audiobook/` |
+| **audiobook_long.py** | Tạo audiobook toàn cuốn từ `final/vi.md`: detect chương, smart chunk, resume, cache fingerprint, auto MP3 | `scripts/audiobook/` |
+| **batch_qa.py** | QA nhanh progress theo batch: rỗng, marker lỗi, alignment tam ngữ | `scripts/qa/` |
+| **audio_qa.py** | QA coverage audiobook, WAV/MP3, duration, sample rate và clipping | Báo cáo `working/qa/<slug>/audio-report.json` |
 | **add_pinyin.py** | Sinh pinyin từ Hán tự (cấp câu) | JSON output, xử lý text pha Latin |
 | **generate_trilingual.py** | Backfill pinyin vào chunk đã dịch | Thêm original+pinyin field, giữ translated |
 | **git** | Version control | OneDrive không thay thế được |

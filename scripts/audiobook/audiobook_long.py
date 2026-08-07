@@ -23,7 +23,7 @@ Usage:
     # Chạy lại từ đầu (bỏ qua progress)
     python scripts/audiobook_long.py --force
 """
-import sys, os, re, time, argparse, json, shutil
+import sys, os, re, time, argparse, json, shutil, hashlib
 import numpy as np
 import soundfile as sf
 
@@ -512,24 +512,59 @@ def generate_chunk_audio(tts, voice_name, chunk, chunk_idx, total_chunks,
                 raise
 
 
+def _audio_cache_signature(chunk: str, voice_name: str, temperature: float, top_k: int) -> str:
+    payload = json.dumps({
+        "chunk": chunk,
+        "voice": voice_name,
+        "temperature": temperature,
+        "top_k": top_k,
+        "max_chars": MAX_CHARS,
+        "sample_rate": SAMPLE_RATE,
+    }, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _load_cached_audio(path: str, signature_path: str, signature: str):
+    if not os.path.exists(path) or not os.path.exists(signature_path):
+        return None
+    try:
+        if open(signature_path, "r", encoding="utf-8").read().strip() != signature:
+            return None
+        info = sf.info(path)
+        if info.samplerate != SAMPLE_RATE or info.frames <= 0:
+            return None
+        audio, _ = sf.read(path, dtype="float32")
+        if audio.size == 0 or not np.isfinite(audio).all():
+            return None
+        return audio
+    except Exception:
+        return None
+
+
+def _save_audio_cache(path: str, audio, signature: str) -> None:
+    temp_wav = path + ".tmp.wav"
+    temp_sig = path + ".tmp.sig"
+    sf.write(temp_wav, audio, SAMPLE_RATE)
+    os.replace(temp_wav, path)
+    with open(temp_sig, "w", encoding="utf-8") as f:
+        f.write(signature)
+    os.replace(temp_sig, path + ".sig")
+
+
 def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7,
                            top_k=20, chunk_dir=None, force=False):
-    """Generate audio cho 1 chapter.
-
-    chunks: list of (text, ends_paragraph).
-    chunk_dir: nếu có, lưu audio từng chunk ra đây để resume giữa chừng.
-    Returns (audio_array, gen_time).
-    """
+    """Generate audio cho 1 chapter với cache kiểm tra được tham số."""
     raw_chunks = []
     total_gen_time = 0
 
     # 1. Generate hoặc load cache — chỉ thu thập audio chunks, chưa chèn silence
     for i, (chunk, ends_para) in enumerate(chunks):
-        if chunk_dir:
+        if chunk_dir and not force:
             chunk_wav = os.path.join(chunk_dir, f"{i:04d}.wav")
-            if os.path.exists(chunk_wav) and not force:
+            signature = _audio_cache_signature(chunk, voice_name, temperature, top_k)
+            audio = _load_cached_audio(chunk_wav, chunk_wav + ".sig", signature)
+            if audio is not None:
                 print(f"      [{i+1:3d}/{len(chunks)}] ⏭  dùng lại cache")
-                audio, _ = sf.read(chunk_wav, dtype="float32")
                 raw_chunks.append(audio)
                 continue
 
@@ -538,7 +573,9 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
         total_gen_time += elapsed
 
         if chunk_dir:
-            sf.write(os.path.join(chunk_dir, f"{i:04d}.wav"), audio, SAMPLE_RATE)
+            _save_audio_cache(
+                os.path.join(chunk_dir, f"{i:04d}.wav"), audio,
+                _audio_cache_signature(chunk, voice_name, temperature, top_k))
 
         raw_chunks.append(audio)
 
@@ -635,10 +672,34 @@ def load_progress(slug: str) -> dict:
 
 
 def save_progress(slug: str, progress: dict):
-    """Save progress to JSON."""
+    """Save progress atomically so an interrupted run cannot truncate JSON."""
     path = _progress_path(slug)
-    with open(path, "w", encoding="utf-8") as f:
+    temp = path + ".tmp"
+    with open(temp, "w", encoding="utf-8") as f:
         json.dump(progress, f, ensure_ascii=False, indent=2)
+    os.replace(temp, path)
+
+
+def _file_sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file:
+        for block in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def audio_progress_metadata(voice: str, temperature: float, top_k: int,
+                            bitrate: str, source_fingerprint: str) -> dict:
+    return {
+        "voice": voice,
+        "temperature": temperature,
+        "top_k": top_k,
+        "bitrate": bitrate,
+        "source_fingerprint": source_fingerprint,
+        "max_chars": MAX_CHARS,
+        "sample_rate": SAMPLE_RATE,
+        "pipeline_version": 3,
+    }
 
 
 def reconcile_existing_outputs(slug: str) -> list:
@@ -903,6 +964,26 @@ def main():
                   description="Active voice for audiobook",
                   gender=_get_voice_gender(ref_path),
                   denoise=False)
+
+    source_fingerprint = _file_sha256(vi_md)
+    current_metadata = audio_progress_metadata(
+        args.voice or os.path.basename(ref_path),
+        args.temperature, args.top_k, args.bitrate,
+        source_fingerprint)
+    old_metadata = progress.get("audio_metadata")
+    metadata_changed = bool(completed and old_metadata != current_metadata)
+    if metadata_changed:
+        print("⚠️  Tham số/voice đã đổi; tạo lại các chapter đã hoàn tất.")
+        completed = set()
+        progress["completed_chapters"] = []
+        if args.first:
+            selected = [chapters[0]]
+        elif args.chapter:
+            selected = [ch for ch in chapters if ch["num"] in args.chapter]
+        else:
+            selected = chapters
+    progress["audio_metadata"] = current_metadata
+    save_progress(slug, progress)
 
     # 5. Generate audio for each selected chapter
     # Khởi tạo từ progress cũ (cộng dồn khi resume)

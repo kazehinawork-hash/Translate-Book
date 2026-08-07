@@ -41,6 +41,38 @@ TERMINAL_WIDTH = 66
 MergeResult = dict  # {segments: list[str], merged_count: int, ...}
 
 
+def validate_chunk_coverage(chunks: list[tuple[int, dict]]) -> dict:
+    """Kiểm tra coverage và tính nhất quán trước khi merge."""
+    invalid_ids = [cid for cid, _ in chunks if cid < 0]
+    ids = [cid for cid, _ in chunks]
+    duplicate_ids = sorted({cid for cid in ids if ids.count(cid) > 1})
+    chunk_map = dict(chunks)
+    total_values = {
+        int(data.get('total_chunks', 0))
+        for _, data in chunks
+        if data.get('total_chunks') is not None
+    }
+    total_chunks = max(
+        max(total_values, default=0),
+        max(ids, default=-1) + 1,
+    )
+    missing_ids = sorted(set(range(total_chunks)) - set(ids))
+    empty_ids = sorted(
+        cid for cid, data in chunk_map.items()
+        if not data.get('translated_text', '').strip()
+    )
+    return {
+        'total_chunks': total_chunks,
+        'present_ids': sorted(set(ids)),
+        'missing_ids': missing_ids,
+        'empty_ids': empty_ids,
+        'duplicate_ids': duplicate_ids,
+        'invalid_ids': invalid_ids,
+        'inconsistent_totals': sorted(total_values - {0, total_chunks}),
+        'missing_all': sorted(set(missing_ids + empty_ids)),
+    }
+
+
 def merge_texts(
     total_chunks: int,
     chunk_map: dict[int, dict],
@@ -221,24 +253,11 @@ def main():
 
     chunks.sort(key=lambda x: x[0])
     chunk_map = dict(chunks)
-
-    # Determine total_chunks
-    total_chunks = max(
-        max((d.get('total_chunks', 0) for d in chunk_map.values()), default=0),
-        max(chunk_map.keys(), default=0) + 1,
-    )
-
-    # Validate chunk coverage
-    expected_ids = set(range(total_chunks))
-    present_ids = set(chunk_map.keys())
-    missing_ids = sorted(expected_ids - present_ids)
-
-    # Check for empty translations
-    empty_ids = []
-    for cid in list(chunk_map.keys()):
-        text = chunk_map[cid].get('translated_text', '').strip()
-        if not text:
-            empty_ids.append(cid)
+    validation = validate_chunk_coverage(chunks)
+    total_chunks = validation['total_chunks']
+    missing_ids = validation['missing_ids']
+    empty_ids = validation['empty_ids']
+    missing_all = validation['missing_all']
 
     # Validation report
     print_header(f"MERGE VALIDATION")
@@ -246,7 +265,13 @@ def main():
     print(f"  Chunks found: {len(chunk_map)}")
     if invalid:
         print(f"  Invalid files: {len(invalid)} ({', '.join(invalid[:5])}{'...' if len(invalid) > 5 else ''})")
-    missing_all = sorted(set(missing_ids + empty_ids))
+    if validation['duplicate_ids']:
+        print(f"  Duplicate chunk IDs: {', '.join(map(str, validation['duplicate_ids']))}")
+    if validation['inconsistent_totals']:
+        print(f"  Inconsistent total_chunks values: {validation['inconsistent_totals']}")
+    if validation['duplicate_ids'] or validation['inconsistent_totals']:
+        print("\n  [LỖI] Manifest chunk không nhất quán; dừng merge để tránh mất hoặc đảo nội dung.", file=sys.stderr)
+        sys.exit(1)
 
     if missing_all:
         print(f"  Missing/empty chunks: {len(missing_all)}")
@@ -257,14 +282,15 @@ def main():
                 print(f"    ❌ Chunk {cid + 1}: EMPTY translation")
 
         if args.skip_missing:
-            print(f"\n  \u23ed --skip-missing: b\u1ecf qua {len(missing_all)} chunk thi\u1ebfu/r\u1ed7ng")
+            print(f"\n  ⏭ --skip-missing: bỏ qua {len(missing_all)} chunk thiếu/rỗng")
         elif args.allow_partial:
-            print(f"\n  \u23ed --allow-partial: ch\u00e8n placeholder cho {len(missing_all)} chunk thi\u1ebfu/r\u1ed7ng")
+            print(f"\n  ⏭ --allow-partial: chèn placeholder cho {len(missing_all)} chunk thiếu/rỗng")
         else:
-            print(f"\n  [L\u1ed6I] Ph\u00e1t hi\u1ec7n chunk thi\u1ebfu/r\u1ed7ng.")
-            print(f"  D\u00f9ng --allow-partial \u0111\u1ec3 ch\u00e8n placeholder, --skip-missing \u0111\u1ec3 b\u1ecf qua,")
-            print(f"  ho\u1eb7c ho\u00e0n th\u00e0nh c\u00e1c chunk thi\u1ebfu tr\u01b0\u1edbc khi merge.")
+            print(f"\n  [LỖI] Phát hiện chunk thiếu/rỗng.")
+            print(f"  Dùng --allow-partial để chèn placeholder, --skip-missing để bỏ qua,")
+            print(f"  hoặc hoàn thành các chunk thiếu trước khi merge.")
             sys.exit(1)
+
 
     # Merge
     result = merge_texts(

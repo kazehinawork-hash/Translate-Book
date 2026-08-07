@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, 'scripts')
 
-from merge_chunks import merge_texts
+from merge_chunks import merge_texts, validate_chunk_coverage
 
 
 def _make_chunk(cid: int, text: str, chapter: str = '', total: int = 10,
@@ -17,6 +17,25 @@ def _make_chunk(cid: int, text: str, chapter: str = '', total: int = 10,
         'word_count_source': len(text.split()),
         'word_count_translated': len(text.split()),
     })
+
+
+class TestChunkCoverage:
+    def test_duplicate_ids_and_inconsistent_totals(self):
+        result = validate_chunk_coverage([
+            (0, {"chunk_id": 0, "total_chunks": 2, "translated_text": "A"}),
+            (0, {"chunk_id": 0, "total_chunks": 3, "translated_text": "B"}),
+        ])
+        assert result["duplicate_ids"] == [0]
+        assert result["inconsistent_totals"] == [2]
+
+    def test_missing_and_empty_ids(self):
+        result = validate_chunk_coverage([
+            (0, {"chunk_id": 0, "total_chunks": 3, "translated_text": "A"}),
+            (2, {"chunk_id": 2, "total_chunks": 3, "translated_text": ""}),
+        ])
+        assert result["missing_ids"] == [1]
+        assert result["empty_ids"] == [2]
+        assert result["missing_all"] == [1, 2]
 
 
 class TestChapterHeadings:

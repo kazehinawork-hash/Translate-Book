@@ -1,6 +1,14 @@
 {
   "permissions": {
     "allow": [
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "read_file",
+      "read_directory",
+      "read_multiple_files",
+      "grep",
+      "glob",
       "Shell(.venvScriptspython.exe:*)",
       "Shell(workingvenv-vieneuScriptspython.exe:*)",
       "Shell(git:*)",
@@ -26,14 +34,29 @@
       "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\core' -Recurse -Force -ErrorAction SilentlyContinue\")",
       "Shell(powershell -Command \"Get-ChildItem 'E:\\OneDrive\\onyx\\Translate Book\\scripts' | Select-Object Name, @{N='Type';E={if($_.PSIsContainer){'DIR'}else{'FILE'}}} | Format-Table -AutoSize\")",
       "Shell(.venvScriptspip.exe:*)",
-      "Shell(del:*)",
       "Shell(dotnet:*)",
-      "Shell(rmdir:*)",
       "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\desktop.py','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\styles\\theme.py','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\styles\\liquid.qss','E:\\OneDrive\\onyx\\Translate Book\\desktop.bat' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\styles','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\widgets','E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\workers' -Recurse -Force -ErrorAction SilentlyContinue\")",
       "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui\\__init__.py' -Force -ErrorAction SilentlyContinue; Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\ui' -Recurse -Force -ErrorAction SilentlyContinue\")",
-      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\api' -Recurse -Force\")"
+      "Shell(powershell -Command \"Remove-Item 'E:\\OneDrive\\onyx\\Translate Book\\scripts\\api' -Recurse -Force\")",
+      "powershell",
+      "config"
     ],
-    "deny": [],
+    "deny": [
+      "Shell(git reset*)",
+      "Shell(git checkout*)",
+      "Shell(git clean*)",
+      "Shell(git restore*)",
+      "Shell(git commit*)",
+      "Shell(git push*)",
+      "Shell(git rebase*)",
+      "Shell(git merge*)",
+      "Shell(git cherry-pick*)",
+      "Shell(git revert*)",
+      "Shell(Remove-Item*)",
+      "Shell(del*)",
+      "Shell(rmdir*)",
+      "Shell(rm -rf*)"
+    ],
     "defaultMode": "default"
   }
 }
