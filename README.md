@@ -8,7 +8,7 @@
 
 1. **Cài đặt 1 lần**: Cài [Python](https://www.python.org/downloads/) (tick ✅ *Add to PATH*) và [Git](https://git-scm.com/download/win), rồi chạy `.git\setup.bat` — chờ script tự tạo venv + cài packages.
 2. **Copy file PDF/EPUB vào `input\`**.
-3. **Mở opencode, gõ `/dich`** và chọn file → pipeline (extract → QC → detect ngôn ngữ → chunk → glossary → dịch → QA → merge → EPUB) tự chạy hoàn toàn, kết quả ở `output/books/<slug>/`. Sách dịch dở thì chạy lại `/dich` để dịch tiếp phần còn thiếu.
+3. **Mở Command Code (hoặc opencode), gõ `/dich`** và chọn file → pipeline (extract → QC → detect ngôn ngữ → chunk → glossary → dịch → QA → merge → EPUB) tự chạy hoàn toàn, kết quả ở `output/books/<slug>/`. Sách dịch dở thì chạy lại `/dich` để dịch tiếp phần còn thiếu.
 
 Không cần nhớ lệnh, không cần biết PowerShell. (*Sách scan cần thêm `pip install -U mineru; mineru-models-download`.*)
 
@@ -71,10 +71,10 @@ python scripts/pipeline/run_pipeline.py --book "MyBook" --from-step 5
 python scripts/pipeline/run_pipeline.py --input "input/sach.pdf" --book "Ten Sach" --lang auto
 
 # Kết quả:
-#   - Sách ZH → output/books/ten-sach/final/tamngu.md (tam ngữ)
+#   - Sách ZH → output/books/ten-sach/final/tamngu.md (tam ngữ ZH/Pinyin/VI)
 #              → output/books/ten-sach/trilingual.epub (tự động, nếu có pandoc)
 #   - Sách EN → output/books/ten-sach/final/vi.md (thuần Việt)
-#              → output/books/ten-sach/trilingual.epub (tự động, nếu có pandoc)
+#              → output/books/ten-sach/final/vi.epub (tự động, nếu có pandoc)
 ```
 
 **Workflow tổng quan:**
@@ -121,13 +121,15 @@ Xem chi tiết trong **[AGENTS.md](./AGENTS.md)** (Bước 11).
 
 ## 🖥 App desktop (C# WPF)
 
-Thư mục `desktop/` chứa app Windows (C# WPF, .NET) để duyệt/xem bản dịch:
+Thư mục `desktop/` chứa app Windows (C# WPF, .NET 8, giao diện **WPF-UI Fluent**) để duyệt/xem bản dịch:
 
-- `Views/MainWindow.xaml` — cửa sổ chính, chuyển đổi theme sáng/tối (`Themes/DarkTheme.xaml`, `LightTheme.xaml`)
-- `Views/EpubPreviewWindow.xaml` — xem trước nội dung EPUB/bản dịch
-- `Services/AcrylicWindowHelper.cs` — hiệu ứng kính mờ (acrylic) cho cửa sổ
+- `Views/MainWindow.xaml` — cửa sổ chính: NavigationView trái (Sách / Audio / Cài đặt), **Realtime Log** dock bên phải (RichTextBox màu theo level, ô lọc, nút `</>` thu/mở)
+- `Views/BooksPage.xaml` — danh sách sách tab Input (chưa dịch) / Output (đã dịch): card sách có avatar, stat tiles, progress; tab Output chỉ còn nút **Đọc thử**
+- `Views/EpubPreviewWindow.xaml` — xem trước EPUB qua WebView2 (đọc tam ngữ / thuần Việt, kèm audio player nếu có audiobook), nút Đọc thử tự tìm file: `trilingual.epub` (ZH) → `final/vi.epub` (EN)
+- `Views/AudioPage.xaml` — quản lý giọng VieNeu + tạo audiobook
+- `Views/ApiPage.xaml` — cấu hình API dịch (provider/key/model)
 
-Chạy bằng Visual Studio / `dotnet run` từ `desktop/` (xem `desktop/TranslateBook.csproj`).
+Theme theo hệ thống (Dark/Light) qua WPF-UI `ThemesDictionary`. Chạy bằng Visual Studio / `dotnet run` từ `desktop/` (xem `desktop/TranslateBook.csproj`).
 
 ---
 
@@ -136,11 +138,13 @@ Chạy bằng Visual Studio / `dotnet run` từ `desktop/` (xem `desktop/Transla
 | STT | Slug | Tên sách | Ngôn ngữ gốc | Định dạng |
 |-----|------|----------|:------------:|:---------:|
 | 1 | `zuo-yi-ge-gang-gang-hao-de-nu-zi` | *Trở thành người phụ nữ vừa vặn* (做一个刚刚好的女子) — Khang Tĩnh Văn | ZH | EPUB + audiobook |
-| 2 | `zuo-yi-ge-gang-gang-hao-de-nu-zi-3` | *Trở thành người phụ nữ vừa vặn — Tập 3* (做一个刚刚好的女子·第三卷) — Vi Dương | ZH | Đã dịch xong |
+| 2 | `zuo-yi-ge-gang-gang-hao-de-nu-zi-3` | *Trở thành người phụ nữ vừa vặn — Tập 3* (做一个刚刚好的女子·第三卷) — Vi Dương | ZH | EPUB + audiobook |
 | 3 | `zuo-yi-ge-you-feng-gu-de-nu-zi` | *Trở thành người phụ nữ có phong thái* (做一个有风骨的女子) — Vi Dương | ZH | EPUB + audiobook |
 | 4 | `ban-co-nam-cho-ngoi` | *Bạn Có Năm Chỗ Ngồi* — Nguyễn Nhật Ánh | VI | audiobook |
+| 5 | `la-nam-trong-la` | *Lá Nằm Trong Lá* — Nguyễn Nhật Ánh | VI | audiobook |
+| 6 | `eu-bim-task-group-handbook-v2-1` | *EU BIM Task Group Handbook* (BIM/Twin Transition) — EU | EN | vi.md + vi.epub (audiobook tùy chọn) |
 
-Mỗi cuốn gồm bản dịch Markdown (`output/books/<slug>/final/`), EPUB tam ngữ (sách ZH), ảnh và audiobook MP3 — **giữ local/Drive, không đẩy lên git**.
+Mỗi cuốn gồm bản dịch Markdown (`output/books/<slug>/final/`), EPUB (tam ngữ sách ZH / thuần Việt sách EN), ảnh và audiobook MP3 — **giữ local/Drive, không đẩy lên git**.
 
 ---
 
@@ -166,7 +170,8 @@ Translate Book\
 ├── docs\               # Trí nhớ phiên (CÓ commit)
 │   ├── STATE.md        # Trạng thái sống — agent đọc/ghi mỗi phiên
 │   └── session_log.md  # Nhật ký phiên (append-only)
-├── .opencode\          # Cấu hình opencode (command, agent) (CÓ commit)
+├── .commandcode\        # Cấu hình Command Code (agent, command, taste, permissions) (CÓ commit)
+├── .opencode\           # Cấu hình opencode cũ (command, agent) (CÓ commit)
 ├── .gitignore
 ├── README.md
 └── AGENTS.md
