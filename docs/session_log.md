@@ -426,3 +426,79 @@
 
 ### Git
 - Không tự commit.
+
+
+## 2026-08-08 — Fix NullReferenceException "Đọc thử" EPUB desktop (dual-Agent)
+
+### Đã làm
+- Chạy lệnh `/dual-Agent` với task: "tôi gặp lỗi như hình khi ấn vào phần đọc thử của UI". Ảnh lỗi: `System.NullReferenceException` ("Object reference not set to an instance of an object") ở dialog "Lỗi hệ thống", không có stack trace.
+- **Bước 1 Analyze**: analyzer khám phá desktop WPF, xác định live entry point: `BooksPage.xaml:348-350` → MVVM command `OpenEpubPreviewCommand` → `MainViewModel.OpenEpubPreviewAsync(BookStatus)` — không phải XAML Click handler. Đưa ra plan + 3 slice.
+- **Bước 2 Baseline**: git status sạch trên `main` (working tree clean).
+- **Bước 3 Execute**: executor (read/write/edit, không shell) sửa 2 file — null-guard `book/slug/_projectRoot/Application.Current/MainWindow` + try/catch trong `OpenEpubPreviewAsync`; null-check `CoreWebView2` + `_epubFilePath` trong `EpubPreviewWindow_Loaded`; guard 9 handler WebView2 phụ thuộc (`if (WebView?.CoreWebView2 == null) return;`).
+- **Bước 4 Git check + Review 1**: build `dotnet build` đầu thất bại do `TranslateBook.exe` bị process cũ (PID 21296) giữ lock (MSB3021, không phải lỗi compile C#); kill process → rebuild `0 Warning(s) 0 Error(s)`. analyzer review: toàn bộ checklist ✅ → `FINAL_STATUS: APPROVED`. review_count=1 (không cần vòng sửa thứ 2).
+- **Bước 5/6**: không cần thiết (Review 1 APPROVED).
+
+### File đổi
+- `desktop/ViewModels/MainViewModel.cs` (OpenEpubPreviewAsync)
+- `desktop/Views/EpubPreviewWindow.xaml.cs` (Loaded flow + 9 handler)
+- `docs/STATE.md`, `docs/session_log.md` (bookkeeping)
+
+### Còn dở
+- Chưa kiểm thử runtime thực tế "Đọc thử" (cần EXE chạy + file EPUB mẫu); chờ user test.
+- Chưa commit — đang chờ duyệt message.
+
+### Git
+- Trạng thái: 4 file thay đổi (2 code + 2 docs) chưa commit trên `main`. Không tự commit/push.
+
+## 2026-08-08 — Tối ưu Dual-Agent: Luna plan theo lô + Laguna thực thi + flash review
+
+### Đã làm
+- Benchmark token/chi phí thực tế (đọc transcript usage): single-agent 189K tokens ~$0.015 (flash); dual cũ 686K ~$5.9 (Luna plan+review); phát hiện sub-agent usage không nằm trong transcript orchestrator mà qua tag `<usage>` trong output.
+- Đổi kiến trúc Dual-Agent sang 3 vai:
+  - analyzer (gpt-5.6-luna): chỉ plan theo LÔ (gom nhiều task, Luna chạy 1 lần/lô), bỏ review mode.
+  - executor (poolside/laguna-s-2.1-free): giữ nguyên, thêm chế độ batch item + checkpoint + tự review sơ bộ.
+  - reviewer (deepseek/deepseek-v4-flash): MỚI — review độc lập, read-only.
+- dual-Agent.md: thêm Bước 0 phân loại task (task bé chạy thẳng, không dùng pipeline), pipeline 3 vai, giám sát executor vô thời hạn (background + agent_output(status) định kỳ, chỉ dừng khi BLOCKED/mất kết nối), xác minh sơ bộ kết quả Laguna trước khi review.
+- Đồng bộ .opencode/command/dual-Agent.md.
+- E2E: task bé → bỏ pipeline đúng; lô 2 task → analyzer plan (8.3K tokens ~$0.83 Luna) → executor Laguna tạo 2 file (44.8K, $0) → reviewer flash APPROVED (25.7K, ~$0.01); orchestrator flash $0.09. Tổng ~$0.93/lô → ~$0.47/task (dual cũ ~$5.9/task, single Luna ~$3.65/task).
+
+### File đổi
+- .commandcode/agents/analyzer.md (chỉ plan theo lô)
+- .commandcode/agents/executor.md (batch item + checkpoint + tự verify)
+- .commandcode/agents/reviewer.md (mới)
+- .commandcode/commands/dual-Agent.md, .opencode/command/dual-Agent.md (3 vai + bước 0)
+- docs/STATE.md, docs/session_log.md
+
+### Còn dở
+- Chưa commit — chờ duyệt.
+
+### Git
+- Không tự commit/push.
+
+## 2026-08-08 — Fix preview EPUB trắng + tinh chỉnh UI desktop (books tab, log panel, card)
+
+### Đã làm
+- **Fix "Đọc thử" EPUB trắng tinh**: nguyên nhân `BuildEpubCss()`/`ReapplyThemeColors` đọc WPF-UI brush (`ControlFillColorTertiaryBrush`, `TextFillColorPrimaryBrush`) từ `Application.Current.Resources` trả về màu trắng/gần trong suốt (`#08FFFFFF`, `#FFFFFFFF`) → `--bg-color: #FFFFFF`, vùng đọc trắng. Fix: helper `GetSafeColor()` (kiểm tra alpha < 0x40 + luminance, fallback dark palette `#1E1E1E`/`#E0E0E0`/`#B0B0B0`). Verify: log `bgHex=#1E1E1E`, pixel màn hình nền tối RGB(24-31).
+- **Đọc thử hết hard-code trilingual.epub**: `FindPreviewEpub()` ưu tiên `trilingual.epub` (ZH) → `final/vi.epub` (EN) → `.epub` bất kỳ; dùng chung trong `GetBookStatus` (HasEpub) và `OpenEpubPreviewAsync`. Verify sách EN `eu-bim` parse được vi.epub (8 chapter).
+- **Realtime Log → panel phải 300px**: RichTextBox màu level (ERR đỏ/WARN vàng/INFO xám), ô Lọc hoạt động (filter + re-render), thu gọn hoàn toàn bằng nút toggle `<`/`>` (mở hiện `<`, thu hiện `>`); bỏ bar log đáy.
+- **Card sách đẹp hơn**: avatar tròn chữ cái đầu (`BookStatus.Initial`), header nền, badge ✓/…, stat tiles Chunks/EPUB/Audio (thêm `BoolToEmojiConverter`), progress bar; hover chỉ đổi shadow (bỏ translate tránh giật).
+- **Tab Input/Output animation**: fade + trượt lên 180ms CubicEase (`BooksPage.xaml.cs AnimatePanelIn`).
+- **Tab Output gọn**: chỉ còn nút "Đọc thử" (bỏ Dịch/Gộp/EPUB/QA/Audio/Report QA/Hủy) — logic output = xem/nghe thành phẩm.
+- `ReadTextFileWithEncoding()` detect BOM UTF-8/UTF-16 cho chapter XHTML chống mojibake; null-check `BtnRefreshTheme_Click`; `DefaultBackgroundColor="#1E1E1E"`.
+
+### File đổi
+- desktop/Views/EpubPreviewWindow.xaml.cs + .xaml (fix màu, encoding, null-check)
+- desktop/ViewModels/MainViewModel.cs (FindPreviewEpub, LogEntry events, ClearLog)
+- desktop/Views/MainWindow.xaml + .xaml.cs (log panel phải, filter/màu/copy)
+- desktop/Views/BooksPage.xaml + .xaml.cs (card đẹp, tab animation, output gọn)
+- desktop/Themes/AppStyles.xaml (InteractiveCard hover, StatTile, BookCardHeader, LogRichTextBox)
+- desktop/Models/BookStatus.cs (Initial)
+- desktop/Converters/BoolToEmojiConverter.cs (mới)
+- desktop/App.xaml (đăng ký converter)
+
+### Còn dở
+- Chưa kiểm thử runtime đầy đủ các lệnh Dịch/Audio/QA (cần API key + sách mẫu); card/log đã verify qua build + pixel màn hình.
+- `RewriteImagePaths` chưa xử lý `url()` trong CSS stylesheet (ảnh nền EPUB) — ảnh qua `<img>` hoạt động, ảnh nền hiếm.
+
+### Git
+- Đang trên `main`, chưa commit — chờ user duyệt message rồi commit + push.

@@ -80,14 +80,34 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
-                                <ui:Card Margin="6" Width="280" Padding="16" Style="{StaticResource InteractiveCard}">
+                                <ui:Card Margin="6" Width="300" Padding="16" Style="{StaticResource InteractiveCard}">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold"
-                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Text="Chưa dịch - đặt vào input/" FontSize="12"
-                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                   Margin="0,8,0,12"/>
+                                        <!-- Header: avatar + title + status -->
+                                        <Border Style="{StaticResource BookCardHeader}"
+                                                Background="{DynamicResource ControlFillColorTertiaryBrush}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="42" Height="42" CornerRadius="21"
+                                                        Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="Chưa dịch - đặt vào input/" FontSize="11"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                               Margin="0,3,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
                                         <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}"
                                                    Content="Chạy Pipeline" HorizontalAlignment="Stretch"
                                                    ToolTip="Chạy toàn bộ pipeline: Extract → QC → Chunk → Glossary → Translate → QA → Merge → EPUB"
@@ -193,31 +213,51 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
-                                <ui:Card Margin="6" MinWidth="340" Style="{StaticResource InteractiveCard}">
+                                <ui:Card Margin="6" Width="340" Style="{StaticResource InteractiveCard}">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="Bold"
-                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
-
-                                        <ui:InfoBadge HorizontalAlignment="Left" Margin="0,4,0,0">
-                                            <ui:InfoBadge.Style>
-                                                <Style TargetType="ui:InfoBadge">
-                                                    <Setter Property="Value" Value="{Binding StatusText}"/>
-                                                    <Setter Property="Severity" Value="Informational"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                            <Setter Property="Severity" Value="Caution"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding HasViMd}" Value="True">
+                                        <!-- Header: avatar + title + status badge -->
+                                        <Border Style="{StaticResource BookCardHeader}"
+                                                Background="{DynamicResource ControlFillColorTertiaryBrush}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="42" Height="42" CornerRadius="21"
+                                                        Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                               Margin="0,3,0,0"/>
+                                                </StackPanel>
+                                                <ui:InfoBadge Grid.Column="2" VerticalAlignment="Top">
+                                                    <ui:InfoBadge.Style>
+                                                        <Style TargetType="ui:InfoBadge">
+                                                            <Setter Property="Value" Value="✓"/>
                                                             <Setter Property="Severity" Value="Success"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </ui:InfoBadge.Style>
-                                        </ui:InfoBadge>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasViMd}" Value="False">
+                                                                    <Setter Property="Value" Value="…"/>
+                                                                    <Setter Property="Severity" Value="Caution"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:InfoBadge.Style>
+                                                </ui:InfoBadge>
+                                            </Grid>
+                                        </Border>
 
-                                        <!-- Progress section with percentage and chunk info -->
-                                        <Grid Margin="0,6,0,0">
+                                        <!-- Progress bar + percentage -->
+                                        <Grid Margin="0,2,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -229,165 +269,49 @@
                                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,2"/>
                                         </Grid>
 
-                                        <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0">
-                                            <Run Text="Chunks: "/><Run Text="{Binding ProgressCount}"/><Run Text="/"/><Run Text="{Binding TotalChunks}"/>
-                                            <Run Text="  •  EPUB: "/><Run Text="{Binding HasEpub}"/>
-                                            <Run Text="  •  Audio: "/><Run Text="{Binding Mp3Count}"/><Run Text=" files"/>
-                                        </TextBlock>
+                                        <!-- Stat tiles: Chunks / EPUB / Audio -->
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="6"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="6"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" Style="{StaticResource StatTile}">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <TextBlock Text="📄" FontSize="13" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding ProgressCount, StringFormat={}{0}}" FontSize="13" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                    <TextBlock Text="Chunks" FontSize="10"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Grid.Column="2" Style="{StaticResource StatTile}">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding HasEpub, Converter={StaticResource BoolToEmojiConverter}}" FontSize="13" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding HasEpub}" FontSize="13" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                    <TextBlock Text="EPUB" FontSize="10"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Border Grid.Column="4" Style="{StaticResource StatTile}">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <TextBlock Text="🎧" FontSize="13" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Mp3Count}" FontSize="13" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                    <TextBlock Text="Audio" FontSize="10"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
 
-                                        <Grid Margin="0,8,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Content="Dịch" Icon="{ui:SymbolIcon Edit24}" FontSize="12"
-                                                       ToolTip="Dịch tiếp phần còn thiếu"
-                                                       Command="{Binding DataContext.StartTranslateCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="Content" Value="Đang dịch..."/>
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                            <ui:Button Grid.Column="2" Appearance="Primary" Content="Audio" Icon="{ui:SymbolIcon Headphones24}" FontSize="12"
-                                                       ToolTip="Tự động tạo Audiobook MP3"
-                                                       Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="Content" Value="Đang tạo..."/>
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                            <ui:Button Grid.Column="4" Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}" FontSize="12"
-                                                       Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                        </Grid>
-                                        <Grid Margin="0,6,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Content="Gộp" Icon="{ui:SymbolIcon List24}" FontSize="12"
-                                                       ToolTip="Gộp các chunks đã dịch thành file hoàn chỉnh"
-                                                       Command="{Binding DataContext.MergeChunksCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                            <ui:Button Grid.Column="2" Content="EPUB" Icon="{ui:SymbolIcon Book24}" FontSize="12"
-                                                       ToolTip="Tạo file EPUB từ bản dịch"
-                                                       Command="{Binding DataContext.MakeEpubCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                            <ui:Button Grid.Column="4" Content="QA" Icon="{ui:SymbolIcon Checkmark24}" FontSize="12"
-                                                       ToolTip="Kiểm tra chất lượng bản dịch"
-                                                       Command="{Binding DataContext.RunQaCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                        </Grid>
-                                        <Grid Margin="0,6,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Content="Đọc thử" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
-                                                       Command="{Binding DataContext.OpenEpubPreviewCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}"/>
-                                            <ui:Button Grid.Column="2" Content="Report QA" Icon="{ui:SymbolIcon Document24}" FontSize="12"
-                                                       ToolTip="Xem báo cáo QA đã chạy"
-                                                       Command="{Binding DataContext.ToggleQaReportCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding DataContext.HasQaReport, RelativeSource={RelativeSource AncestorType={x:Type Page}}}" Value="True">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                        </Grid>
-                                        <Border Margin="0,8,0,0" Padding="12" Background="{DynamicResource ControlFillColorDefaultBrush}"
-                                                CornerRadius="8" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding DataContext.ShowQaReport, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <StackPanel>
-                                                <TextBlock Text="Báo cáo QA" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"
-                                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                                <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                                    <TextBlock Text="{Binding DataContext.QaReport, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                               FontSize="12" FontFamily="Consolas" TextWrapping="Wrap"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                                </ScrollViewer>
-                                                <ui:Button Content="Đóng" Icon="{ui:SymbolIcon Dismiss24}" HorizontalAlignment="Right" Margin="0,8,0,0"
-                                                           Command="{Binding DataContext.ToggleQaReportCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"/>
-                                            </StackPanel>
-                                        </Border>
+                                        <ui:Button Appearance="Primary" Content="Đọc thử" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
+                                                   HorizontalAlignment="Stretch" Margin="0,12,0,0"
+                                                   ToolTip="Xem trước sách đã dịch (kèm nghe audiobook nếu có)"
+                                                   Command="{Binding DataContext.OpenEpubPreviewCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                   CommandParameter="{Binding}"/>
                                     </StackPanel>
                                 </ui:Card>
                             </DataTemplate>

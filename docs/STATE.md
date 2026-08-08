@@ -25,7 +25,15 @@
 
 ## 🔨 Đang làm (hiện tại)
 
-- Dịch sách `eu-bim-task-group-handbook-v2-1` (EN→VI) theo batch: `working\progress\eu-bim-task-group-handbook-v2-1\` có 9 chunk. Batch 1 (chunk 1) complete 08-07 (95 dòng, 4787 từ, QA 0 lỗi). Batch 4 (chunk 4) complete 08-07 (84 dòng, 4611 từ, QA 0 lỗi). Batch 6 (chunk 6 CALL TO REALITY) complete 08-07 bởi w-batch7 (87 dòng, 4952 từ, QA 0 lỗi). Batch 8 (chunk 8 References) complete 08-07 (68 dòng, 1146 từ, QA 0 lỗi). Batch 7 (chunk 7 PUBLIC PROCUREMENT) complete 08-07 (143 dòng, 4751 từ, QA 0 lỗi). Batch 5 (chunk 5) complete. Còn chunk 2,3.
+- Sách `eu-bim-task-group-handbook-v2-1`: ✅ Hoàn tất (9/9 chunk, QA 0 lỗi) — đã merge + vi.md + vi.epub + images/. Audiobook optional (chưa làm). Còn chunk 2,3 đã hoàn tất hết theo log phiên 08-07.
+- Sửa lỗi preview "Đọc thử" EPUB trắng tinh trên desktop app (WPF) — **đã hoàn tất**: nguyên nhân là `BuildEpubCss()`/`ReapplyThemeColors` đọc WPF-UI brush từ `Application.Current.Resources` trả về màu trắng/gần trong suốt (`#08FFFFFF`, `#FFFFFFFF`) → `--bg-color: #FFFFFF` làm vùng đọc trắng. Fix: thêm `GetSafeColor()` kiểm tra alpha + luminance, fallback palette dark theme (`#1E1E1E` nền/`#E0E0E0` chữ/`#B0B0B0` phụ). Verify thực tế: log `bgHex=#1E1E1E`, pixel màn hình nền tối RGB(24-31). Build 0 lỗi/0 cảnh báo.
+- UI desktop tinh chỉnh phiên 08-08 (đã build 0 lỗi/0 cảnh báo, app chạy ổn):
+  - **Fix preview trắng** (mô tả trên) + `ReadTextFileWithEncoding()` (detect BOM UTF-8/16 cho chapter XHTML chống mojibake) + null-check `BtnRefreshTheme_Click` + `DefaultBackgroundColor="#1E1E1E"`.
+  - **FindPreviewEpub()**: nút "Đọc thử" hết hard-code `trilingual.epub` → tìm theo thứ tự `trilingual.epub` → `final/vi.epub` (sách EN) → `.epub` bất kỳ. Verify `eu-bim` (EN) mở được `final/vi.epub`.
+  - **Realtime Log** chuyển từ đáy sang **panel dọc phải 300px**: RichTextBox màu theo level (ERR đỏ/WARN vàng/INFO xám), ô "Lọc" hoạt động (filter theo dòng), nút Xóa/📋; thu gọn hoàn toàn bằng nút `<`/`>` (toggle chuẩn: mở hiện `<`, thu hiện `>`).
+  - **Card sách** Input/Output làm đẹp: avatar tròn chữ cái đầu, header nền, badge trạng thái, stat tiles (Chunks/EPUB/Audio), progress bar; hover chỉ đổi shadow (bỏ translate gây giật khi chuột gần mép).
+  - **Tab Input/Output** có animation fade + trượt lên (180ms CubicEase).
+  - Tab Output gọn: chỉ còn nút **Đọc thử** (bỏ Dịch/Gộp/EPUB/QA/Audio — tạo audiobook ở trang Audio, nghe trong cửa sổ Đọc thử).
 
 ---
 
@@ -37,6 +45,7 @@
 - Tạo prompt/batch manifest cố định, cache glossary và ngữ cảnh chung; Agent chỉ đọc phần cần dịch thay vì quét lại toàn bộ thư mục.
 - QA/kiểm tra số dòng và glossary chạy sau mỗi batch; chỉ giao lại các chunk lỗi, không dịch lại cả sách.
 - API trong desktop chỉ là hướng tương lai, không dùng làm cơ sở ưu tiên hiệu suất hiện tại.
+- **Dual-Agent tối ưu chi phí (08-08)**: cấu hình 3 vai — analyzer (Luna) plan theo LÔ → executor (Laguna free) thực thi từng item → reviewer (deepseek-v4-flash) review độc lập. Bước 0 phân loại task: task bé chạy thẳng (không dùng pipeline), task ≥ trung bình mới vào pipeline. Luna chỉ chạy 1 lần/1 lô (giảm chi phí đáng kể: dual cũ ~$5.9/task → mới ~$0.47/task theo benchmark lô 2 task). Giám sát Laguna vô thời hạn: chạy background, kiểm tra `agent_output(status)` định kỳ, chỉ dừng khi executor tự trả `BLOCKED` hoặc mất kết nối; kèm xác minh sơ bộ kết quả trước khi gửi review vì Laguna là model yếu.
 - Multi-Agent đã có workflow tối đa 2 vòng review/sửa: vòng 1 plan → implement → review; chỉ khi `NEEDS_CHANGES` mới sửa một lần và review 2 rồi bắt buộc dừng. Prompt đã tối ưu theo hướng giảm context lặp nhưng giữ success criteria, file scope, diff và test evidence. Đã ổn định permission bằng `dont-ask`: analyzer chỉ đọc, executor chỉ read/write/edit không dùng shell; test analyzer đọc và executor ghi scratchpad đều đạt. **E2E hai vòng đã chạy thành công 08-07**: analyzer plan → executor implement → review 1 `NEEDS_CHANGES` → executor sửa 1 lần → review 2 `APPROVED`; kết thúc đúng quy tắc giới hạn vòng. Hai phát hiện: (1) executor không có shell nên không tự chạy `git status` — git check nên giao orchestrator; (2) `.gitignore` chỉ ignore thư mục con cụ thể của `working/`, không ignore toàn bộ — file test tạm nên đặt trong `working/qa/` hoặc thư mục được ignore khác.
 - Đã triển khai workflow AI Agent theo batch: `scripts/translate/batch_manifest.py` tạo/claim/complete/fail/verify batch, `.opencode/command/dich.md` bắt buộc dùng manifest + QA batch.
 - Đã thêm `scripts/qa/batch_qa.py` kiểm tra rỗng/marker/alignment tam ngữ; `merge_chunks.py` chặn duplicate và total_chunks không nhất quán.
@@ -50,7 +59,7 @@
 
 ## ⏳ Việc còn nợ / Còn dở
 
-- App desktop: chưa kiểm thử runtime vì chưa có API key. Chờ user test.
+- App desktop: đã fix lỗi NullReferenceException ở nút "Đọc thử" EPUB (Preview): guard `Application.Current`/`MainWindow`/slug/project-root trong `OpenEpubPreviewAsync` + null-check `CoreWebView2` và EPUB path trong `EpubPreviewWindow`, cùng guard 9 handler phụ thuộc. Chưa kiểm thử runtime do chưa có API key; chờ user test các lệnh Dịch/Audio/QA.
 
 ---
 
@@ -61,6 +70,7 @@
 - Lịch sử git đã được rewrite (`filter-branch`) — repo giảm từ ~717MB → 0.4MB, không còn binary.
 - Docs rút gọn: README là tài liệu duy nhất; đã xoá `QUICKSTART.md`, `USAGE.md`.
 - Triển khai **Memory Bank** (STATE.md + session_log.md + AGENTS.md để agent tự đọc/ghi giữa phiên).
+- **Fix desktop "Đọc thử" EPUB**: `MainViewModel.OpenEpubPreviewAsync` + `EpubPreviewWindow` (WebView2 `CoreWebView2` + EPUB path) thêm null-guard đầy đủ; 9 handler WebView2 phụ thuộc cũng được guard. Build `dotnet build` 0 lỗi/0 cảnh báo. dual-Agent workflow: analyzer plan → executor implement → Review 1 `FINAL_STATUS: APPROVED` (review_count=1, không cần sửa lần 2).
 
 ---
 

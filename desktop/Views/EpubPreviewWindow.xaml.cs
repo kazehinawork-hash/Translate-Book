@@ -77,7 +77,15 @@ namespace TranslateBook.Views
                 }
 
                 await WebView.EnsureCoreWebView2Async();
-                WebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
+                var core = WebView.CoreWebView2;
+                if (core == null)
+                    throw new InvalidOperationException("Không thể khởi tạo WebView2.");
+
+                core.Settings.IsWebMessageEnabled = true;
+
+                // Validate EPUB path
+                if (string.IsNullOrWhiteSpace(_epubFilePath))
+                    throw new InvalidOperationException("Đường dẫn file EPUB trống.");
 
                 // Read and extract EPUB
                 EpubBook book = await EpubReader.ReadBookAsync(_epubFilePath);
@@ -129,7 +137,7 @@ namespace TranslateBook.Views
                     {
                         _pathToChapterId[relativePath] = domChapterId;
 
-                        string html = File.ReadAllText(absolutePath, Encoding.UTF8);
+                        string html = ReadTextFileWithEncoding(absolutePath);
                         string body = ExtractBodyContent(html);           // HtmlAgilityPack
                         body = RewriteImagePaths(body, absolutePath, _tempExtractPath); // HtmlAgilityPack
 
@@ -145,9 +153,9 @@ namespace TranslateBook.Views
                 File.WriteAllText(_fullBookHtmlPath, sb.ToString(), Encoding.UTF8);
 
                 // Navigate to the full book
-                WebView.CoreWebView2.SetVirtualHostNameToFolderMapping("translatebook.local", _tempExtractPath,
+                core.SetVirtualHostNameToFolderMapping("translatebook.local", _tempExtractPath,
                     Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
-                WebView.CoreWebView2.Navigate($"https://translatebook.local/fullbook.html");
+                core.Navigate($"https://translatebook.local/fullbook.html");
 
                 InitAudioPlayer();
             }
@@ -159,14 +167,17 @@ namespace TranslateBook.Views
 
         private string BuildEpubCss()
         {
-            var bg = Application.Current.Resources["ControlFillColorTertiaryBrush"] as SolidColorBrush;
-            var fg = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
-            var fgSecondary = Application.Current.Resources["TextFillColorSecondaryBrush"] as SolidColorBrush;
-            var link = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Colors.LightBlue;
+            // WPF-UI theme brushes may not resolve correctly here (they can come back as
+            // white/near-transparent defaults), so validate luminance and fall back to a
+            // fixed dark-theme palette that matches the app's dark UI.
+            var bg = GetSafeColor("ControlFillColorTertiaryBrush", Color.FromRgb(0x1e, 0x1e, 0x1e), allowLight: false);
+            var fg = GetSafeColor("TextFillColorPrimaryBrush", Color.FromRgb(0xe0, 0xe0, 0xe0), allowLight: true, maxLuminance: 240);
+            var fgSecondary = GetSafeColor("TextFillColorSecondaryBrush", Color.FromRgb(0xb0, 0xb0, 0xb0), allowLight: true, maxLuminance: 200);
+            var link = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Color.FromRgb(0x60, 0xa5, 0xfa);
 
-            string bgHex = bg != null ? ColorToHex(bg.Color) : "#1e1e1e";
-            string fgHex = fg != null ? ColorToHex(fg.Color) : "#e0e0e0";
-            string fgSecondaryHex = fgSecondary != null ? ColorToHex(fgSecondary.Color) : "#b0b0b0";
+            string bgHex = ColorToHex(bg);
+            string fgHex = ColorToHex(fg);
+            string fgSecondaryHex = ColorToHex(fgSecondary);
             string linkHex = ColorToHex(link);
 
             return $@"
@@ -269,13 +280,39 @@ namespace TranslateBook.Views
             ";
         }
 
+        /// <summary>
+        /// Reads an XHTML chapter with BOM/encoding detection so Vietnamese and CJK
+        /// characters are never mis-decoded (mojibake) when the file is not UTF-8.
+        /// </summary>
+        private static string ReadTextFileWithEncoding(string path)
+        {
+            var bytes = File.ReadAllBytes(path);
+            // UTF-16 BOM (LE/FE FF / FF FE)
+            if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+                return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+            if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+                return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+            // UTF-8 BOM
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+                return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+            // Fallback: strict UTF-8; if the bytes are not valid UTF-8, fall back to
+            // the system ANSI codepage so legacy-encoded chapters still decode.
+            try
+            {
+                return new UTF8Encoding(false, true).GetString(bytes);
+            }
+            catch (DecoderFallbackException)
+            {
+                return Encoding.Default.GetString(bytes);
+            }
+        }
+
         private string ExtractBodyContent(string html)
         {
             try
             {
                 var doc = new HtmlDocument();
                 doc.LoadHtml(html);
-
                 var body = doc.DocumentNode.Descendants("body").FirstOrDefault();
                 if (body != null)
                     return body.InnerHtml;
@@ -414,6 +451,7 @@ namespace TranslateBook.Views
 
         private void ScrollToChapter(string tocFilePath)
         {
+            if (WebView?.CoreWebView2 == null) return;
             if (string.IsNullOrEmpty(tocFilePath)) return;
 
             string pathOnly = tocFilePath;
@@ -468,7 +506,7 @@ namespace TranslateBook.Views
             }
         }
 
-        private async void WebView_NavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs e)
+        private void WebView_NavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs e)
         {
             if (e.IsSuccess)
             {
@@ -481,16 +519,45 @@ namespace TranslateBook.Views
 
         private void ReapplyThemeColors()
         {
-            var bg = Application.Current.Resources["ControlFillColorTertiaryBrush"] as SolidColorBrush;
-            var fg = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
-            var link = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Colors.LightBlue;
+            if (WebView?.CoreWebView2 == null) return;
+            var bg = GetSafeColor("ControlFillColorTertiaryBrush", Color.FromRgb(0x1e, 0x1e, 0x1e), allowLight: false);
+            var fg = GetSafeColor("TextFillColorPrimaryBrush", Color.FromRgb(0xe0, 0xe0, 0xe0), allowLight: true, maxLuminance: 240);
+            var link = (Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush)?.Color ?? Color.FromRgb(0x60, 0xa5, 0xfa);
 
-            string bgHex = bg != null ? ColorToHex(bg.Color) : "#1e1e1e";
-            string fgHex = fg != null ? ColorToHex(fg.Color) : "#e0e0e0";
+            string bgHex = ColorToHex(bg);
+            string fgHex = ColorToHex(fg);
             string linkHex = ColorToHex(link);
 
             string js = $@"var root = document.documentElement; root.style.setProperty('--bg-color', '{bgHex}'); root.style.setProperty('--fg-color', '{fgHex}'); root.style.setProperty('--link-color', '{linkHex}');";
             WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        /// <summary>
+        /// Reads a theme brush from application resources, but only trusts it when the
+        /// color is actually usable (not white/near-transparent defaults). Falls back to
+        /// a fixed dark-theme palette otherwise, so the reader pane never renders
+        /// white-on-white even if the WPF-UI resource doesn't resolve correctly.
+        /// </summary>
+        private static Color GetSafeColor(string resourceKey, Color fallback, bool allowLight, double maxLuminance = 255)
+        {
+            try
+            {
+                if (Application.Current.Resources[resourceKey] is SolidColorBrush brush)
+                {
+                    var c = brush.Color;
+                    // Near-transparent colors (alpha near 0) are unresolved defaults
+                    if (c.A < 0x40) return fallback;
+                    double lum = (0.299 * c.R + 0.587 * c.G + 0.114 * c.B);
+                    if (!allowLight && lum > 128) return fallback;   // background must stay dark
+                    if (allowLight && lum > maxLuminance) return fallback; // reject over-bright fg
+                    return c;
+                }
+            }
+            catch
+            {
+                // fall through to fallback
+            }
+            return fallback;
         }
 
         private static string ColorToHex(Color color) =>
@@ -498,6 +565,7 @@ namespace TranslateBook.Views
 
         private void InjectKeyboardNavScript()
         {
+            if (WebView?.CoreWebView2 == null) return;
             string js = @"
                 (function() {
                     if (window.__keyNavInjected) return;
@@ -558,6 +626,7 @@ namespace TranslateBook.Views
 
         private void ScrollToNextChapter()
         {
+            if (WebView?.CoreWebView2 == null) return;
             string js = @"
                 (function() {
                     var current = window.pageYOffset || document.documentElement.scrollTop;
@@ -579,6 +648,7 @@ namespace TranslateBook.Views
 
         private void ScrollToPrevChapter()
         {
+            if (WebView?.CoreWebView2 == null) return;
             string js = @"
                 (function() {
                     var current = window.pageYOffset || document.documentElement.scrollTop;
@@ -630,6 +700,7 @@ namespace TranslateBook.Views
 
         private void ClearSearchHighlights()
         {
+            if (WebView?.CoreWebView2 == null) return;
             string js = @"
                 (function() {
                     var highlights = document.querySelectorAll('.search-highlight');
@@ -650,6 +721,7 @@ namespace TranslateBook.Views
 
         private void HighlightSearchTerm(string term)
         {
+            if (WebView?.CoreWebView2 == null) return;
             ClearSearchHighlights();
             string escaped = EscapeJsString(term);
 
@@ -702,6 +774,7 @@ namespace TranslateBook.Views
         private void BtnSearchNext_Click(object sender, RoutedEventArgs e)
         {
             if (!_isSearchHighlightActive) return;
+            if (WebView?.CoreWebView2 == null) return;
 
             string js = @"
                 (function() {
@@ -729,6 +802,7 @@ namespace TranslateBook.Views
         private void BtnSearchPrev_Click(object sender, RoutedEventArgs e)
         {
             if (!_isSearchHighlightActive) return;
+            if (WebView?.CoreWebView2 == null) return;
 
             string js = @"
                 (function() {
@@ -771,9 +845,12 @@ namespace TranslateBook.Views
 
         private void BtnRefreshTheme_Click(object sender, RoutedEventArgs e)
         {
-            if (WebView.CoreWebView2 != null && WebView.Source != null)
-                WebView.Reload();
-            else if (WebView.CoreWebView2 != null)
+            var core = WebView?.CoreWebView2;
+            if (core == null) return;
+
+            if (core.Source != null)
+                core.Reload();
+            else
                 ReapplyThemeColors();
         }
 

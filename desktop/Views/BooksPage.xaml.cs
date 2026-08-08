@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.ComponentModel;
 using TranslateBook.Models;
 
@@ -44,14 +46,34 @@ public partial class BooksPage : Page
 
     private void TabInput_Click(object sender, RoutedEventArgs e)
     {
-        if (InputPanel != null) InputPanel.Visibility = Visibility.Visible;
         if (OutputPanel != null) OutputPanel.Visibility = Visibility.Collapsed;
+        if (InputPanel != null) AnimatePanelIn(InputPanel);
     }
 
     private void TabOutput_Click(object sender, RoutedEventArgs e)
     {
         if (InputPanel != null) InputPanel.Visibility = Visibility.Collapsed;
-        if (OutputPanel != null) OutputPanel.Visibility = Visibility.Visible;
+        if (OutputPanel != null) AnimatePanelIn(OutputPanel);
+    }
+
+    /// <summary>Fades the target panel in with a slight upward slide.</summary>
+    private static void AnimatePanelIn(UIElement panel)
+    {
+        panel.Visibility = Visibility.Visible;
+        panel.Opacity = 0;
+        panel.RenderTransformOrigin = new Point(0.5, 0.5);
+        panel.RenderTransform = new TranslateTransform(0, 12);
+
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var slide = new DoubleAnimation(12, 0, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        panel.BeginAnimation(OpacityProperty, fade);
+        panel.RenderTransform.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
 }

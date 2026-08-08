@@ -30,6 +30,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _activeProvider = "";
     [ObservableProperty] private bool _isApiOk;
     [ObservableProperty] private bool _logExpanded = true;
+    [ObservableProperty] private string _logFilter = "";
     [ObservableProperty] private string _globalSearchQuery = "";
 
     [ObservableProperty] private double _audioTemperature = 0.3;
@@ -73,6 +74,11 @@ public partial class MainViewModel : ObservableObject
     private const int MaxLogLines = 2000;
     private CancellationTokenSource? _currentCts;
     private readonly DispatcherTimer _progressTimer;
+
+    /// <summary>Structured log entries so the UI can color and filter them.</summary>
+    public readonly record struct LogEntry(string Text, string Level);
+    public event Action<LogEntry>? LogEntryAdded;
+    public event Action? LogCleared;
 
     public ObservableCollection<BookStatus> InputBooks { get; } = new();
     public ObservableCollection<BookStatus> OutputBooks { get; } = new();
@@ -449,7 +455,8 @@ public partial class MainViewModel : ObservableObject
             "warning" => "[WARN]",
             _ => "[INFO]"
         };
-        LogText += $"[{time}] {colorTag} {msg}\n";
+        string line = $"[{time}] {colorTag} {msg}";
+        LogText += line + "\n";
 
         if (LogText.Length > 80_000)
         {
@@ -459,6 +466,15 @@ public partial class MainViewModel : ObservableObject
                 LogText = string.Join("\n", lines[^MaxLogLines..]);
             }
         }
+
+        LogEntryAdded?.Invoke(new LogEntry(line, level));
+    }
+
+    /// <summary>Clears the on-screen log and notifies the UI to drop colored entries.</summary>
+    public void ClearLog()
+    {
+        LogText = "";
+        LogCleared?.Invoke();
     }
 
     private void UpdateBookStatus(BookStatus book)
@@ -477,11 +493,34 @@ public partial class MainViewModel : ObservableObject
         return text.Any(c => (c >= 0x3400 && c <= 0x9FFF) || (c >= 0xFF00 && c <= 0xFFEF));
     }
 
+    /// <summary>
+    /// Locates the EPUB used for the "Đọc thử" preview. Priority:
+    /// 1. trilingual.epub (ZH books, trilingual root file)
+    /// 2. final/vi.epub (EN books, Vietnamese-only file)
+    /// 3. any other *.epub under the book folder
+    /// Returns null when no EPUB exists for the book.
+    /// </summary>
+    private static string? FindPreviewEpub(string bookDir)
+    {
+        var trilingual = Path.Combine(bookDir, "trilingual.epub");
+        if (File.Exists(trilingual)) return trilingual;
+
+        var viEpub = Path.Combine(bookDir, "final", "vi.epub");
+        if (File.Exists(viEpub)) return viEpub;
+
+        var anyEpub = Directory.Exists(bookDir)
+            ? Directory.GetFiles(bookDir, "*.epub", SearchOption.AllDirectories)
+                  .OrderBy(p => p.Length) // prefer closest to root
+                  .FirstOrDefault()
+            : null;
+        return anyEpub;
+    }
+
     private static BookStatus GetBookStatus(string projectRoot, string slug, string source)
     {
         var bookDir = Path.Combine(projectRoot, "output", "books", slug);
         var viMd = Path.Combine(bookDir, "final", "vi.md");
-        var epub = Path.Combine(bookDir, "trilingual.epub");
+        var epub = FindPreviewEpub(bookDir);
         var audiobookDir = Path.Combine(bookDir, "audiobook");
 
         var mp3Count = Directory.Exists(audiobookDir)
@@ -779,20 +818,46 @@ public partial class MainViewModel : ObservableObject
     private async Task OpenEpubPreviewAsync(BookStatus book)
     {
         if (book == null) return;
-
-        var epubPath = Path.Combine(_projectRoot, "output", "books", book.Slug, "trilingual.epub");
-        if (!File.Exists(epubPath))
+        if (string.IsNullOrWhiteSpace(_projectRoot))
         {
-            AppendLog($"[Lỗi] Không tìm thấy file EPUB: {epubPath}", "error");
+            AppendLog("[Lỗi] Chưa xác định thư mục dự án, không thể mở xem thử EPUB.", "error");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(book.Slug))
+        {
+            AppendLog("[Lỗi] Sách không có slug hợp lệ, không thể mở xem thử EPUB.", "error");
             return;
         }
 
-        await Application.Current.Dispatcher.InvokeAsync(() =>
+        var bookDir = Path.Combine(_projectRoot, "output", "books", book.Slug);
+        var epubPath = FindPreviewEpub(bookDir);
+        if (string.IsNullOrEmpty(epubPath))
         {
-            var window = new EpubPreviewWindow();
-            window.Owner = Application.Current.MainWindow;
-            window.LoadEpubFile(epubPath);
-            window.Show();
+            AppendLog($"[Lỗi] File EPUB preview chưa tồn tại cho sách '{book.Slug}'.", "error");
+            return;
+        }
+
+        var app = Application.Current;
+        if (app == null)
+        {
+            AppendLog("[Lỗi] Ứng dụng chưa khởi tạo (Application.Current == null), không thể mở cửa sổ xem thử EPUB.", "error");
+            return;
+        }
+
+        await app.Dispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                var window = new EpubPreviewWindow();
+                if (app.MainWindow != null)
+                    window.Owner = app.MainWindow;
+                window.LoadEpubFile(epubPath);
+                window.Show();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Lỗi] Không thể mở cửa sổ xem thử EPUB: {ex.Message}", "error");
+            }
         });
     }
 

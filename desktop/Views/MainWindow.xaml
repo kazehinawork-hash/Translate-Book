@@ -28,7 +28,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <ui:TitleBar Grid.Row="0" Title="Translate Book" Icon="{ui:SymbolIcon Library24}">
@@ -40,65 +39,120 @@
             </ui:TitleBar.Header>
         </ui:TitleBar>
 
-        <ui:NavigationView Grid.Row="1" x:Name="NavView"
-                           IsPaneOpen="True" OpenPaneLength="220" PaneDisplayMode="Left"
-                           Margin="0,0,0,4">
-            <ui:NavigationView.MenuItems>
-                <ui:NavigationViewItem Content="Sách" IsActive="True"
-                                       TargetPageType="{x:Type views:BooksPage}"
-                                       Icon="{ui:SymbolIcon BookOpen24}"/>
-                <ui:NavigationViewItem Content="Audio" TargetPageType="{x:Type views:AudioPage}"
-                                       Icon="{ui:SymbolIcon Headphones24}"/>
-            </ui:NavigationView.MenuItems>
-            <ui:NavigationView.FooterMenuItems>
-                <ui:NavigationViewItem IsHitTestVisible="False">
-                    <StackPanel Margin="0,6">
-                        <TextBlock Text="API" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.8"/>
-                        <TextBlock Text="{Binding ActiveProvider, Mode=OneWay}" FontSize="13"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Cài đặt" TargetPageType="{x:Type views:ApiPage}"
-                                       Icon="{ui:SymbolIcon Settings24}"/>
-            </ui:NavigationView.FooterMenuItems>
-        </ui:NavigationView>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="2" MinHeight="40" MaxHeight="180" Margin="0,0,0,4">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="{DynamicResource ControlFillColorSecondaryBrush}" Padding="8,2">
+            <ui:NavigationView Grid.Column="0" x:Name="NavView"
+                               IsPaneOpen="True" OpenPaneLength="220" PaneDisplayMode="Left"
+                               Margin="0,0,0,4">
+                <ui:NavigationView.MenuItems>
+                    <ui:NavigationViewItem Content="Sách" IsActive="True"
+                                           TargetPageType="{x:Type views:BooksPage}"
+                                           Icon="{ui:SymbolIcon BookOpen24}"/>
+                    <ui:NavigationViewItem Content="Audio" TargetPageType="{x:Type views:AudioPage}"
+                                           Icon="{ui:SymbolIcon Headphones24}"/>
+                </ui:NavigationView.MenuItems>
+                <ui:NavigationView.FooterMenuItems>
+                    <ui:NavigationViewItem IsHitTestVisible="False">
+                        <StackPanel Margin="0,6">
+                            <TextBlock Text="API" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.8"/>
+                            <TextBlock Text="{Binding ActiveProvider, Mode=OneWay}" FontSize="13"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </ui:NavigationViewItem>
+                    <ui:NavigationViewItem Content="Cài đặt" TargetPageType="{x:Type views:ApiPage}"
+                                           Icon="{ui:SymbolIcon Settings24}"/>
+                </ui:NavigationView.FooterMenuItems>
+            </ui:NavigationView>
+
+            <!-- Realtime Log — right docked panel (fully collapses when hidden) -->
+            <Border Grid.Column="1" x:Name="LogPanel" Width="300" Margin="0,0,0,4"
+                    BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}" BorderThickness="1,0,0,0"
+                    Background="{DynamicResource ControlFillColorTertiaryBrush}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding LogExpanded}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
-                    <ToggleButton Grid.Column="1" Content="▾" Margin="12,0,0,0" Padding="6,2"
-                                  IsChecked="{Binding LogExpanded}" ToolTip="Expand/Collapse" Cursor="Hand"/>
-                    <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="12,0,12,0" Height="22"
-                                PlaceholderText="Lọc..." Style="{StaticResource InteractiveTextBox}" FontSize="10"/>
-                    <Button Grid.Column="3" Content="Xóa" FontSize="10" Padding="8,2" Cursor="Hand"
-                            Click="ClearLogButton_Click" Visibility="{Binding LogExpanded, Converter={StaticResource BoolToVisibility}}"/>
-                    <Button Grid.Column="4" Content="↑" FontSize="11" Padding="6,2" Width="28" Cursor="Hand"
-                            ToolTip="Sao chép log" Click="CopyLogButton_Click"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Expanded area: header + log body -->
+                    <Grid Grid.Row="0" Grid.RowSpan="2" x:Name="LogExpandedArea">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Panel header: hamburger toggle + title + actions -->
+                        <Border Grid.Row="0" Background="{DynamicResource ControlFillColorSecondaryBrush}" Padding="6,4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="&lt;" FontSize="15" Padding="4,0" Width="28" Cursor="Hand"
+                                        ToolTip="Thu Realtime Log (Ctrl+/)"
+                                        Command="{Binding ToggleLogCommand}"/>
+                                <TextBlock Grid.Column="1" Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="8,0,8,0" Height="22"
+                                            PlaceholderText="Lọc..." Style="{StaticResource InteractiveTextBox}" FontSize="10"
+                                            Text="{Binding LogFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            TextChanged="LogFilterBox_TextChanged"/>
+                                <Button Grid.Column="3" Content="Xóa" FontSize="10" Padding="6,2" Cursor="Hand"
+                                        Click="ClearLogButton_Click"/>
+                                <Button Grid.Column="4" Content="📋" FontSize="11" Padding="5,2" Width="26" Cursor="Hand"
+                                        ToolTip="Sao chép log" Click="CopyLogButton_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto">
+                            <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
+                                         FontFamily="Consolas" FontSize="11"
+                                         TextChanged="LogTextBox_TextChanged"/>
+                        </ScrollViewer>
+                    </Grid>
                 </Grid>
             </Border>
-            <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
-                          Visibility="{Binding LogExpanded, Converter={StaticResource BoolToVisibility}}"
-                          VerticalScrollBarVisibility="Auto">
-                <TextBox x:Name="LogBox" Text="{Binding LogText, Mode=OneWay}"
-                         TextChanged="LogTextBox_TextChanged" Style="{StaticResource LogTextBox}"
-                         FontFamily="Consolas" FontSize="11" IsReadOnly="True" TextWrapping="Wrap"/>
-            </ScrollViewer>
+
+            <!-- Collapsed tab — slim vertical bar on the right edge to re-open the log -->
+            <Border Grid.Column="1" x:Name="LogCollapsedTab" Width="28" Margin="0,0,0,4"
+                    BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}" BorderThickness="1,0,0,0"
+                    Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding LogExpanded}" Value="False">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Button Content="&gt;" FontSize="16" Width="22" Height="32" Cursor="Hand"
+                        ToolTip="Mở Realtime Log (Ctrl+/)"
+                        VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,10,0,0"
+                        Command="{Binding ToggleLogCommand}"/>
+            </Border>
         </Grid>
 
-        <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Grid.RowSpan="3" Margin="0,0,12,12"
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Grid.RowSpan="2" Margin="0,0,12,12"
                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="380"/>
     </Grid>
 </ui:FluentWindow>

@@ -10,6 +10,7 @@
                 <ui:ControlsDictionary />
                 <ResourceDictionary Source="Themes/AppStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <converters:BoolToEmojiConverter x:Key="BoolToEmojiConverter" xmlns:converters="clr-namespace:TranslateBook.Converters"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
