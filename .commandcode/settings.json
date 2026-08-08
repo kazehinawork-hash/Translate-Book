@@ -42,10 +42,8 @@
       "config"
     ],
     "deny": [
-      "Shell(git reset*)",
       "Shell(git checkout*)",
       "Shell(git clean*)",
-      "Shell(git restore*)",
       "Shell(git rebase*)",
       "Shell(git merge*)",
       "Shell(git cherry-pick*)",
