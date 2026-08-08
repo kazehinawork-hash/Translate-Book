@@ -46,8 +46,6 @@
       "Shell(git checkout*)",
       "Shell(git clean*)",
       "Shell(git restore*)",
-      "Shell(git commit*)",
-      "Shell(git push*)",
       "Shell(git rebase*)",
       "Shell(git merge*)",
       "Shell(git cherry-pick*)",
