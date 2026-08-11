@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -20,8 +21,22 @@ namespace TranslateBook.Views;
             InitializeComponent();
             SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
             _snackbarService.SetSnackbarPresenter(SnackbarPresenter);
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
+        }
+
+        private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // Ctrl+F: jump to the books list and focus its search box.
+            if (e.Key == System.Windows.Input.Key.F
+                && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                NavigateToBooks();
+                if (DataContext is ViewModels.MainViewModel vm)
+                    vm.FocusSearchRequested = true;
+            }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -35,7 +50,27 @@ namespace TranslateBook.Views;
             {
                 vm.LogEntryAdded += OnLogEntryAdded;
                 vm.LogCleared += OnLogCleared;
+                ReplayLogHistory(vm.LogText);
             }
+        }
+
+        /// <summary>Renders log lines that were written before the window subscribed.</summary>
+        private void ReplayLogHistory(string logText)
+        {
+            if (string.IsNullOrEmpty(logText) || LogBox == null) return;
+            foreach (var line in logText.Split('\n'))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var level = line.Contains("[ERR]") ? "error"
+                    : line.Contains("[WARN]") ? "warning" : "info";
+                var entry = new ViewModels.MainViewModel.LogEntry(line.TrimEnd('\r'), level);
+                _logHistory.Add(entry);
+                if (_logHistory.Count > 2000)
+                    _logHistory.RemoveAt(0);
+                if (FilterApplies(entry.Text))
+                    AppendLogEntry(entry);
+            }
+            LogBox.ScrollToEnd();
         }
 
         private void OnLogEntryAdded(ViewModels.MainViewModel.LogEntry entry)
@@ -124,6 +159,14 @@ namespace TranslateBook.Views;
     public void NavigateToBooks()
     {
         NavView.Navigate(typeof(BooksPage));
+    }
+
+    /// <summary>Enter in the titlebar search jumps to the books list and applies the query.</summary>
+    private void GlobalSearch_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Enter) return;
+        e.Handled = true;
+        NavigateToBooks();
     }
 
     public void ShowSnackbar(string message, bool isError = false)

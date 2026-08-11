@@ -32,6 +32,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _logExpanded = true;
     [ObservableProperty] private string _logFilter = "";
     [ObservableProperty] private string _globalSearchQuery = "";
+    /// <summary>Set true by Ctrl+F so BooksPage focuses its search box on load.</summary>
+    [ObservableProperty] private bool _focusSearchRequested;
 
     [ObservableProperty] private double _audioTemperature = 0.3;
     [ObservableProperty] private int _audioTopK = 10;
@@ -47,7 +49,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _selectedLang = "auto";
     [ObservableProperty] private string _epubAuthor = "";
     [ObservableProperty] private string _epubTitle = "";
-    [ObservableProperty] private bool _isPipelineBusy;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusyAny))]
+    private bool _isPipelineBusy;
+    [ObservableProperty] private string _busyMessage = "";
 
     // Voice properties
     [ObservableProperty] private ObservableCollection<string> _voiceList = new();
@@ -55,13 +60,17 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _voiceName = "";
     [ObservableProperty] private string _voiceGender = "";
     [ObservableProperty] private string _voiceDescription = "";
-    [ObservableProperty] private bool _isVoiceBusy;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusyAny))]
+    private bool _isVoiceBusy;
     [ObservableProperty] private string _voicePreviewText = "Xin chào, đây là đoạn đọc thử giọng.";
 
     // QA properties
     [ObservableProperty] private string _qaReport = "";
     [ObservableProperty] private bool _hasQaReport;
-    [ObservableProperty] private bool _isQaBusy;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusyAny))]
+    private bool _isQaBusy;
     [ObservableProperty] private bool _showQaReport;
 
     // Audiobook extra properties
@@ -83,6 +92,10 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<BookStatus> InputBooks { get; } = new();
     public ObservableCollection<BookStatus> OutputBooks { get; } = new();
 
+    /// <summary>True when any long-running operation is active — drives the busy overlay.</summary>
+    public bool IsBusyAny => IsPipelineBusy || IsVoiceBusy || IsQaBusy
+        || InputBooks.Any(b => b.IsBusy) || OutputBooks.Any(b => b.IsBusy);
+
     partial void OnSelectedProviderChanged(string value)
     {
         LoadApiConfigForSelectedProvider();
@@ -103,6 +116,9 @@ public partial class MainViewModel : ObservableObject
                 App.Current.Dispatcher.Invoke(() => AppendLog(msg, "error"));
         };
 
+        // Keep the global busy overlay in sync with per-book busy states.
+        Models.BookStatus.AnyBusyChanged += OnAnyBookBusyChanged;
+
         _progressTimer = new DispatcherTimer();
         _progressTimer.Interval = TimeSpan.FromSeconds(3);
         _progressTimer.Tick += (s, e) => RefreshBookProgress();
@@ -111,6 +127,8 @@ public partial class MainViewModel : ObservableObject
         LoadBooks();
         LoadApiStatus();
     }
+
+    private void OnAnyBookBusyChanged() => OnPropertyChanged(nameof(IsBusyAny));
 
     public void LoadBooks()
     {
@@ -206,6 +224,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         book.IsBusy = true;
+        BusyMessage = $"Đang dịch: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
@@ -225,6 +244,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            BusyMessage = "";
             _currentCts = null;
             UpdateBookStatus(book);
         }
@@ -371,6 +391,8 @@ public partial class MainViewModel : ObservableObject
         }
 
         book.IsBusy = true;
+        IsVoiceBusy = true;
+        BusyMessage = $"Đang tạo audio: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
@@ -401,6 +423,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            IsVoiceBusy = false;
+            BusyMessage = "";
             _currentCts = null;
             UpdateBookStatus(book);
         }
@@ -541,6 +565,8 @@ public partial class MainViewModel : ObservableObject
             totalChapters = Regex.Matches(content, @"^# ", RegexOptions.Multiline).Count;
         }
 
+        var cover = FindCoverImage(bookDir);
+
         return new BookStatus
         {
             Slug = slug,
@@ -551,7 +577,35 @@ public partial class MainViewModel : ObservableObject
             TotalChapters = totalChapters,
             ProgressCount = progressCount,
             TotalChunks = totalChunks,
+            CoverPath = cover,
+            AudioDone = mp3Count,
+            AudioTotal = totalChapters,
         };
+    }
+
+    /// <summary>
+    /// Finds a cover image for a book: prefers an image named like a cover,
+    /// otherwise the first image under the book's images/ folder. Returns "" if none.
+    /// </summary>
+    private static string FindCoverImage(string bookDir)
+    {
+        var imagesDir = Path.Combine(bookDir, "images");
+        if (!Directory.Exists(imagesDir)) return "";
+
+        var candidates = Directory.GetFiles(imagesDir, "*.jpg")
+            .Concat(Directory.GetFiles(imagesDir, "*.png"))
+            .Concat(Directory.GetFiles(imagesDir, "*.jpeg"))
+            .OrderBy(p => p) // stable
+            .ToList();
+        if (candidates.Count == 0) return "";
+
+        // Prefer a filename that suggests a cover (front/cover/0/1 often the cover).
+        var coverish = candidates.FirstOrDefault(p =>
+        {
+            var name = Path.GetFileNameWithoutExtension(p).ToLowerInvariant();
+            return name.Contains("cover") || name.Contains("front") || name == "0" || name == "1" || name.StartsWith("cover");
+        });
+        return coverish ?? candidates[0];
     }
 
     private void LoadApiStatus()
@@ -627,6 +681,7 @@ public partial class MainViewModel : ObservableObject
 
         book.IsBusy = true;
         IsPipelineBusy = true;
+        BusyMessage = $"Đang chạy pipeline: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
@@ -653,6 +708,7 @@ public partial class MainViewModel : ObservableObject
         {
             book.IsBusy = false;
             IsPipelineBusy = false;
+            BusyMessage = "";
             _currentCts = null;
             UpdateBookStatus(book);
         }
@@ -669,6 +725,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         book.IsBusy = true;
+        BusyMessage = $"Đang trích xuất: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
@@ -690,6 +747,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            BusyMessage = "";
             _currentCts = null;
         }
     }
@@ -712,6 +770,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         book.IsBusy = true;
+        BusyMessage = $"Đang tạo glossary: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
@@ -734,6 +793,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            BusyMessage = "";
             _currentCts = null;
         }
     }
@@ -887,6 +947,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         IsQaBusy = true;
+        BusyMessage = $"Đang chạy QA: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
@@ -923,6 +984,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             IsQaBusy = false;
+            BusyMessage = "";
             _currentCts = null;
         }
     }
@@ -1037,7 +1099,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void FocusSearchInBooks()
     {
-        // The BooksPage owns the actual search control focus.
+        FocusSearchRequested = true;
     }
 
     [RelayCommand]

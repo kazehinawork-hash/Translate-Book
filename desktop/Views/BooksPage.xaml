@@ -65,12 +65,16 @@
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
+                            <TextBlock Text="📚" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                             <TextBlock Text="Chưa có sách nào để dịch."
                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                        HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             <TextBlock Text="Copy file .pdf, .epub hoặc .docx vào thư mục input/ rồi bấm Làm mới."
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       HorizontalAlignment="Center" FontSize="14"/>
+                                       HorizontalAlignment="Center" FontSize="14" Margin="0,0,0,16"/>
+                            <ui:Button Content="Mở thư mục input" Icon="{ui:SymbolIcon Folder24}"
+                                       HorizontalAlignment="Center" Padding="16,6" Cursor="Hand"
+                                       Click="OpenInputFolder_Click"/>
                         </StackPanel>
                         <ItemsControl x:Name="InputItemsControl" ItemsSource="{Binding InputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
@@ -198,6 +202,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
+                        <TextBlock Text="✅" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                         <TextBlock Text="Chưa có sách nào được dịch xong."
                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                    HorizontalAlignment="Center" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
@@ -215,7 +220,7 @@
                             <DataTemplate DataType="{x:Type models:BookStatus}">
                                 <ui:Card Margin="6" Width="340" Style="{StaticResource InteractiveCard}">
                                     <StackPanel>
-                                        <!-- Header: avatar + title + status badge -->
+                                        <!-- Header: cover/avatar + title + status badge -->
                                         <Border Style="{StaticResource BookCardHeader}"
                                                 Background="{DynamicResource ControlFillColorTertiaryBrush}">
                                             <Grid>
@@ -224,13 +229,37 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <Border Width="42" Height="42" CornerRadius="21"
-                                                        Background="{DynamicResource AccentFillColorDefaultBrush}"
-                                                        HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="Bold"
-                                                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
+                                                <!-- Cover thumbnail if available -->
+                                                <Grid Width="48" Height="64" VerticalAlignment="Center">
+                                                    <Border CornerRadius="4" Background="{DynamicResource AccentFillColorDefaultBrush}">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CoverPath}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock Text="{Binding Initial}" FontSize="16" FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <Border CornerRadius="4" ClipToBounds="True">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CoverPath}" Value="">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Image Source="{Binding CoverPath}" Stretch="UniformToFill"/>
+                                                    </Border>
+                                                </Grid>
                                                 <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="Bold"
                                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"

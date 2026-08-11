@@ -18,7 +18,6 @@
 
     <ui:FluentWindow.InputBindings>
         <KeyBinding Key="R" Modifiers="Ctrl" Command="{Binding RefreshBooksCommand}"/>
-        <KeyBinding Key="F" Modifiers="Ctrl" Command="{Binding FocusSearchInBooksCommand}"/>
         <KeyBinding Key="Oem2" Modifiers="Ctrl" Command="{Binding ToggleLogCommand}"/>
         <KeyBinding Key="Escape" Command="{Binding CancelCommand}"/>
         <KeyBinding Key="F5" Command="{Binding RunPipelineFirstBookCommand}"/>
@@ -32,9 +31,10 @@
 
         <ui:TitleBar Grid.Row="0" Title="Translate Book" Icon="{ui:SymbolIcon Library24}">
             <ui:TitleBar.Header>
-                <ui:TextBox Width="260" Height="30" Margin="16,0,0,0"
-                            PlaceholderText="Tìm kiếm toàn bộ..."
+                <ui:TextBox x:Name="GlobalSearchBox" Width="260" Height="30" Margin="16,0,0,0"
+                            PlaceholderText="Tìm kiếm toàn bộ... (Enter để tìm)"
                             Text="{Binding GlobalSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                            KeyDown="GlobalSearch_KeyDown"
                             Style="{StaticResource InteractiveTextBox}"/>
             </ui:TitleBar.Header>
         </ui:TitleBar>
@@ -154,5 +154,29 @@
 
         <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Grid.RowSpan="2" Margin="0,0,12,12"
                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="380"/>
+
+        <!-- Busy overlay: shown while any long-running operation is active -->
+        <Border Grid.Row="0" Grid.RowSpan="2" Background="#80000000">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsBusyAny}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ui:ProgressRing IsIndeterminate="True" Width="56" Height="56"
+                                 HorizontalAlignment="Center" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                <TextBlock Text="{Binding BusyMessage}" FontSize="15" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           HorizontalAlignment="Center" Margin="0,16,0,0" TextWrapping="Wrap"/>
+                <ui:Button Content="Hủy thao tác" Icon="{ui:SymbolIcon Dismiss24}" Margin="0,14,0,0"
+                           Padding="18,6" HorizontalAlignment="Center" Cursor="Hand"
+                           Command="{Binding CancelCommand}"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </ui:FluentWindow>

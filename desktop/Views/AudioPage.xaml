@@ -143,6 +143,24 @@
                                     <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,8,0,0">
                                         <Run Text="Audio chapters: "/><Run Text="{Binding Mp3Count, Mode=OneWay}"/>
                                     </TextBlock>
+                                    <!-- Chapter progress while generating -->
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <ProgressBar Value="{Binding AudioDone, Mode=OneWay}" Maximum="{Binding AudioTotal, Mode=OneWay}"
+                                                     Height="6"/>
+                                        <TextBlock Text="{Binding AudioDone, StringFormat=Chương {0}}" FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0"/>
+                                    </Grid>
                                     <ui:TextBox PlaceholderText="Chapters (VD: 1 2 3 hoặc để trống = tất cả)"
                                                 Text="{Binding DataContext.AudioChapterInput, RelativeSource={RelativeSource AncestorType={x:Type Window}}, UpdateSourceTrigger=PropertyChanged}"
                                                 Margin="0,8,0,0" Height="28"/>
