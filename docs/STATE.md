@@ -34,6 +34,16 @@
   - **Card sách** Input/Output làm đẹp: avatar tròn chữ cái đầu, header nền, badge trạng thái, stat tiles (Chunks/EPUB/Audio), progress bar; hover chỉ đổi shadow (bỏ translate gây giật khi chuột gần mép).
   - **Tab Input/Output** có animation fade + trượt lên (180ms CubicEase).
   - Tab Output gọn: chỉ còn nút **Đọc thử** (bỏ Dịch/Gộp/EPUB/QA/Audio — tạo audiobook ở trang Audio, nghe trong cửa sổ Đọc thử).
+- UI nâng cấp tiếp (08-08, build 0 lỗi/0 cảnh báo):
+  - **Busy overlay** toàn cửa sổ: ProgressRing + BusyMessage + nút "Hủy thao tác" — hiện khi chạy pipeline/dịch/QA/audio; `IsBusyAny` gồm cả per-book busy (qua `BookStatus.AnyBusyChanged`).
+  - **Ảnh bìa card sách** (Output): tìm ảnh trong `images/` (ưu tiên tên cover/front), fallback avatar chữ.
+  - **Empty state** Input/Output có icon + nút "Mở thư mục input" (mở Explorer).
+  - **AudioPage**: progress bar "Chương N" khi tạo audio (AudioDone/AudioTotal).
+  - **Global search**: Enter ở ô tìm kiếm titlebar → nhảy tới tab Sách + lọc; **Ctrl+F** → focus ô tìm kiếm.
+  - **Fix mất log**: replay `LogText` khi MainWindow subscribe (log khởi tạo không bị mất).
+  - **Search theo tên**: filter khớp slug + DisplayTitle + tên file (tìm được tên tiếng Trung/Việt).
+  - **Toolbar preview**: bọc ScrollViewer ngang + thu gọn nút (Làm mới, zoom 90, search 160) — hết bị cắt nút Tiếp/Trước.
+  - **Fix**: `GenerateAudiobookAsync` set `IsVoiceBusy` (trước đây overlay không hiện khi tạo audio).
 
 ---
 

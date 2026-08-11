@@ -502,3 +502,34 @@
 
 ### Git
 - Đang trên `main`, chưa commit — chờ user duyệt message rồi commit + push.
+
+## 2026-08-08 — Nâng cấp UI desktop tiếp (busy overlay, ảnh bìa, global search, fix log/busy)
+
+### Đã làm
+- **Busy overlay** toàn cửa sổ (ProgressRing + BusyMessage + nút "Hủy thao tác" bind CancelCommand): hiện khi chạy pipeline/dịch/QA/audio. `IsBusyAny` gồm cả per-book busy qua static event `BookStatus.AnyBusyChanged`.
+- **Fix** `GenerateAudiobookAsync` thiếu `IsVoiceBusy` → overlay không hiện khi tạo audio (giờ set đúng).
+- **Ảnh bìa card sách Output**: `FindCoverImage()` tìm ảnh trong `images/` (ưu tiên tên cover/front), fallback avatar chữ; `BookStatus.CoverPath`.
+- **Empty state** Input/Output: icon + nút "Mở thư mục input" (Process.Start explorer qua `ProjectHelper.FindProjectRoot`).
+- **AudioPage**: progress bar "Chương N" khi tạo audio (`AudioDone`/`AudioTotal` set trong GetBookStatus).
+- **Global search**: Enter ở ô tìm kiếm titlebar → navigate tab Sách + lọc; **Ctrl+F** (`PreviewKeyDown` trong MainWindow) → navigate + focus SearchBox qua flag `FocusSearchRequested`.
+- **Fix mất log**: `ReplayLogHistory()` replay `LogText` khi MainWindow subscribe (log khởi tạo VM không mất).
+- **Search theo tên**: `Matches()` khớp slug + DisplayTitle + Initial + tên file gốc (tìm được tên tiếng Trung/Việt).
+- **Toolbar EpubPreviewWindow**: bọc ScrollViewer ngang, thu gọn (Làm mới/zoom 90/search 160) — hết cắt nút Tiếp/Trước.
+
+### File đổi
+- desktop/ViewModels/MainViewModel.cs (BusyMessage, IsBusyAny, AnyBusyChanged, FindCoverImage, FocusSearchRequested, IsVoiceBusy trong GenerateAudiobook)
+- desktop/Models/BookStatus.cs (CoverPath, AnyBusyChanged static event)
+- desktop/Views/MainWindow.xaml + .xaml.cs (busy overlay, Ctrl+F, replay log, nút Hủy)
+- desktop/Views/BooksPage.xaml + .xaml.cs (ảnh bìa, empty state, search theo tên)
+- desktop/Views/AudioPage.xaml (progress chương)
+- desktop/Views/EpubPreviewWindow.xaml (toolbar scroll ngang)
+- desktop/Services/ProjectHelper.cs (đã verify FindProjectRoot trả project root đúng)
+- docs/STATE.md, docs/session_log.md
+
+### Còn dở
+- 3 cuốn không có EPUB (ban-co-nam-cho-ngoi, la-nam-trong-la, long-test) → nút "Đọc thử" báo lỗi; ghi nhận để xử lý sau (ẩn nút hoặc tạo vi.epub từ vi.md).
+- `RewriteImagePaths` chưa xử lý CSS `url()` (ảnh nền EPUB) — để sau.
+- `scripts/audiobook/audiobook_long.py` có thay đổi lớn (chunk 280, gộp chunk nhỏ, từ điển phát âm, repetition penalty, re-encode MP3) đang chờ commit — cần commit riêng.
+
+### Git
+- Trên `main`, chưa commit. Dự kiến tách commit: (1) desktop UI nâng cấp, (2) audiobook_long.py, (3) docs. Chờ user duyệt.
