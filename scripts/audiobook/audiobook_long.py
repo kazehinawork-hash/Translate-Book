@@ -23,7 +23,7 @@ Usage:
     # Chạy lại từ đầu (bỏ qua progress)
     python scripts/audiobook_long.py --force
 """
-import sys, os, re, time, argparse, json, shutil, hashlib
+import sys, os, re, time, argparse, json, shutil, hashlib, subprocess
 import numpy as np
 import soundfile as sf
 
@@ -32,13 +32,15 @@ sys.stdout.reconfigure(encoding="utf-8")
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Config
-MAX_CHARS = 180          # chars per chunk (giảm từ 240 để tránh líu lưỡi)
+MAX_CHARS = 280          # chars per chunk (chunk dài hơn → model có ngữ cảnh, bớt nuốt phụ âm đầu câu/đoạn)
+TTS_MAX_CHARS = 320      # giới hạn char của vieneu (phải >= MAX_CHARS để thư viện KHÔNG cắt lại → không vỡ câu)
 SILENCE_BETWEEN = 0.4    # seconds silence between chunks
 SILENCE_PARA = 0.8       # seconds silence between paragraphs
 SILENCE_CHAPTER_END = 1.5 # seconds silence cuối chapter (trước khi chapter mới bắt đầu)
 SAMPLE_RATE = 48000
 MAX_RETRIES = 3          # retries per chunk on TTS failure
 FADE_MS = 10             # fade in/out ở đầu/cuối chapter (tránh click khi start/stop)
+CROSSFADE_MS = 15        # fade out/in nhẹ ở 2 đầu mỗi chunk trước khi chèn silence (chống click tại chỗ nối)
 NORM_MASTER = 0.92       # normalize toàn chapter
 
 
@@ -52,6 +54,23 @@ def _normalize(audio, target=NORM_MASTER):
 
 def _apply_fade(audio, fade_ms=FADE_MS):
     """Fade in/out ở đầu/cuối chapter để tránh click khi start/stop."""
+    n = int(SAMPLE_RATE * fade_ms / 1000)
+    if n <= 0 or len(audio) <= 2 * n:
+        return audio
+    audio = audio.copy()
+    fade_in = np.linspace(0, 1, n, dtype=np.float32)
+    fade_out = np.linspace(1, 0, n, dtype=np.float32)
+    audio[:n] *= fade_in
+    audio[-n:] *= fade_out
+    return audio
+
+
+def _edge_fade(audio, fade_ms=CROSSFADE_MS):
+    """Fade ngắn (micro) ở 2 đầu chunk để chống click tại chỗ nối khi ghép.
+
+    Khác ``_apply_fade`` (fade toàn chapter): chỉ nhún 2-3ms đầu/cuối về 0,
+    không tạo cảm giác nghỉ — đủ để biên độ tại điểm nối = 0.
+    """
     n = int(SAMPLE_RATE * fade_ms / 1000)
     if n <= 0 or len(audio) <= 2 * n:
         return audio
@@ -208,6 +227,126 @@ def cleanup_markdown(text: str) -> str:
 # Cache VietNormalizer instance
 _viet_normalizer = None
 
+# Cache sea_g2p.Normalizer (đã có sẵn trong venv vieneu) để normalize số/ngày/
+# tiền/viết tắt TRƯỚC khi tách câu & chunk — tránh cắt nhầm "3.5"/"1.200.000".
+_sea_g2p_normalizer = None
+
+
+def normalize_by_sea_g2p(text: str) -> str:
+    """Chuẩn hóa số/ngày/tiền/viết tắt bằng sea_g2p (giống tầng normalize của vieneu).
+
+    Chỉ chạy khi có sẵn sea_g2p (venv vieneu); nếu không thì trả nguyên text.
+    Không ép punc_norm để giữ dấu câu gốc (tránh biến "3." thành hết câu giả).
+    """
+    global _sea_g2p_normalizer
+    try:
+        if _sea_g2p_normalizer is None:
+            from sea_g2p import Normalizer
+            _sea_g2p_normalizer = Normalizer()
+        return _sea_g2p_normalizer.normalize(text, punc_norm=False)
+    except Exception as e:
+        # sea_g2p không có / lỗi → bỏ qua (vieneu vẫn tự normalize khi phonemize)
+        if _sea_g2p_normalizer is None:
+            print(f"   ⚠️  sea_g2p chưa có — bỏ qua normalize số trước chunk: {e}")
+        return text
+
+# ── Từ điển phát âm ngoại lệ (từ mượn/tiếng Anh đọc theo cách Việt hoá) ──
+# Thứ tự: từ DÀI trước (tránh khớp nhầm tiền tố của từ ghép), tất cả lowercase.
+DEFAULT_PRONOUNCE = {
+    "ok": "ô kê",
+    "oke": "ô kê",
+    "okay": "ô kê",
+    "AI": "ê a i",  # chỉ viết HOA (viết tắt AI), không đụng "ai" (đại từ tiếng Việt)
+    "wifi": "uy phai",
+    "wi-fi": "uy phai",
+    "tv": "tê vi",
+    "tivi": "ti vi",
+    "sms": "ét em mờ ét",
+    "email": "i meo",
+    "e-mail": "i meo",
+    "website": "uép sao",
+    "web": "uép",
+    "app": "ép",
+    "apps": "ép",
+    "iphone": "ai phôn",
+    "android": "an đroi",
+    "windows": "uin đâu",
+    "software": "phần mềm",
+    "hardware": "phần cứng",
+    "bim": "bim",
+    "data": "đa ta",
+    "file": "phai",
+    "files": "phai",
+    "server": "xơ vơ",
+    "cloud": "clao",
+    "online": "on lai",
+    "offline": "óp phai",
+    "internet": "in tơ nét",
+    "google": "gồ gồ",
+    "youtube": "iu túp",
+    "facebook": "phây búc",
+    "chat": "chát",
+    "video": "vi đê ô",
+    "audio": "au đi ô",
+    "photo": "phô tô",
+    "robot": "rô bốt",
+    "computer": "côm piu tơ",
+    "laptop": "láp tốp",
+    "phone": "phôn",
+    "tablet": "táp lét",
+    "camera": "ca mê ra",
+    "gps": "gi pi ét",
+    "bluetooth": "bơ lu tút",
+    "html": "hát tê em mờ en",
+    "css": "xê ét ét",
+    "pdf": "pi đi ép",
+    "docx": "đóc x",
+    "xlsx": "éc xen x",
+    "api": "ê pi ai",
+    "url": "iu a en",
+    "www": "u u u",
+    "https": "hát tê tê ép x",
+    "http": "hát tê tê pi",
+    "vpn": "vi pi en",
+}
+
+_pronounce_map = dict(DEFAULT_PRONOUNCE)  # copy mặc định; có thể bị ghi đè bằng --pronounce-json
+_pronounce_sorted = sorted(DEFAULT_PRONOUNCE.keys(), key=len, reverse=True)
+
+
+def _apply_pronounce(text: str) -> str:
+    """Thay từ mượn/ngoại lệ trong text bằng cách đọc Việt hoá.
+
+    - Key viết HOA (vd "AI") → chỉ khớp khi viết HOA (tránh đụng "ai" thường).
+    - Key viết thường → khớp không phân biệt hoa/thường.
+    """
+    if not _pronounce_sorted:
+        return text
+    for word in _pronounce_sorted:
+        if word != word.lower():
+            # Key có ký tự HOA → match chính xác (case-sensitive)
+            pattern = r"(?<![\w])" + re.escape(word) + r"(?![\w])"
+            text = re.sub(pattern, _pronounce_map[word], text)
+        else:
+            pattern = r"(?<![\w])" + re.escape(word) + r"(?![\w])"
+            text = re.sub(pattern, _pronounce_map[word], text, flags=re.IGNORECASE)
+    return text
+
+
+def load_pronounce_dict(path: str) -> None:
+    """Nạp từ điển phát âm ngoại lệ từ JSON (ghi đè/merge lên mặc định)."""
+    global _pronounce_sorted, _pronounce_map
+    if not path or not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        print(f"   ⚠️  --pronounce-json phải là object {{'từ': 'cách đọc'}}")
+        return
+    _pronounce_map.update({str(k).lower(): str(v) for k, v in data.items()})
+    _pronounce_sorted = sorted(_pronounce_map.keys(), key=len, reverse=True)
+    print(f"   📖 Đã nạp từ điển phát âm: {len(data)} từ bổ sung (tổng {len(_pronounce_map)})")
+
 
 def normalize_vietnamese_text(text: str) -> str:
     """Chuẩn hóa văn bản tiếng Việt cho TTS sử dụng VietNormalizer.
@@ -216,6 +355,8 @@ def normalize_vietnamese_text(text: str) -> str:
     từ viết tắt, từ mượn.
     """
     global _viet_normalizer
+    # 1. Từ điển phát âm ngoại lệ (từ mượn) — chạy trước normalizer
+    text = _apply_pronounce(text)
     try:
         if _viet_normalizer is None:
             from vietnormalizer import VietnameseNormalizer
@@ -270,7 +411,10 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
         # Bỏ qua dòng chỉ có dấu câu hoặc ký tự vô nghĩa cho TTS
         if re.match(r'^[\s"\'""\'\'!,.?…—–\-*~()（）\-–—\[\]【】{}]+$', text):
             continue
-        # Chuẩn hóa văn bản tiếng Việt cho TTS
+        # Normalize số/ngày/tiền/viết tắt TRƯỚC khi tách câu/chunk
+        # (tránh cắt nhầm "3.5", "1.200.000", "v.v." thành hết câu giả)
+        text = normalize_by_sea_g2p(text)
+        # Chuẩn hóa văn bản tiếng Việt cho TTS (từ mượn + vietnormalizer nếu có)
         text = normalize_vietnamese_text(text)
         current.append(text)
     # Paragraph cuối cùng → section end
@@ -283,14 +427,32 @@ def _split_sentences(text: str) -> list:
     """Tách text thành danh sách câu hoàn chỉnh.
 
     Tách tại: . ! ? … ; theo sau bởi space hoặc cuối chuỗi.
+    KHÔNG tách khi dấu chấm thuộc viết tắt tiếng Anh (Mr., Mrs., Dr., St.,
+    vs., etc., vd.) hoặc viết tắt 1 chữ hoa + dấu chấm (vd "TP.", "HCM."),
+    và không tách sau số (số thứ tự/viết tắt kiểu "3." khi đứng trước chữ).
     Xử lý quote đóng: ". "? "! "? → giữ nguyên trong cùng câu.
     """
     text = text.strip()
     if not text:
         return []
-    # Tách tại dấu câu结束 (không tách nếu trước đó là quote mở)
-    # Pattern: dấu câu + space hoặc cuối chuỗi, KHÔNG có quote mở ngay trước
-    parts = re.split(r'(?<=[.!?…])\s+', text)
+
+    # ── Phương án đơn giản & chính xác: tách theo dấu câu + space, loại trừ viết tắt ──
+    # Chèn sentinel cho viết tắt để không bị tách. Text đã qua sea_g2p thường
+    # là chữ thường ("Mr." → "mr.", "TP." → "thành phố.") nên dùng IGNORECASE.
+    protected = text
+    # Viết tắt tiếng Anh + "vân vân" (sau normalize) — giữ nguyên dấu chấm
+    protected = re.sub(
+        r"\b(mr|mrs|ms|dr|prof|st|vs|etc|vd|e\.g|i\.e|no|vân vân)\.(?=\s+\S)",
+        r"\1<PROTECT>", protected, flags=re.IGNORECASE)
+    # "thành phố." từ "TP." đứng trước tên địa danh chữ thường ("hồ chí minh")
+    # → không tách (tránh "thành phố. hồ chí minh" vỡ thành 2 câu)
+    protected = re.sub(r"\bthành phố\.(?=\s+[a-zà-ỹ])", "thành phố<PROTECT>", protected)
+    # Viết tắt 1 chữ hoa liền dấu chấm (TP., HCM.) trước chữ hoa — giữ
+    protected = re.sub(r"\b([A-ZÀ-Ỹ])\.(?=\s+[A-ZÀ-Ỹ])", r"\1<PROTECT>", protected)
+
+    # Tách tại dấu câu kết thúc + space/cuối chuỗi
+    raw_parts = re.split(r'(?<=[.!?…])\s+', protected)
+    parts = [p.replace("<PROTECT>", ".") for p in raw_parts]
     return [p.strip() for p in parts if p.strip()]
 
 
@@ -342,6 +504,7 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
             sentences = [para]
 
         current = ""
+        prev_sent_first = None  # 2 từ đầu của câu TRƯỚC trong cùng paragraph (phát hiện song song)
 
         for sent_idx, sent in enumerate(sentences):
             sent = sent.strip()
@@ -349,6 +512,21 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
                 continue
 
             is_last_sent = (sent_idx == len(sentences) - 1)
+
+            # Phát hiện câu SONG SONG (lặp cụm đầu câu, vd "một số đứa ở lại..." /
+            # "một số đứa chuyển..."): model TTS dễ kẹt lặp nếu 2 câu cạnh nhau
+            # trong cùng chunk → ép tách chunk trước khi gộp câu này.
+            sent_first = tuple(sent.split()[:2])
+            is_parallel = (
+                prev_sent_first is not None
+                and len(prev_sent_first) == 2 and len(sent_first) == 2
+                and prev_sent_first[0] == sent_first[0]
+                and prev_sent_first[1] == sent_first[1]
+            )
+            if is_parallel and current:
+                chunks.append((_ensure_sentence_ending(current.strip()), False))
+                current = ""
+            prev_sent_first = sent_first
 
             # Nếu thêm câu này vào chunk hiện tại mà vẫn <= max_chars → gộp
             candidate = (current + " " + sent).strip() if current else sent
@@ -415,13 +593,34 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
             # Đảm bảo chunk kết thúc bằng dấu câu
             chunks.append((_ensure_sentence_ending(current.strip()), para_section_end))
 
-    # Gộp chunk cuối cùng vào chunk trước nếu cả 2 đều nhỏ
-    if len(chunks) >= 2:
-        last_text, last_para = chunks[-1]
-        prev_text, prev_para = chunks[-2]
-        if len(prev_text) + len(last_text) + 1 <= max_chars:
-            chunks[-2] = (prev_text + " " + last_text, last_para or prev_para)
-            chunks.pop()
+    # Gộp các chunk NHỎ liền kề (nhất là câu hội thoại ngắn đứng riêng) để model
+    # có đủ ngữ cảnh, tránh sinh lặp khi chunk quá ngắn. Duyệt từ đầu: nếu chunk i
+    # + chunk i+1 <= max_chars → gộp (giữ flag para_end của chunk sau).
+    # NGOẠI LỆ: không gộp nếu câu ĐẦU của chunk sau lặp cụm từ đầu của câu CUỐI
+    # chunk trước (vd "một số đứa ở lại..." / "một số đứa chuyển...") — 2 câu song
+    # song cạnh nhau khiến model TTS dễ kẹt lặp; tách riêng sẽ hết.
+    def _first_words(s, n=3):
+        return tuple(s.split()[:n])
+
+    def _is_parallel(prev, cur):
+        prev_last = prev.rstrip().rsplit(".", 1)[-1] if "." in prev else prev
+        prev_sents = [s for s in prev.split(". ") if s]
+        cur_sents = [s for s in cur.split(". ") if s]
+        if not prev_sents or not cur_sents:
+            return False
+        p = _first_words(prev_sents[-1])
+        c = _first_words(cur_sents[0])
+        return len(p) >= 2 and len(c) >= 2 and p[0] == c[0] and (p[1] == c[1] or p[1] in c)
+
+    merged = []
+    for text, para_end in chunks:
+        if merged and len(merged[-1][0]) + len(text) + 1 <= max_chars \
+                and not _is_parallel(merged[-1][0], text):
+            prev_text, prev_para = merged[-1]
+            merged[-1] = (prev_text + " " + text, para_end or prev_para)
+        else:
+            merged.append((text, para_end))
+    chunks = merged
 
     return chunks
 
@@ -481,7 +680,8 @@ def _get_voice_gender(ref_path: str) -> str:
 
 
 def generate_chunk_audio(tts, voice_name, chunk, chunk_idx, total_chunks,
-                         temperature=0.7, top_k=20):
+                         temperature=0.7, top_k=20, repetition_penalty=1.5,
+                         top_p=0.95):
     """Generate audio cho 1 chunk với retry logic."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -490,9 +690,11 @@ def generate_chunk_audio(tts, voice_name, chunk, chunk_idx, total_chunks,
                 chunk,
                 voice=voice_name,
                 style="doc_truyen",
-                max_chars=MAX_CHARS + 64,
+                max_chars=TTS_MAX_CHARS,
                 temperature=temperature,
                 top_k=top_k,
+                repetition_penalty=repetition_penalty,
+                top_p=top_p,
                 apply_watermark=False,
             )
             elapsed = time.time() - t0
@@ -512,13 +714,16 @@ def generate_chunk_audio(tts, voice_name, chunk, chunk_idx, total_chunks,
                 raise
 
 
-def _audio_cache_signature(chunk: str, voice_name: str, temperature: float, top_k: int) -> str:
+def _audio_cache_signature(chunk: str, voice_name: str, temperature: float, top_k: int,
+                           repetition_penalty: float = 1.5, top_p: float = 0.95) -> str:
     payload = json.dumps({
         "chunk": chunk,
         "voice": voice_name,
         "temperature": temperature,
         "top_k": top_k,
-        "max_chars": MAX_CHARS,
+        "repetition_penalty": repetition_penalty,
+        "top_p": top_p,
+        "max_chars": TTS_MAX_CHARS,
         "sample_rate": SAMPLE_RATE,
     }, ensure_ascii=False, sort_keys=True).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
@@ -552,7 +757,8 @@ def _save_audio_cache(path: str, audio, signature: str) -> None:
 
 
 def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7,
-                           top_k=20, chunk_dir=None, force=False):
+                           top_k=20, chunk_dir=None, force=False,
+                           repetition_penalty=1.5, top_p=0.95):
     """Generate audio cho 1 chapter với cache kiểm tra được tham số."""
     raw_chunks = []
     total_gen_time = 0
@@ -561,7 +767,8 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
     for i, (chunk, ends_para) in enumerate(chunks):
         if chunk_dir and not force:
             chunk_wav = os.path.join(chunk_dir, f"{i:04d}.wav")
-            signature = _audio_cache_signature(chunk, voice_name, temperature, top_k)
+            signature = _audio_cache_signature(chunk, voice_name, temperature, top_k,
+                                               repetition_penalty, top_p)
             audio = _load_cached_audio(chunk_wav, chunk_wav + ".sig", signature)
             if audio is not None:
                 print(f"      [{i+1:3d}/{len(chunks)}] ⏭  dùng lại cache")
@@ -569,25 +776,32 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
                 continue
 
         audio, elapsed = generate_chunk_audio(
-            tts, voice_name, chunk, i, len(chunks), temperature, top_k)
+            tts, voice_name, chunk, i, len(chunks), temperature, top_k,
+            repetition_penalty, top_p)
         total_gen_time += elapsed
 
         if chunk_dir:
             _save_audio_cache(
                 os.path.join(chunk_dir, f"{i:04d}.wav"), audio,
-                _audio_cache_signature(chunk, voice_name, temperature, top_k))
+                _audio_cache_signature(chunk, voice_name, temperature, top_k,
+                                       repetition_penalty, top_p))
 
         raw_chunks.append(audio)
 
-    # 2. Ghép: chèn silence GIỮA các chunk, + silence cuối chapter
+    # 2. Ghép: fade ngắn ở 2 đầu mỗi chunk (chống click), chèn silence theo loại
+    #    ranh giới thật: hết câu/ngắt đoạn (dài) > cắt giữa câu (ngắn, gần như liền).
     combined = []
     for i, audio in enumerate(raw_chunks):
+        # Fade out 2-3ms cuối + fade in 2-3ms đầu của chunk → âm kết thúc về 0
+        # trước khi gặp silence → hết "click"/"pop" tại chỗ nối (không ảnh hưởng cảm nhận).
+        audio = _edge_fade(audio, CROSSFADE_MS)
         combined.append(audio)
         if i < len(raw_chunks) - 1:
             chunk_text = chunks[i][0]
             ends_para = chunks[i][1]
-            is_para_end = ends_para or chunk_text.rstrip().endswith((".", "!", "?", '"', "…"))
-            silence_dur = SILENCE_PARA if is_para_end else SILENCE_BETWEEN
+            # Ngắt đoạn (heading/end) hoặc hết câu → nghỉ dài; cắt giữa câu → nghỉ ngắn
+            is_sentence_end = ends_para or chunk_text.rstrip().endswith((".", "!", "?", '"', "…"))
+            silence_dur = SILENCE_PARA if is_sentence_end else SILENCE_BETWEEN
             combined.append(make_silence(silence_dur))
     # Silence cuối chapter (tránh chuyển chapter đột ngột)
     combined.append(make_silence(SILENCE_CHAPTER_END))
@@ -614,6 +828,14 @@ def _find_ffmpeg() -> str | None:
     return None
 
 
+def _subprocess_kwargs() -> dict:
+    """Kwargs cho subprocess: ẩn cửa sổ console trên Windows (tránh bật PowerShell khi chạy ffmpeg)."""
+    kwargs = {"capture_output": True, "text": True}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+    return kwargs
+
+
 def convert_to_mp3(wav_path: str, keep_wav: bool = False, bitrate: str = "128k",
                    title: str = None, album: str = None) -> str | None:
     """Convert WAV → MP3 bằng ffmpeg nếu có. Trả về mp3 path hoặc None."""
@@ -624,14 +846,14 @@ def convert_to_mp3(wav_path: str, keep_wav: bool = False, bitrate: str = "128k",
 
     mp3_path = wav_path.rsplit(".", 1)[0] + ".mp3"
     try:
-        import subprocess
         cmd = [ffmpeg, "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-b:a", bitrate]
         if title:
             cmd += ["-metadata", f"title={title}"]
         if album:
             cmd += ["-metadata", f"album={album}"]
         cmd.append(mp3_path)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, encoding="utf-8", errors="replace")
+        result = subprocess.run(cmd, timeout=300, encoding="utf-8", errors="replace",
+                                **_subprocess_kwargs())
         if result.returncode != 0:
             print(f"   ⚠️  ffmpeg lỗi (exit {result.returncode}): {result.stderr[:200]}")
             return None
@@ -689,16 +911,19 @@ def _file_sha256(path: str) -> str:
 
 
 def audio_progress_metadata(voice: str, temperature: float, top_k: int,
-                            bitrate: str, source_fingerprint: str) -> dict:
+                            bitrate: str, source_fingerprint: str,
+                            repetition_penalty: float = 1.5, top_p: float = 0.95) -> dict:
     return {
         "voice": voice,
         "temperature": temperature,
         "top_k": top_k,
+        "repetition_penalty": repetition_penalty,
+        "top_p": top_p,
         "bitrate": bitrate,
         "source_fingerprint": source_fingerprint,
         "max_chars": MAX_CHARS,
         "sample_rate": SAMPLE_RATE,
-        "pipeline_version": 3,
+        "pipeline_version": 4,
     }
 
 
@@ -736,12 +961,12 @@ def _chapter_chunk_dir(slug: str, chapter_num: int) -> str:
     return d
 
 
-def merge_all_chapters(slug: str, out_dir: str, chapters: list):
+def merge_all_chapters(slug: str, out_dir: str, chapters: list, bitrate: str = "128k"):
     """Nối tất cả chapter MP3/WAV thành 1 file hoàn chỉnh.
 
-    Ưu tiên dùng ffmpeg (nối MP3). Nếu không có ffmpeg, nối WAV bằng numpy.
+    Ưu tiên dùng ffmpeg (nối MP3, RE-ENCODE để timestamp liên tục).
+    Nếu không có ffmpeg, nối WAV bằng numpy.
     """
-    import subprocess
 
     # Tìm tất cả file chapter đã tạo, sắp xếp theo số thứ tự
     mp3_files = []
@@ -767,7 +992,9 @@ def merge_all_chapters(slug: str, out_dir: str, chapters: list):
         print("   ⚠️  Không tìm thấy file chapter nào để merge")
         return
 
-    # Ưu tiên merge MP3 bằng ffmpeg
+    # Ưu tiên merge MP3 bằng ffmpeg — RE-ENCODE (không -c copy) để chuẩn hoá
+    # sample-rate/bitrate giữa các chapter → timestamp liên tục, player không
+    # nhảy sai thời điểm; aresample=async=1 ép đúng tốc độ khi có chênh lệch.
     if mp3_files:
         ffmpeg = _find_ffmpeg()
         if not ffmpeg:
@@ -780,13 +1007,19 @@ def merge_all_chapters(slug: str, out_dir: str, chapters: list):
                 # ffmpeg concat demuxer cần path escaped
                 safe = mp3.replace("\\", "/").replace("'", "'\\''")
                 f.write(f"file '{safe}'\n")
+        # Re-encode: -ar 48000 -ac 1 chuẩn hoá mọi chapter về cùng format
+        # (tránh bitrate/sample-rate khác nhau làm ngắt quãng khi ghép).
         cmd = [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", concat_list,
-               "-codec:a", "copy", merged_path]
+               "-ar", "48000", "-ac", "1",
+               "-af", "aresample=async=1:first_pts=0",
+               "-codec:a", "libmp3lame", "-b:a", bitrate,
+               "-metadata", f"title={slug}", "-metadata", f"album={slug}",
+               merged_path]
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(cmd, timeout=600, **_subprocess_kwargs())
             if result.returncode == 0 and os.path.exists(merged_path):
                 size_mb = os.path.getsize(merged_path) / 1024 / 1024
-                print(f"   ✅ Merge: {merged_path} ({size_mb:.1f} MB, {len(mp3_files)} chapters)")
+                print(f"   ✅ Merge: {merged_path} ({size_mb:.1f} MB, {len(mp3_files)} chapters, re-encoded {bitrate})")
             else:
                 print(f"   ⚠️  ffmpeg merge lỗi: {result.stderr[:200]}")
         except Exception as e:
@@ -828,12 +1061,23 @@ def main():
     parser.add_argument("--voice", default=None, help="Tên voice đã lưu (vd: van_tinh). Mặc định dùng active")
     parser.add_argument("--temperature", type=float, default=0.7, help="Nhiệt độ TTS (default: 0.7)")
     parser.add_argument("--top-k", type=int, default=20, help="Top-k sampling (default: 20)")
+    parser.add_argument("--repetition-penalty", type=float, default=1.5,
+                        help="Repetition penalty (default: 1.5, cao hơn = ít lặp từ/câu hơn)")
+    parser.add_argument("--top-p", type=float, default=0.95,
+                        help="Top-p nucleus sampling (default: 0.95)")
     parser.add_argument("--bitrate", default="128k", help="Bitrate MP3 (default: 128k, có thể dùng 64k)")
     parser.add_argument("--read-titles", action="store_true", default=True,
                         help="Đọc tên chapter đầu mỗi chương (default: bật)")
     parser.add_argument("--no-read-titles", action="store_false", dest="read_titles",
                         help="Không đọc tên chapter")
+    parser.add_argument("--pronounce-json", default=None,
+                        help="JSON từ điển phát âm ngoại lệ {'từ': 'cách đọc'} (merge lên mặc định)")
+    parser.add_argument("--keep-chunks", action="store_true",
+                        help="Giữ cache WAV từng chunk sau khi chapter xong (phục vụ phân tích lặp)")
     args = parser.parse_args()
+
+    if args.pronounce_json:
+        load_pronounce_dict(args.pronounce_json)
 
     # 1. Find -vi.md
     vi_md, slug = find_vi_md(args.slug)
@@ -878,8 +1122,9 @@ def main():
 
         print("🎵 Generating...")
         t0 = time.time()
-        audio = tts.infer(passage, voice=voice_name, style="doc_truyen", max_chars=MAX_CHARS + 64,
+        audio = tts.infer(passage, voice=voice_name, style="doc_truyen", max_chars=TTS_MAX_CHARS,
                           temperature=args.temperature, top_k=args.top_k,
+                          repetition_penalty=args.repetition_penalty, top_p=args.top_p,
                           apply_watermark=False)
         elapsed = time.time() - t0
         audio = audio.squeeze()
@@ -969,7 +1214,8 @@ def main():
     current_metadata = audio_progress_metadata(
         args.voice or os.path.basename(ref_path),
         args.temperature, args.top_k, args.bitrate,
-        source_fingerprint)
+        source_fingerprint,
+        args.repetition_penalty, args.top_p)
     old_metadata = progress.get("audio_metadata")
     metadata_changed = bool(completed and old_metadata != current_metadata)
     if metadata_changed:
@@ -1034,7 +1280,8 @@ def main():
             audio, gen_time = generate_chapter_audio(
                 tts, voice_name, chunks, num,
                 temperature=args.temperature, top_k=args.top_k,
-                chunk_dir=chunk_dir, force=args.force)
+                chunk_dir=chunk_dir, force=args.force,
+                repetition_penalty=args.repetition_penalty, top_p=args.top_p)
         except Exception as e:
             print(f"   ❌ Failed at chapter {num}: {e}")
             print(f"   💾 Progress saved (chunk cache giữ lại để resume). Run again to resume.")
@@ -1061,8 +1308,8 @@ def main():
         gen_this_run += gen_time
         audio_this_run += wav_duration
 
-        # Dọn chunk cache sau khi chapter hoàn thành
-        if os.path.isdir(chunk_dir):
+        # Dọn chunk cache sau khi chapter hoàn thành (trừ khi --keep-chunks để phân tích)
+        if os.path.isdir(chunk_dir) and not args.keep_chunks:
             shutil.rmtree(chunk_dir, ignore_errors=True)
 
         # ETA dựa trên chapters đã xong TRONG lần chạy này (chính xác hơn)
@@ -1103,7 +1350,7 @@ def main():
     # 7. Merge all chapters nếu --merge
     if args.merge:
         print(f"\n🔗 Merging chapters...")
-        merge_all_chapters(slug, out_dir, chapters)
+        merge_all_chapters(slug, out_dir, chapters, bitrate=args.bitrate)
 
 
 if __name__ == "__main__":
