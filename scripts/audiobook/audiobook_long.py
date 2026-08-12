@@ -27,6 +27,12 @@ import sys, os, re, time, argparse, json, shutil, hashlib, subprocess
 import numpy as np
 import soundfile as sf
 
+# scipy dùng cho fftconvolve (làm mượt envelope nhạc nền nhanh hơn np.convolve)
+try:
+    from scipy.signal import fftconvolve
+except ImportError:
+    fftconvolve = None
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,6 +48,16 @@ MAX_RETRIES = 3          # retries per chunk on TTS failure
 FADE_MS = 10             # fade in/out ở đầu/cuối chapter (tránh click khi start/stop)
 CROSSFADE_MS = 15        # fade out/in nhẹ ở 2 đầu mỗi chunk trước khi chèn silence (chống click tại chỗ nối)
 NORM_MASTER = 0.92       # normalize toàn chapter
+
+# Nhạc nền (music bed) — trộn DƯỚI giọng đọc
+MUSIC_DIR = os.path.join(PROJECT_ROOT, "core", "music")
+MUSIC_VOLUME_DEFAULT = 0.12      # volume nhạc nền trung bình (tỷ lệ với giọng full-scale)
+MUSIC_MIN_RATIO = 0.50           # khi giọng đọc: nhạc = volume * 0.5 (vd volume 0.2 → 10%)
+MUSIC_MAX_RATIO = 1.0            # khi giọng nghỉ: nhạc = volume * 1.0 (vd volume 0.2 → 20%)
+MUSIC_ENV_MS = 150               # làm mượt envelope (ms) — phản hồi nhanh, tự nhiên
+MUSIC_CROSSFADE_MS = 6000        # crossfade tại điểm nối loop nhạc (tránh "click")
+MUSIC_RISE_CAP_S = 1.2           # giới hạn thời gian nhạc "thở" lên khi giọng nghỉ (tránh nổi lâu)
+MUSIC_TARGET_RMS = 0.18          # loudness chuẩn của nhạc nền sau normalize (mọi bài về cùng mức)
 
 
 def _normalize(audio, target=NORM_MASTER):
@@ -80,6 +96,201 @@ def _edge_fade(audio, fade_ms=CROSSFADE_MS):
     audio[:n] *= fade_in
     audio[-n:] *= fade_out
     return audio
+
+
+def list_music_files():
+    """Liệt kê file nhạc nền (mp3/wav) trong core/music/, sắp theo tên."""
+    if not os.path.isdir(MUSIC_DIR):
+        return []
+    exts = (".mp3", ".wav", ".m4a", ".flac", ".ogg")
+    files = [f for f in os.listdir(MUSIC_DIR)
+             if os.path.splitext(f)[1].lower() in exts]
+    return sorted(files)
+
+
+def _resample(x, src_sr, dst_sr=SAMPLE_RATE):
+    """Resample 1D float array về dst_sr bằng nội suy tuyến tính (đủ tốt cho nhạc nền)."""
+    if src_sr == dst_sr or len(x) == 0:
+        return x
+    n = int(len(x) * dst_sr / src_sr)
+    if n <= 1:
+        return x[:1]
+    return np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x).astype(np.float32)
+
+
+def _loop_with_crossfade(music, total_samples):
+    """Lặp nhạc cho đủ total_samples với crossfade mềm tại điểm nối.
+
+    Tránh tiếng "click"/nhảy nhịp khi file nhạc ngắn hơn chapter và phải loop.
+    """
+    n = len(music)
+    if n <= 0:
+        return np.zeros(total_samples, dtype=np.float32)
+    if total_samples <= n:
+        return music[:total_samples]
+
+    fade = int(SAMPLE_RATE * MUSIC_CROSSFADE_MS / 1000)
+    fade = min(fade, n // 4)
+
+    # Phần đầu/cuối dùng để crossfade: fade-out cuối + fade-in đầu
+    tail = music[-fade:].copy()
+    head = music[:fade].copy()
+    ramp = np.linspace(0, 1, fade, dtype=np.float32)
+    tail *= (1 - ramp)          # giảm dần về 0
+    head *= ramp                # tăng dần từ 0
+
+    # Chuẩn bị "vòng" nhạc: [tail (giảm) + head (tăng)] là phần nối mượt
+    # Đơn giản hoá: nối chuỗi music liên tục, chèn crossfade ở ranh giới.
+    out = np.zeros(total_samples, dtype=np.float32)
+    pos = 0
+    # Luôn phát trọn lần đầu từ đầu file (intro tự nhiên)
+    while pos < total_samples:
+        take = min(n, total_samples - pos)
+        out[pos:pos + take] = music[:take]
+        pos += take
+        if pos >= total_samples:
+            break
+        # Tại điểm nối: áp crossfade — dùng bản music có tail/head đã chuẩn bị
+        # Thay vì nối cứng, ta dùng phương pháp: phần fade-out cuối + fade-in đầu
+        # đã được nhân sẵn → ghép vào là hết click.
+        take = min(fade, total_samples - pos)
+        if take > 0:
+            out[pos:pos + take] = tail[:take]
+        pos += take
+        take = min(fade, total_samples - pos)
+        if take > 0:
+            out[pos:pos + take] = head[:take]
+        pos += take
+    return out
+
+
+def mix_music_bed(voice, music_path, volume=MUSIC_VOLUME_DEFAULT,
+                  min_ratio=MUSIC_MIN_RATIO, max_ratio=MUSIC_MAX_RATIO,
+                  chapter_num=None, music_list=None):
+    """Trộn nhạc nền DƯỚI giọng đọc (music bed) với ducking theo độ to giọng.
+
+    - Nhạc tự "thở": dịu xuống khi giọng đọc, lên nhẹ khi giọng nghỉ.
+    - Loop nhạc (nếu ngắn hơn chapter) bằng crossfade mềm — không click.
+    - Giới hạn thời gian nhạc nổi lên (MUSIC_RISE_CAP_S) tránh nổi lâu khó chịu.
+    - Trả về (mixed_audio, music_file_used).
+    """
+    if not music_path or not os.path.exists(music_path):
+        return voice, None
+    if len(voice) == 0:
+        return voice, None
+
+    sr = SAMPLE_RATE
+    dur = len(voice)
+
+    # 1. Load nhạc
+    try:
+        if music_path.lower().endswith(".mp3"):
+            # Decode MP3 → WAV qua ffmpeg (tránh phụ thuộc thư viện decode MP3)
+            import tempfile
+            ffmpeg = None
+            for cand in [shutil.which("ffmpeg"),
+                         os.path.join(PROJECT_ROOT, "tools", "ffmpeg", "ffmpeg.exe"),
+                         os.path.join(PROJECT_ROOT, "tools", "ffmpeg", "bin", "ffmpeg.exe")]:
+                if cand and os.path.exists(cand):
+                    ffmpeg = cand
+                    break
+            if not ffmpeg:
+                print("   ⚠️  Không tìm thấy ffmpeg để đọc MP3 nhạc nền — bỏ qua nhạc.")
+                return voice, None
+            tmp_wav = os.path.join(tempfile.gettempdir(), f"bgm_{os.getpid()}.wav")
+            proc = subprocess.run(
+                [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", music_path,
+                 "-ar", str(sr), "-ac", "1", tmp_wav],
+                capture_output=True, check=False,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+            if proc.returncode != 0 or not os.path.exists(tmp_wav):
+                print("   ⚠️  ffmpeg không decode được nhạc nền — bỏ qua nhạc.")
+                return voice, None
+            music, msr = sf.read(tmp_wav, dtype="float32")
+            try:
+                os.remove(tmp_wav)
+            except OSError:
+                pass
+        else:
+            music, msr = sf.read(music_path, dtype="float32")
+        if music.ndim > 1:
+            music = music.mean(axis=1)
+        if len(music) == 0:
+            return voice, None
+        music = _resample(music, msr)
+    except Exception as e:
+        print(f"   ⚠️  Lỗi load nhạc nền ({e}) — bỏ qua nhạc.")
+        return voice, None
+
+    # 2. Loudness normalization: đo RMS cả bài rồi scale về mức chuẩn.
+    #    Các file nhạc master to/nhỏ khác nhau → đưa về cùng độ to để volume
+    #    10%/20% nghe đồng đều giữa các chương (bài nào cũng như bài nào).
+    cur_rms = float(np.sqrt(np.mean(music.astype(np.float64) ** 2) + 1e-12))
+    if cur_rms > 1e-6:
+        gain = MUSIC_TARGET_RMS / cur_rms
+        # Giới hạn gain để không khuếch đại bài quá nhỏ thành méo/vỡ
+        gain = min(gain, 4.0)
+        music = (music * gain).astype(np.float32)
+
+    # 3. Loop nhạc cho đủ dài chapter (crossfade mềm tại nối)
+    music_loop = _loop_with_crossfade(music, dur)
+
+    # 4. Envelope ducking: RMS khung 40ms của giọng → volume nhạc
+    win = int(0.04 * sr)
+    hop = int(0.02 * sr)
+    n_frames = max(1, (dur - win) // hop + 1)
+    idx = np.arange(n_frames)[:, None] * hop + np.arange(win)
+    idx = np.minimum(idx, dur - 1)
+    frames = voice[idx].astype(np.float64)
+    rms = np.sqrt(np.mean(frames ** 2, axis=1) + 1e-12)
+    thr = np.percentile(rms, 15)
+    peak = np.percentile(rms, 99)
+    v = np.clip((rms - thr) / (peak - thr + 1e-9), 0, 1)
+
+    # duck: 1 khi giọng nghỉ, 0 khi giọng đọc
+    duck = 1.0 - v
+    # làm phẳng: nhạc dao động nhẹ nhàng (không tắt hẳn)
+    duck_smooth = 0.25 * duck + 0.75
+    # Biên độ NHẠC NỀN thực tế = volume * tỷ lệ (volume là mức trung bình, tỷ lệ là dao động)
+    amp_ratio = min_ratio + (max_ratio - min_ratio) * duck_smooth * duck
+    amp = volume * amp_ratio
+
+    # 4. Giới hạn thời gian nhạc "thở" lên: sau khi nghỉ quá lâu thì tự dịu lại
+    #    (tránh nhạc nổi liên tục ở chương ít lời)
+    rise_cap = int(MUSIC_RISE_CAP_S / (hop / sr))
+    rise = np.where(duck > 0.5, 1.0, 0.0).astype(np.float32)
+    # Chỉ cho phép "nổi" tối đa rise_cap frame liên tiếp
+    counter = np.zeros_like(rise)
+    cnt = 0
+    for i in range(len(rise)):
+        if rise[i] == 1.0:
+            cnt += 1
+            if cnt > rise_cap:
+                rise[i] = 0.0
+        else:
+            cnt = 0
+    # Nhạc chỉ nổi ở đoạn đầu của khoảng nghỉ
+    amp_rise = np.where(rise > 0.5, 1.0, 0.0)
+    amp = volume * (min_ratio + (max_ratio - min_ratio) * duck_smooth * amp_rise)
+
+    # 5. Up-sample envelope về sample rate + làm mượt (fftconvolve nhanh)
+    amp_up = np.interp(np.arange(dur), np.arange(len(amp)) * hop, amp).astype(np.float32)
+    k = max(1, int(sr * MUSIC_ENV_MS / 1000))
+    kernel = np.ones(k, dtype=np.float32) / k
+    if fftconvolve is not None:
+        amp_smooth = fftconvolve(amp_up, kernel, mode="same").astype(np.float32)
+    else:
+        amp_smooth = np.convolve(amp_up, kernel, mode="same").astype(np.float32)
+
+    # 6. Trộn: nhạc * envelope + giọng, chống clip, giữ độ to giọng
+    music_bed = music_loop * amp_smooth
+    mixed = voice + music_bed
+    voice_peak = np.max(np.abs(voice)) + 1e-9
+    mix_peak = np.max(np.abs(mixed)) + 1e-9
+    if mix_peak > voice_peak:
+        mixed = mixed / mix_peak * voice_peak * 0.97
+
+    return mixed, os.path.basename(music_path)
 
 
 def find_vi_md(slug: str = None) -> tuple:
@@ -912,7 +1123,8 @@ def _file_sha256(path: str) -> str:
 
 def audio_progress_metadata(voice: str, temperature: float, top_k: int,
                             bitrate: str, source_fingerprint: str,
-                            repetition_penalty: float = 1.5, top_p: float = 0.95) -> dict:
+                            repetition_penalty: float = 1.5, top_p: float = 0.95,
+                            music_files: list = None, music_volume: float = None) -> dict:
     return {
         "voice": voice,
         "temperature": temperature,
@@ -923,7 +1135,9 @@ def audio_progress_metadata(voice: str, temperature: float, top_k: int,
         "source_fingerprint": source_fingerprint,
         "max_chars": MAX_CHARS,
         "sample_rate": SAMPLE_RATE,
-        "pipeline_version": 4,
+        "pipeline_version": 5,
+        "music_files": music_files or [],
+        "music_volume": music_volume,
     }
 
 
@@ -1074,6 +1288,12 @@ def main():
                         help="JSON từ điển phát âm ngoại lệ {'từ': 'cách đọc'} (merge lên mặc định)")
     parser.add_argument("--keep-chunks", action="store_true",
                         help="Giữ cache WAV từng chunk sau khi chapter xong (phục vụ phân tích lặp)")
+    parser.add_argument("--music", nargs="?", const="auto", default=None, metavar="FILE",
+                        help="Trộn nhạc nền DƯỚI giọng đọc. Truyền tên file trong core/music/ "
+                             "(vd: --music sach_ke_chuyen_lofi.mp3), 'auto' = chọn file có sẵn, "
+                             "nhiều file cách dấu phẩy để xoay theo chương. Mặc định tắt.")
+    parser.add_argument("--music-volume", type=float, default=None,
+                        help=f"Volume nhạc nền trung bình 0..1 (default: {MUSIC_VOLUME_DEFAULT})")
     args = parser.parse_args()
 
     if args.pronounce_json:
@@ -1157,6 +1377,32 @@ def main():
     out_dir = os.path.join(PROJECT_ROOT, "output", "books", slug, "audiobook")
     os.makedirs(out_dir, exist_ok=True)
 
+    # Nhạc nền (music bed): resolve danh sách file dùng cho các chapter
+    music_files = []
+    music_volume = args.music_volume if args.music_volume is not None else MUSIC_VOLUME_DEFAULT
+    if args.music:
+        avail = list_music_files()
+        if not avail:
+            print("   ⚠️  core/music/ trống — tắt nhạc nền (đặt file .mp3/.wav vào core/music/)")
+        else:
+            if args.music == "auto":
+                # auto: chọn file đầu tiên (hoặc xoay nếu dùng --music "auto,auto")
+                music_files = [avail[0]]
+            else:
+                # Dùng tên file chỉ định, cho phép nhiều file cách dấu phẩy
+                for name in [s.strip() for s in args.music.split(",") if s.strip()]:
+                    if name == "auto":
+                        pick = avail[len(music_files) % len(avail)]
+                        music_files.append(pick)
+                    elif name in avail:
+                        music_files.append(name)
+                    else:
+                        print(f"   ⚠️  Không tìm thấy nhạc '{name}' trong core/music/ — bỏ qua")
+            if music_files:
+                print(f"🎵 Nhạc nền: {', '.join(music_files)} (volume {music_volume:.0%}, xoay theo chương)")
+            else:
+                print("   ⚠️  Không có nhạc nền hợp lệ — tắt")
+
     # 3. Load progress
     progress = load_progress(slug)
     completed = set(progress.get("completed_chapters", []))
@@ -1215,7 +1461,8 @@ def main():
         args.voice or os.path.basename(ref_path),
         args.temperature, args.top_k, args.bitrate,
         source_fingerprint,
-        args.repetition_penalty, args.top_p)
+        args.repetition_penalty, args.top_p,
+        music_files=music_files, music_volume=music_volume)
     old_metadata = progress.get("audio_metadata")
     metadata_changed = bool(completed and old_metadata != current_metadata)
     if metadata_changed:
@@ -1287,6 +1534,15 @@ def main():
             print(f"   💾 Progress saved (chunk cache giữ lại để resume). Run again to resume.")
             save_progress(slug, progress)
             return
+
+        # Trộn nhạc nền DƯỚI giọng đọc (music bed) nếu có
+        if music_files:
+            music_name = music_files[(num - 1) % len(music_files)]
+            music_path = os.path.join(MUSIC_DIR, music_name)
+            audio, used = mix_music_bed(audio, music_path, volume=music_volume,
+                                        chapter_num=num, music_list=music_files)
+            if used:
+                print(f"   🎵 Nhạc nền: {used} (chapter {num})")
 
         # Save WAV
         wav_path = os.path.join(out_dir, f"ch{num:02d}.wav")
