@@ -44,6 +44,24 @@
                     <ui:Button x:Name="BtnSearchPrev" Content="Trước" Icon="{ui:SymbolIcon ChevronUp24}"
                                Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click"
                                ToolTip="Tìm chuỗi trước đó"/>
+
+                    <!-- Nhạc nền -->
+                    <Border Grid.Column="0" Background="{DynamicResource ControlFillColorTertiaryBrush}"
+                            CornerRadius="6" Padding="8,2" Margin="16,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:Button x:Name="BtnMusicToggle" Content="Nhạc nền: Tắt" Icon="{ui:SymbolIcon MusicNote24}"
+                                       Height="32" Margin="0,0,8,0" Click="BtnMusicToggle_Click"
+                                       ToolTip="Bật / tắt nhạc nền khi đọc"/>
+                            <ComboBox x:Name="MusicSelect" Width="160" Height="32" VerticalAlignment="Center"
+                                      Margin="0,0,8,0" SelectionChanged="MusicSelect_SelectionChanged"
+                                      ToolTip="Chọn bản nhạc nền"/>
+                            <TextBlock x:Name="MusicVolLabel" Text="Nhạc" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <Slider x:Name="MusicVolumeSlider" Width="80" Minimum="0" Maximum="1" Value="0.15"
+                                    VerticalAlignment="Center" ValueChanged="MusicVolumeSlider_ValueChanged"
+                                    ToolTip="Volume nhạc nền"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Border>

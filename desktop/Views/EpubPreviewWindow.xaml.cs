@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Controls;
 using TranslateBook.Models;
+using TranslateBook.Services;
 using VersOne.Epub;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -33,6 +34,16 @@ namespace TranslateBook.Views
         private List<string> _audioFiles = new();
         private int _currentTrackIndex = -1;
         private bool _isDraggingSlider = false;
+
+        // Background music (demo)
+        private readonly List<string> _musicFiles = new();
+        private MediaPlayer? _musicPlayer;
+        private bool _musicEnabled = false;
+        private double _musicVolume = 0.15;
+        private bool _musicDucking = false;
+        private const double MusicNormalVolume = 0.15;
+        private const double MusicDuckedVolume = 0.05;
+        private static readonly string MusicDir = Path.Combine(ProjectHelper.FindProjectRoot(), "core", "music");
 
         // Search state
         private bool _isSearchHighlightActive = false;
@@ -158,6 +169,7 @@ namespace TranslateBook.Views
                 core.Navigate($"https://translatebook.local/fullbook.html");
 
                 InitAudioPlayer();
+                InitMusicPlayer();
             }
             catch (Exception ex)
             {
@@ -962,6 +974,8 @@ namespace TranslateBook.Views
                 _timer.Start();
                 BtnAudioPlay.Content = "\uE769"; // Pause icon
             }
+
+            ApplyMusicDucking();
         }
 
         private void BtnAudioPrev_Click(object? sender, RoutedEventArgs e)
@@ -1009,10 +1023,117 @@ namespace TranslateBook.Views
                 AudioTimeCurrent.Text = TimeSpan.FromSeconds(AudioSlider.Value).ToString(@"mm\:ss");
         }
 
+        // --- Background music (demo) ---
+
+        private void InitMusicPlayer()
+        {
+            try
+            {
+                _musicFiles.Clear();
+                if (Directory.Exists(MusicDir))
+                {
+                    _musicFiles.AddRange(Directory.GetFiles(MusicDir, "*.wav")
+                        .Concat(Directory.GetFiles(MusicDir, "*.mp3"))
+                        .OrderBy(f => f));
+                }
+
+                MusicSelect.Items.Clear();
+                foreach (var f in _musicFiles)
+                    MusicSelect.Items.Add(Path.GetFileNameWithoutExtension(f));
+
+                if (_musicFiles.Count == 0)
+                {
+                    BtnMusicToggle.IsEnabled = false;
+                    MusicSelect.IsEnabled = false;
+                    MusicVolumeSlider.IsEnabled = false;
+                    return;
+                }
+
+                _musicPlayer = new MediaPlayer();
+                _musicPlayer.MediaEnded += MusicPlayer_MediaEnded;
+
+                if (MusicSelect.Items.Count > 0)
+                    MusicSelect.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Music init error: {ex.Message}");
+            }
+        }
+
+        private void MusicSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (MusicSelect.SelectedIndex < 0 || MusicSelect.SelectedIndex >= _musicFiles.Count) return;
+            if (_musicPlayer == null) return;
+
+            try
+            {
+                _musicPlayer.Open(new Uri(_musicFiles[MusicSelect.SelectedIndex]));
+                if (_musicEnabled && _mediaPlayer != null && _timer != null && !_timer.IsEnabled)
+                    _musicPlayer.Play();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Music load error: {ex.Message}");
+            }
+        }
+
+        private void MusicPlayer_MediaEnded(object? sender, EventArgs e)
+        {
+            // Loop the track
+            if (_musicPlayer != null && _musicPlayer.Source != null)
+                _musicPlayer.Position = TimeSpan.Zero;
+        }
+
+        private void BtnMusicToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_musicPlayer == null) return;
+
+            _musicEnabled = !_musicEnabled;
+            if (_musicEnabled)
+            {
+                if (_musicPlayer.Source == null && MusicSelect.SelectedIndex >= 0)
+                    _musicPlayer.Open(new Uri(_musicFiles[MusicSelect.SelectedIndex]));
+                _musicPlayer.Play();
+                BtnMusicToggle.Content = "Nhạc nền: Bật";
+                BtnMusicToggle.ToolTip = "Tắt nhạc nền khi đọc";
+            }
+            else
+            {
+                _musicPlayer.Stop();
+                BtnMusicToggle.Content = "Nhạc nền: Tắt";
+                BtnMusicToggle.ToolTip = "Bật nhạc nền khi đọc";
+            }
+        }
+
+        private void MusicVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            _musicVolume = MusicVolumeSlider.Value;
+            if (_musicPlayer != null && !_musicDucking)
+                _musicPlayer.Volume = _musicVolume;
+        }
+
+        /// <summary>
+        /// Hạ volume nhạc nền xuống khi audiobook đang phát (ducking),
+        /// khôi phục lại khi tạm dừng hoặc dừng audiobook.
+        /// </summary>
+        private void ApplyMusicDucking()
+        {
+            if (_musicPlayer == null) return;
+
+            bool audioPlaying = _timer?.IsEnabled == true && _mediaPlayer != null;
+            _musicDucking = audioPlaying;
+            if (_musicDucking)
+                _musicPlayer.Volume = MusicDuckedVolume;
+            else
+                _musicPlayer.Volume = _musicVolume;
+        }
+
         private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_mediaPlayer != null)
                 _mediaPlayer.Volume = VolumeSlider.Value;
+            ApplyMusicDucking();
         }
 
         private void EpubPreviewWindow_Closed(object? sender, EventArgs e)
@@ -1028,6 +1149,14 @@ namespace TranslateBook.Views
                     _mediaPlayer.Stop();
                     _mediaPlayer.Close();
                     _mediaPlayer = null;
+                }
+
+                if (_musicPlayer != null)
+                {
+                    _musicPlayer.MediaEnded -= MusicPlayer_MediaEnded;
+                    _musicPlayer.Stop();
+                    _musicPlayer.Close();
+                    _musicPlayer = null;
                 }
 
                 if (Directory.Exists(_tempExtractPath))
