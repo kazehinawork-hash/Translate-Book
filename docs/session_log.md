@@ -533,3 +533,137 @@
 
 ### Git
 - Trên `main`, chưa commit. Dự kiến tách commit: (1) desktop UI nâng cấp, (2) audiobook_long.py, (3) docs. Chờ user duyệt.
+
+## 2026-08-12 — Dịch chunk 20-29 sách qie-yi-qing-shen-gong-bai-tou (Vãn Tình)
+
+### Đã làm
+- Dịch xong chunk 20-29 (10 chunk) của sách tản văn ZH `qie-yi-qing-shen-gong-bai-tou`: đọc glossary, dịch `original_text` dòng-đối-dòng sang tiếng Việt (giữ heading #, ---, ảnh, bỏ ///, dùng glossary Vãn Tình/A Nhan/Lão Ngô/Lão Lý).
+- Cập nhật progress JSON: `translated_text`, `translated_at=2026-07-31T00:00:00`, `word_count_translated` (tính qua split). Giữ nguyên mọi field khác.
+- QA batch: `scripts/qa/batch_qa.py` chạy 10/10 pass (0 lỗi) ngay lần đầu.
+- Complete batch 20-29: `scripts/translate/batch_manifest.py complete --batch-id N`, tất cả status=complete.
+- Tổng từ đã dịch: ~13.898 từ (20:1439, 21:1443, 22:1315, 23:1331, 24:1361, 25:1485, 26:1379, 27:1441, 28:1309, 29:1395).
+
+### File đổi
+- working/progress/qie-yi-qing-shen-gong-bai-tou/chunk_020..029.json (translated_text + word_count_translated + translated_at) — KHÔNG commit (progress)
+- working/progress/qie-yi-qing-shen-gong-bai-tou/batches/batch-020..029.json (status=complete) — KHÔNG commit
+- docs/STATE.md (thêm dòng sách + mục đang làm) — có commit (docs)
+
+### Còn dở
+- Chunk 0-19 và 30-57 chưa dịch (58 chunk tổng). Bước tiếp: dịch các dải còn lại rồi QA → merge → EPUB → audiobook.
+- Verify manifest vẫn báo missing_progress/incomplete cho chunk ngoài dải (đúng, chưa dịch).
+
+### Git
+- Chưa commit. Đề xuất commit docs (STATE.md) sau khi user duyệt.
+## 2026-08-12 — Dịch chunk 10-19 sách qie-yi-qing-shen-gong-bai-tou (Vãn Tình)
+
+### Đã làm
+- Dịch xong chunk 10-19 (10 chunk) của sách tản văn ZH qie-yi-qing-shen-gong-bai-tou: đọc glossary, dịch original_text dòng-đối-dòng sang tiếng Việt (giữ heading #/##, ---, số/Latin, dùng glossary Vãn Tình/A Nhan/Lão Ngô/Lão Lý).
+- Cập nhật progress JSON: 	ranslated_text, 	ranslated_at=2026-07-31T00:00:00, word_count_translated (tính qua split). Giữ nguyên mọi field khác.
+- QA batch: scripts/qa/batch_qa.py chạy 10/10 pass (0 lỗi) ngay lần đầu cho cả dải.
+- Complete batch 10-19: scripts/translate/batch_manifest.py complete --batch-id N, tất cả status=complete.
+- Tổng từ đã dịch: ~13.680 từ (10:1529, 11:1490, 12:1444, 13:1356, 14:1319, 15:1339, 16:1349, 17:1343, 18:1424, 19:1356).
+
+### File đổi
+- working/progress/qie-yi-qing-shen-gong-bai-tou/chunk_010..019.json (translated_text + word_count_translated + translated_at) — KHÔNG commit (progress)
+- working/progress/qie-yi-qing-shen-gong-bai-tou/batches/batch-010..019.json (status=complete) — KHÔNG commit
+- docs/STATE.md (cập nhật mục sách) — có commit (docs)
+
+### Còn dở
+- Chunk 0-9 và 30-57 chưa dịch (58 chunk tổng). Đã dịch: 10-29. Bước tiếp: dịch dải 0-9 và 30-57 rồi QA → merge → EPUB → audiobook.
+- Verify manifest vẫn báo missing_progress/incomplete cho chunk ngoài dải (đúng, chưa dịch).
+
+### Git
+- Chưa commit. Đề xuất commit docs (STATE.md + session_log.md) sau khi user duyệt.
+
+## 2026-08-12 — Dịch chunk 0-9 sách qie-yi-qing-shen-gong-bai-tou (tản văn Vãn Tình)
+
+### Đã làm
+- Claim batch 0-9 (executor-0) bằng batch_manifest.py.
+- Dịch dòng-đối-dòng ZH→VI 10 chunk (0..9): chunk_000..chunk_009.json trong working/progress/qie-yi-qing-shen-gong-bai-tou/.
+- Ghi translated_text + translated_at="2026-07-31T00:00:00" + word_count_translated (json.dumps ensure_ascii=False, indent=2, utf-8).
+- QA batch_qa.py: 10/10 pass (0 lỗi). Full scan 58 chunk chỉ còn lỗi chunk 40-49 (ngoài phạm vi, translated_text rỗng).
+- Mark complete batch 0-9 (status=complete, error="").
+- Nội dung gồm: bìa/CIP, Mục lục, Lời tựa, các bài: Điều bạn mong muốn..., Gả cho ai..., Tôi là chỗ dựa..., Chú chó và tình yêu, Làm người phụ nữ khác trong khác ngoài, Suy ngẫm về tình yêu, Bạn đã thay đổi chưa?, Bạn còn xinh đẹp chứ?, Chuyện phiếm đám cưới, Chi tiết đánh bại tình yêu, Kiến tạo bầu trời xanh biển biếc..., chuyện Hương Thảo.
+- Glossary áp dụng: Vãn Tình/A Nhan/Lão Ngô/Lão Lý (Lão Ngô, Lão Lý chưa xuất hiện trong dải này).
+
+### File đổi
+- working/progress/qie-yi-qing-shen-gong-bai-tou/chunk_000..009.json (dịch, không commit — sản phẩm)
+- working/progress/qie-yi-qing-shen-gong-bai-tou/batches/batch-000..009.json (complete, không commit)
+- docs/STATE.md, docs/session_log.md
+
+### Còn dở
+- Chunk 10-57 chưa dịch (trong đó 40-49 hiện rỗng).
+
+### Git
+- Chưa commit; chỉ docs thay đổi (STATE.md, session_log.md) thuộc phạm vi commit docs.
+
+## 2026-08-12 — Dịch chunk 40-49 sách qie-yi-qing-shen-gong-bai-tou (tản văn Vãn Tình)
+
+### Đã làm
+- Dịch dòng-đối-dòng ZH→VI 10 chunk (40..49): chunk_040..chunk_049.json trong working/progress/qie-yi-qing-shen-gong-bai-tou/ (translated_text lúc đầu đều rỗng).
+- Ghi translated_text + translated_at="2026-07-31T00:00:00" + word_count_translated (đếm qua split whitespace). Giữ nguyên mọi field khác (chunk_id, total_chunks, chapter, source_text, original_text, pinyin_text, word_count_source, mode). Ghi qua Edit tool, không dùng shell.
+- Glossary áp dụng: Vãn Tình/A Nhan (bắt buộc). Tên riêng khác dịch ổn định: Trần Đạo Minh, Triệu Nhã Chi, Lâm Chí Linh, Tiêu Khương, Mã Y, Văn Chương, A Ngốc (thú cưng).
+- Nội dung gồm: Sát địch một nghìn tự tổn tám trăm, Làm một người phụ nữ vừa vặn, Sức hút khác giới, Hương vị phụ nữ, Trở lại trường học, Bài học từ sự kiện Văn Chương, Tri kỷ tâm hồn, Một chuyến đi nói đi là đi, Đại trượng phu, Ký sự giảm cân, Những điều những người phụ nữ ấy dạy tôi.
+- QA batch_qa.py: 10/10 pass (0 lỗi) ngay lần đầu, không phải sửa lại chunk nào.
+- Mark complete batch 40-49 (status=complete, error="") bằng batch_manifest.py complete --batch-id N.
+
+### File đổi
+- working/progress/qie-yi-qing-shen-gong-bai-tou/chunk_040..049.json (translated_text + word_count_translated + translated_at) — KHÔNG commit (progress)
+- working/progress/qie-yi-qing-shen-gong-bai-tou/batches/batch-040..049.json (status=complete) — KHÔNG commit
+- docs/STATE.md (cập nhật dòng sách + mục đang làm) — có commit (docs)
+- docs/session_log.md (entry này) — có commit (docs)
+
+### Còn dở
+- Chunk 30-39 và 50-57 chưa dịch (58 chunk tổng). Đã dịch + complete: 0-49. Bước tiếp: dịch dải 30-39 và 50-57 rồi QA → merge → EPUB → audiobook.
+- Tổng từ đã dịch dải 40-49: 14.458 từ (40:1446, 41:1567, 42:1439, 43:1426, 44:1446, 45:1484, 46:1402, 47:1416, 48:1396, 49:1436).
+
+### Git
+- Chưa commit; chỉ docs thay đổi (STATE.md, session_log.md) thuộc phạm vi commit docs.
+
+## 2026-08-12 — Hoàn tất pipeline sách `qie-yi-qing-shen-gong-bai-tou` (tản văn Vãn Tình)
+
+### Đã làm
+- Dịch xong toàn bộ 58 chunk (các dải 0-9, 10-19, 20-29, 30-39, 40-49, 50-57) sang tiếng Việt theo manifest batch; ~81.290 từ Việt (nguồn ~90.189 từ).
+- QA bước 8 (`run_pipeline.step_qa`): 58/58 chunk `ok: true` (0 lỗi lệch dòng/marker/rỗng). Lưu ý kỹ thuật: phải override `rp.PROJECT_ROOT = Path(r'<project root>').resolve()` vì `_common.py` PROJECT_ROOT tính sai thành `scripts\qa` (path chứa `..` chưa resolve).
+- Merge: `merge_chunks.py --format trilingual` → `output/books/qie-yi-qing-shen-gong-bai-tou/final/tamngu.md` (1.381.608 B) và `--format bilingual` → `final/vi.md` (483.712 B); rename theo convention pipeline.
+- EPUB: `make_epub.py` từ `final/vi.md` (pandoc) → `output/books/qie-yi-qing-shen-gong-bai-tou/trilingual.epub` (150KB, metadata title/author). Lưu ý: pandoc nhầm dòng `---` (thematic break giữa chapter) thành YAML metadata → phải tạo bản trung gian thay `---` bằng `* * *` (69 chỗ) rồi mới make_epub, sau đó xoá file tạm.
+- Sách không có ảnh (không có dòng `![...]`, không có thư mục images/).
+- **Fix pinyin** (user báo "sai sai pinyin"): `pypinyin` chưa cài → `add_pinyin.sentence_pinyin` trả về text gốc (chữ Hán) thay vì bính âm, nên `pinyin_text` trong progress JSON là bản sao của `original_text`. Đã `pip install pypinyin`, chạy script tạm dùng `process_text(source_text)` để regenerate `pinyin_text` cho 58/58 progress (đã verify `original_text` khớp tái tính; chỉ ghi đè field `pinyin_text`, giữ nguyên translated_text + mọi field khác), rồi merge lại trilingual → `final/tamngu.md` (1.532.291 B). Bản vi.md + EPUB không ảnh hưởng (không chứa pinyin).
+
+### File đổi
+- `output/books/qie-yi-qing-shen-gong-bai-tou/` (final/tamngu.md, final/vi.md, trilingual.epub) — KHÔNG commit (sản phẩm)
+- `docs/STATE.md` (dòng sách + mục đang làm) — có commit (docs)
+- `docs/session_log.md` (entry này) — có commit (docs)
+
+### Còn dở
+- Audiobook chưa làm (sách ZH, tùy chọn — chờ user quyết định).
+- Các entry worker trước (dải 0-9, 10-19, 20-29, 30-39, 40-49, 50-57) đều chưa commit — gộp chung vào commit docs khi user duyệt.
+
+### Git
+- Chưa commit. Đề xuất: 1 commit docs cho toàn bộ phiên (STATE.md + session_log.md) sau khi user duyệt.
+
+## 2026-08-12 — Tính năng nhạc nền (music bed) cho audiobook + chốt mức 10%/20%
+
+### Đã làm
+- **Ý tưởng → demo → pipeline**: user muốn "nhạc nền sau giọng audiobook" (music bed), không phải nhạc riêng khi đọc im. Làm demo trộn 1 chapter thật (ch01 sách `zuo-yi-ge-gang-gang-hao-de-nu-zi`) để user nghe duyệt.
+- **Tích hợp `audiobook_long.py`**: thêm flags `--music` (tên file trong `core/music/`, `auto`, hoặc nhiều file cách dấu phẩy để xoay theo chương) + `--music-volume` (0..1). Hàm `mix_music_bed()`: ducking theo RMS giọng (nhạc dịu khi đọc, thở lên khi nghỉ), crossfade loop (tránh click khi nhạc ngắn hơn chapter), cap thời gian nhạc nổi (MUSIC_RISE_CAP_S=1.2s), envelope mượt 150ms (fftconvolve), normalize giữ độ to giọng.
+- **Fix bug to**: phiên bản đầu quên nhân `volume` vào amp → nhạc nền phát 40–100% (đè giọng, nghe như 2 track). Sửa `amp = volume * ratio`.
+- **Loudness normalization**: file nhạc master to/nhỏ khác nhau (đo thực tế: bài 1 RMS 0.28, bài 2/3 RMS 0.045) → tự scale cả bài về `MUSIC_TARGET_RMS = 0.18` trước khi trộn (gain cap 4x). Mọi bài nghe đều nhau.
+- **Mức nhạc chốt**: `--music-volume 0.20`, `MUSIC_MIN_RATIO=0.50` → khi giọng đọc ~10%, khi nghỉ ~20%. `MUSIC_DIR` chỉ đọc `core/music/` (user tự thay file, pipeline chỉ dùng đúng các file có trong đó).
+- **Metadata**: `audio_progress_metadata` thêm `music_files` + `music_volume`, bump `pipeline_version` 4→5 — đổi nhạc/volume tự tạo lại chapter cũ.
+- **Chạy thử 3 chương** sách `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` (ch1-3): mỗi chương 1 bài (`sach_ke_chuyen_lofi.mp3`, `_2_lofi.mp3`, `_3_lofi.mp3`), volume 0.20, đã verify RMS p10 ~0.03 (nền nhẹ) + metadata đúng. User duyệt: "ngon rồi chốt cái này" — sẽ đi kiếm thêm music bỏ vào `core/music/`.
+
+### File đổi
+- `scripts/audiobook/audiobook_long.py` (mix_music_bed, flags --music/--music-volume, normalize loudness, metadata) — chờ commit
+- `core/music/` (3 bài `sach_ke_chuyen*_lofi.mp3`, user tự thêm) — KHÔNG commit
+- `output/books/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/audiobook/ch01-03.mp3` (bản mới có nhạc nền) — KHÔNG commit (sản phẩm)
+- `output/samples/` (các file bgm test) — KHÔNG commit
+
+### Còn dở
+- `audiobook_long.py` có thay đổi lớn (music bed + normalize) chưa commit — cần commit riêng khi user duyệt.
+- `core/music/` chỉ có 3 bài — user sẽ bổ sung thêm; pipeline tự dò + xoay + normalize.
+- Cửa sổ "Đọc thử" (EpubPreviewWindow) có thêm UI nhạc nền demo (bản cũ) — hiện không dùng nữa vì đã chuyển hướng sang music bed trong pipeline; có thể dọn sau.
+
+### Git
+- Chưa commit. Đề xuất tách: (1) `audiobook_long.py` music bed, (2) docs (STATE.md + session_log.md). Chờ user duyệt.
+

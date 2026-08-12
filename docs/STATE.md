@@ -18,6 +18,7 @@
 | `la-nam-trong-la` | VI | ✅ Hoàn tất | Audiobook (9 chương). Tác giả Nguyễn Nhật Ánh |
 | `eu-bim-task-group-handbook-v2-1` | EN | 📗 Dịch xong | Handbook kỹ thuật BIM/Twin Transition (EU). Đã dịch 9/9 chunk, songngu.md + vi.md + vi.epub. Audiobook chưa làm (sách tài liệu kỹ thuật, tùy chọn) |
 | `eu-bim-task-group-handbook-v2-1` | EN | 🔶 Dịch | Handbook BIM/Twin Transition EU (9 chunks). Đã complete 1,4,5,6,7,8 (08-07, nhiều worker song song), còn chunk 2,3 |
+| `qie-yi-qing-shen-gong-bai-tou` | ZH | ✅ Hoàn tất | Tản văn tình yêu/hôn nhân của Vãn Tình (58 chunks, 08-12). Đã dịch đủ + QA 0 lỗi + merge (tamngu.md 1.38MB, vi.md 483KB) + trilingual.epub (150KB). Audiobook chưa làm (tùy chọn) |
 
 **Giai đoạn**: `⛁ Extract → 🔶 Dịch → ⚙️ QA/Merge → 📗 EPUB → 🎧 Audiobook → ✅ Hoàn tất`
 
@@ -25,6 +26,9 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Tính năng nhạc nền (music bed) audiobook — đã chốt (08-12)**: `audiobook_long.py` thêm `--music` (tên file trong `core/music/`, nhiều file cách dấu phẩy xoay theo chương) + `--music-volume`. Trộn nhạc DƯỚI giọng với ducking (khi đọc ~10%, khi nghỉ ~20% ở volume 0.20), crossfade loop, loudness normalize (mọi bài về RMS 0.18 — bài master to/nhỏ đều nghe đều), metadata bump pipeline v5 (đổi nhạc/volume tự tạo lại). Mức chốt: volume 0.20, MIN_RATIO 0.50. User sẽ bổ sung thêm music vào `core/music/` — pipeline tự dò + xoay + normalize, chỉ dùng đúng file có trong đó.
+- Sách `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` (tản văn Vãn Tình, ZH): đã dịch xong + merge + audiobook 3 chương đầu (ch01-03) có nhạc nền mỗi chương 1 bài. Audiobook cả cuốn chưa chạy.
+- Sách `qie-yi-qing-shen-gong-bai-tou` (tản văn của Vãn Tình, ZH): ✅ Hoàn tất — dịch đủ 58/58 chunk, QA 0 lỗi, merge tamngu.md + vi.md, trilingual.epub. Audiobook chưa làm (ZH, tùy chọn).
 - Sách `eu-bim-task-group-handbook-v2-1`: ✅ Hoàn tất (9/9 chunk, QA 0 lỗi) — đã merge + vi.md + vi.epub + images/. Audiobook optional (chưa làm). Còn chunk 2,3 đã hoàn tất hết theo log phiên 08-07.
 - Sửa lỗi preview "Đọc thử" EPUB trắng tinh trên desktop app (WPF) — **đã hoàn tất**: nguyên nhân là `BuildEpubCss()`/`ReapplyThemeColors` đọc WPF-UI brush từ `Application.Current.Resources` trả về màu trắng/gần trong suốt (`#08FFFFFF`, `#FFFFFFFF`) → `--bg-color: #FFFFFF` làm vùng đọc trắng. Fix: thêm `GetSafeColor()` kiểm tra alpha + luminance, fallback palette dark theme (`#1E1E1E` nền/`#E0E0E0` chữ/`#B0B0B0` phụ). Verify thực tế: log `bgHex=#1E1E1E`, pixel màn hình nền tối RGB(24-31). Build 0 lỗi/0 cảnh báo.
 - UI desktop tinh chỉnh phiên 08-08 (đã build 0 lỗi/0 cảnh báo, app chạy ổn):
