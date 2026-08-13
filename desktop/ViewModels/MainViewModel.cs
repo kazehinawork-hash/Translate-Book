@@ -142,14 +142,15 @@ public partial class MainViewModel : ObservableObject
         {
             foreach (var d in Directory.GetDirectories(booksDir).OrderBy(x => x))
             {
-                var slug = Path.GetFileName(d);
-                OutputBooks.Add(GetBookStatus(_projectRoot, slug, "output"));
+                var title = Path.GetFileName(d);
+                OutputBooks.Add(GetBookStatus(_projectRoot, d, title, "output"));
             }
         }
 
         if (Directory.Exists(inputDir))
         {
-            foreach (var f in Directory.GetFiles(inputDir).OrderBy(x => x))
+            // input/ giờ chia thư mục con (chua-lam/, da-dich/, da-audio/) — quét đệ quy
+            foreach (var f in Directory.GetFiles(inputDir, "*", SearchOption.AllDirectories).OrderBy(x => x))
             {
                 var ext = Path.GetExtension(f).ToLower();
                 if (ext is ".pdf" or ".epub" or ".docx")
@@ -158,6 +159,7 @@ public partial class MainViewModel : ObservableObject
                     InputBooks.Add(new BookStatus
                     {
                         Slug = name,
+                        Title = Path.GetFileNameWithoutExtension(f),
                         Source = "input",
                         FilePath = f,
                     });
@@ -503,7 +505,13 @@ public partial class MainViewModel : ObservableObject
 
     private void UpdateBookStatus(BookStatus book)
     {
-        var updated = GetBookStatus(_projectRoot, book.Slug, book.Source);
+        // Thư mục output đặt theo tên gốc (Title); nếu là input thì tìm theo slug
+        var bookDir = string.IsNullOrEmpty(book.Title)
+            ? Path.Combine(_projectRoot, "output", "books", book.Slug)
+            : Path.Combine(_projectRoot, "output", "books", book.Title);
+        if (!Directory.Exists(bookDir))
+            bookDir = Path.Combine(_projectRoot, "output", "books", book.Slug);
+        var updated = GetBookStatus(_projectRoot, bookDir, Path.GetFileName(bookDir), book.Source);
         book.HasViMd = updated.HasViMd;
         book.HasEpub = updated.HasEpub;
         book.Mp3Count = updated.Mp3Count;
@@ -519,13 +527,30 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// Locates the EPUB used for the "Đọc thử" preview. Priority:
-    /// 1. trilingual.epub (ZH books, trilingual root file)
+    /// 1. <tên sách input>.epub (từ metadata.json source_file — file trilingual gốc)
     /// 2. final/vi.epub (EN books, Vietnamese-only file)
     /// 3. any other *.epub under the book folder
     /// Returns null when no EPUB exists for the book.
     /// </summary>
     private static string? FindPreviewEpub(string bookDir)
     {
+        // 1. Tên EPUB theo tên sách input (từ metadata.json)
+        var metaPath = Path.Combine(bookDir, "metadata.json");
+        if (File.Exists(metaPath))
+        {
+            try
+            {
+                var meta = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(metaPath));
+                if (meta != null && meta.TryGetValue("source_file", out var src) && !string.IsNullOrEmpty(src))
+                {
+                    var epubName = Path.GetFileNameWithoutExtension(src) + ".epub";
+                    var named = Path.Combine(bookDir, epubName);
+                    if (File.Exists(named)) return named;
+                }
+            }
+            catch { /* fallback tiếp */ }
+        }
+
         var trilingual = Path.Combine(bookDir, "trilingual.epub");
         if (File.Exists(trilingual)) return trilingual;
 
@@ -540,9 +565,22 @@ public partial class MainViewModel : ObservableObject
         return anyEpub;
     }
 
-    private static BookStatus GetBookStatus(string projectRoot, string slug, string source)
+    private static BookStatus GetBookStatus(string projectRoot, string bookDir, string displayTitle, string source)
     {
-        var bookDir = Path.Combine(projectRoot, "output", "books", slug);
+        // slug gốc: từ metadata.json (thư mục đặt tên theo tên sách gốc)
+        var slug = displayTitle;
+        var metaPath = Path.Combine(bookDir, "metadata.json");
+        if (File.Exists(metaPath))
+        {
+            try
+            {
+                var meta = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(metaPath));
+                if (meta != null && meta.TryGetValue("slug", out var s) && !string.IsNullOrEmpty(s))
+                    slug = s;
+            }
+            catch { /* fallback tên thư mục */ }
+        }
+
         var viMd = Path.Combine(bookDir, "final", "vi.md");
         var epub = FindPreviewEpub(bookDir);
         var audiobookDir = Path.Combine(bookDir, "audiobook");
@@ -570,6 +608,7 @@ public partial class MainViewModel : ObservableObject
         return new BookStatus
         {
             Slug = slug,
+            Title = displayTitle,
             Source = source,
             HasViMd = File.Exists(viMd),
             HasEpub = File.Exists(epub),
