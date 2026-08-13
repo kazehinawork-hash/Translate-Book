@@ -8,7 +8,9 @@ import sys
 from pathlib import Path
 
 # Đường dẫn gốc dự án (parent của scripts/)
-SCRIPT_DIR = Path(__file__).parent
+# Dùng .resolve() để chuẩn hóa __file__ (tránh bị ".." trong path khi import
+# qua đường dẫn tương đối → PROJECT_ROOT lệch, ghi file sai chỗ).
+SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent  # scripts/common/ → scripts/ → project root
 
 

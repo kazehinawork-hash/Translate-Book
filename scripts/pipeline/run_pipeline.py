@@ -49,6 +49,7 @@ from qa.glossary_qa import qa_sach_text, doc_glossary
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding, PROJECT_ROOT  # noqa: E402
+from glossary_lib import load_all, filter_for_book  # noqa: E402
 
 SCRIPT_DIR = Path(__file__).parent
 SCRIPTS_ROOT = SCRIPT_DIR.parent  # scripts/ directory
@@ -243,17 +244,17 @@ def step_translate_print(slug: str, auto: bool, ngon_ngu: str = 'en'):
 
 def step_qa(slug: str, lang: str, auto: bool) -> bool:
     progress_dir = PROJECT_ROOT / "working" / "progress" / slug
-    glossary_file = PROJECT_ROOT / 'glossary' / f'{slug}.csv'
 
-    if not progress_dir.exists() or not glossary_file.exists():
-        print_step(8, 'QA', '\u26a0\ufe0f B\u1ecf qua: thi\u1ebfu progress_dir ho\u1eb7c glossary')
+    if not progress_dir.exists():
+        print_step(8, 'QA', '\u26a0\ufe0f B\u1ecf qua: thi\u1ebfu progress_dir')
         return True
 
     print_step(8, 'QA', 'Ki\u1ec3m tra ch\u1ea5t l\u01b0\u1ee3ng d\u1ecbch')
     qa_dir = PROJECT_ROOT / 'working' / 'qa' / slug
     qa_dir.mkdir(parents=True, exist_ok=True)
 
-    glossary = doc_glossary(glossary_file) if glossary_file.exists() else []
+    # Lấy glossary từ master.csv (lọc theo slug cuốn)
+    glossary = filter_for_book(load_all(), slug)
     qa_ok = True
 
     import re

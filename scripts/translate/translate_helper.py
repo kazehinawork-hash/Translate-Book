@@ -35,7 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
-from _common import setup_encoding, PROJECT_ROOT
+from _common import setup_encoding, PROJECT_ROOT  # noqa: E402
+from glossary_lib import load_all, filter_for_book  # noqa: E402
 
 
 # Optional pyperclip for clipboard support
@@ -65,6 +66,43 @@ def doc_glossary(csv_path: Path) -> str:
             return csv_path.read_text(encoding=enc)
         except UnicodeDecodeError:
             continue
+    return ''
+
+
+def get_glossary_text(args) -> str:
+    """Lấy nội dung glossary cho prompt.
+
+    Ưu tiên:
+      1. `--glossary <file>` nếu được truyền (tương thích cũ).
+      2. Ngược lại, đọc master.csv + lọc theo slug (từ --progress-dir hoặc --chunks-dir).
+    """
+    if args.glossary:
+        return doc_glossary(args.glossary)
+
+    # Tự đoán slug từ --progress-dir hoặc --chunks-dir
+    # (thư mục có dạng working/<sub>/<slug> hoặc working/<slug>)
+    slug = None
+    for d in (getattr(args, 'progress_dir', None), getattr(args, 'chunks_dir', None)):
+        if d is None or not d.name:
+            continue
+        parts = d.parts
+        # working/progress/<slug> | working/chunks/<slug> | working/<slug>
+        if 'working' in parts:
+            idx = parts.index('working')
+            if idx + 1 < len(parts):
+                slug = parts[idx + 1] if idx + 1 == len(parts) - 1 else parts[idx + 2]
+                break
+    if slug:
+        rows = filter_for_book(load_all(), slug)
+        if rows:
+            import csv as _csv
+            import io
+            buf = io.StringIO()
+            writer = _csv.DictWriter(buf, fieldnames=['source', 'target', 'type', 'note', 'book', 'author', 'genre'],
+                                     extrasaction='ignore')
+            writer.writeheader()
+            writer.writerows(rows)
+            return buf.getvalue()
     return ''
 
 
@@ -263,7 +301,7 @@ def mode_prepare(args):
         print(f"[L\u1ed6I] Kh\u00f4ng t\u00ecm th\u1ea5y chunk {args.prepare} trong {chunks_dir}", file=sys.stderr)
         sys.exit(1)
 
-    glossary_text = doc_glossary(args.glossary) if args.glossary else ''
+    glossary_text = get_glossary_text(args)
     prompt = build_prompt(data, glossary_text, args.source_lang, args.target_lang, args.trilingual)
     print(prompt)
 
@@ -276,7 +314,7 @@ def mode_prepare_batch(args):
 
     start = args.prepare_batch[0]
     end = args.prepare_batch[1]
-    glossary_text = doc_glossary(args.glossary) if args.glossary else ''
+    glossary_text = get_glossary_text(args)
 
     for cid in range(start, end + 1):
         data = load_chunk_data(chunks_dir, cid)
@@ -504,7 +542,7 @@ def mode_interactive(args):
         print(f"[L\u1ed6I] C\u1ea7n --chunks-dir \u0111\u1ec3 d\u00f9ng interactive mode", file=sys.stderr)
         sys.exit(1)
 
-    glossary_text = doc_glossary(args.glossary) if args.glossary else ''
+    glossary_text = get_glossary_text(args)
 
     # Get total chunks
     import re

@@ -478,15 +478,6 @@ def buoc_3_chay_qa(slug=None):
     output_dir = PROJECT_ROOT / "output" / "books" / slug / "final"
     qa_dir = PROJECT_ROOT / "working" / "qa" / slug
     qa_dir.mkdir(parents=True, exist_ok=True)
-    glossary_csv = PROJECT_ROOT / "glossary" / f"{slug}.csv"
-
-    # Detect genre
-    genre_csv = None
-    for g in (PROJECT_ROOT / "glossary" / "genres").glob("*.csv"):
-        if g.stem in ['tien-hiep', 'ky-nghiep', 'ky-thuat-it']:
-            # Check if any row in this CSV matches our book (rough heuristic)
-            genre_csv = g
-            break
 
     # Detect language
     raw = PROJECT_ROOT / "working" / "extracted" / slug / "raw-hans.md"
@@ -521,11 +512,8 @@ def buoc_3_chay_qa(slug=None):
             '--translation', str(t),
             '--lang', lang,
             '--report', str(qa_report),
+            '--book-slug', slug,
         ]
-        if glossary_csv.exists():
-            args.extend(['--glossary', str(glossary_csv)])
-        if genre_csv:
-            args.extend(['--genre-glossary', str(genre_csv)])
         if not chay_script('glossary_qa.py', args):
             n_loi += 1
         else:

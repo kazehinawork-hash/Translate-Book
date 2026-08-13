@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
 from _common import setup_encoding  # noqa: E402
+from glossary_lib import load_all, filter_for_book, get_author_of_book  # noqa: E402
 
 # Cố gắng dùng pandas cho CSV (đẹp hơn); fallback về csv module nếu chưa cài
 try:
@@ -332,6 +333,9 @@ def qa_sach(args) -> dict:
         glossary += doc_glossary(args.glossary)
     if args.genre_glossary:
         glossary += doc_glossary(args.genre_glossary)
+    # Nếu không có file riêng nhưng có --book-slug → lọc từ master.csv
+    if not glossary and args.book_slug:
+        glossary += filter_for_book(load_all(), args.book_slug)
 
     return qa_sach_text(
         source_text=text_goc,
@@ -355,8 +359,9 @@ def main():
     )
     parser.add_argument('--source', type=Path, required=True, help='File gốc (chunk-X.md hoặc raw.srt)')
     parser.add_argument('--translation', type=Path, required=True, help='Bản dịch')
-    parser.add_argument('--glossary', type=Path, help='Glossary cuốn sách (CSV)')
+    parser.add_argument('--glossary', type=Path, help='Glossary cuốn sách (CSV) — nếu có sẽ dùng thay master')
     parser.add_argument('--genre-glossary', type=Path, help='Glossary thể loại (CSV)')
+    parser.add_argument('--book-slug', help='Slug cuốn sách — tự lọc glossary từ master.csv khi không có --glossary')
     parser.add_argument('--lang', choices=['en', 'zh'], required=True, help='Ngôn ngữ gốc')
     parser.add_argument('--mode', choices=['md', 'srt'], default='md', help='Loại file: md hoặc srt')
     parser.add_argument('--report', type=Path, help='File báo cáo (Markdown)')
@@ -434,6 +439,8 @@ def main():
             glossary += doc_glossary(args.glossary)
         if args.genre_glossary:
             glossary += doc_glossary(args.genre_glossary)
+        if not glossary and args.book_slug:
+            glossary += filter_for_book(load_all(), args.book_slug)
         if glossary:
             bao_cao.append("")
             bao_cao.append(f"## Glossary ({len(glossary)} mục)")
