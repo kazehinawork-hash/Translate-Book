@@ -667,3 +667,509 @@
 ### Git
 - Chưa commit. Đề xuất tách: (1) `audiobook_long.py` music bed, (2) docs (STATE.md + session_log.md). Chờ user duyệt.
 
+## 2026-08-12 — Dịch trọn sách `zuo-yi-ge-you-jing-jie-de-nu-zi` (Vãn Tình, EPUB scan)
+
+### Đã làm
+- **Nhận diện EPUB scan**: `input/做一个有境界的女子  不自轻,不自弃 (晚情).epub` là bản scan toàn ảnh (281 JPG, không có text layer) — `epub_extract.py` chỉ ra ảnh trắng + metadata rác.
+- **OCR 281 trang** bằng PaddleOCR (lang ch, CPU, numpy 2.x patched `np.sctypes`) → checkpoint `ocr_ckpt.json` (resume an toàn), raw.md 105KB/92K chữ Hán. Làm sạch: bỏ cover/CIP/TOC, tách 35 chapter `##` theo danh sách title, sửa OCR lỗi phổ biến (自已→自己, 千什么→干什么, 明百→明白...).
+- **Pipeline**: QC OK (0 mojibake), detect `zh-Hans`, chunk smart 56 chunk (1500-3000 chữ), glossary 20 thuật ngữ (Vãn Tình, A My, Tiểu Chu, Noãn Noãn, Chị Cố, Dương Dương, Lisa...), skeleton trilingual (original/pinyin/translated).
+- **Dịch 56/56 chunk** (85.882 từ Việt): 5 chunk đầu dịch trực tiếp, còn lại giao 45 sub-agent general song song mỗi agent 1 file text `số|tiếng Trung` → `số|tiếng Việt` (giữ đúng số dòng), merge bằng script `merge_vi` kiểm tra khớp dòng. QA `batch_qa.py`: 56/56 OK, 0 lỗi.
+- **Merge + EPUB**: tamngu.md 1.54MB + vi.md 511KB (chỉ Việt) + trilingual.epub 155KB (title/author đúng). Lưu ý: `merge_chunks.py` PROJECT_ROOT tự dò lệch → phải truyền `--output-dir` tường minh; sửa 2 chữ Hán sót ở chunk 0.
+- **Dọn dẹp**: xóa file tạm `tr_source/*.txt`, `scripts/output/output/` (output sai vị trí). `_ocr_images/` bị OneDrive lock tạm thời.
+
+### File đổi
+- `working/extracted/zuo-yi-ge-you-jing-jie-de-nu-zi/` (raw.md + ocr_ckpt.json) — KHÔNG commit
+- `working/chunks/zuo-yi-ge-you-jing-jie-de-nu-zi/` (56 chunk) — KHÔNG commit
+- `working/progress/zuo-yi-ge-you-jing-jie-de-nu-zi/` (56 progress JSON đã dịch) — KHÔNG commit
+- `glossary/zuo-yi-ge-you-jing-jie-de-nu-zi.csv` — KHÔNG commit (sản phẩm)
+- `output/books/zuo-yi-ge-you-jing-jie-de-nu-zi/` (final/tamngu.md, vi.md, vi.epub, trilingual.epub) — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Audiobook chưa làm (ZH, tùy chọn — chờ user quyết định).
+- Các thay đổi `audiobook_long.py` (music bed) + docs phiên trước vẫn chưa commit — gộp chung khi user duyệt.
+
+## 2026-08-12 — Kiểm tra và hoàn thiện EPUB `zuo-yi-ge-you-jing-jie-de-nu-zi`
+
+### Đã làm
+- **Rà soát EPUB** (user yêu cầu kiểm tra EPUB trước khi làm audio). Phát hiện 3 vấn đề:
+  1. **TOC rỗng/thiếu**: pandoc chỉ đưa 6 mục vào nav (4 chương + Title + TOC) dù `--toc` — nguyên nhân **32/35 heading `##` không có dòng trống trước** (do merge chunk nối liền) → pandoc parse thành paragraph, không thành heading → không vào TOC.
+  2. **Title metadata mất**: `<dc:title>` rỗng — `--metadata title=...` (viết dài) không hoạt động trong pandoc 3.10, phải dùng `-M title=...`; còn lại author/lang OK.
+  3. **Sót ký tự OCR**: "I三1" (số trang OCR) còn trong văn bản.
+- **Fix**: thêm dòng trống trước 32 heading `##` trong `vi.md`; dùng `-M` thay `--metadata`; `--split-level=2` (thay `--epub-chapter-level` deprecated) để chia 36 chapter file; xóa 3 dòng artifact OCR (I三1, ·079：, :191·...).
+- **Kết quả EPUB cuối**: 203KB, 44 entries (36 chapter xhtml riêng biệt), **TOC đầy đủ 35 chương + title**, metadata title/author=Vãn Tình/lang=vi đúng, **0 chữ Hán sót** trong văn bản, zip hợp lệ (mimetype application/epub+zip, testzip OK).
+
+### File đổi
+- `output/books/zuo-yi-ge-you-jing-jie-de-nu-zi/final/vi.md` (thêm dòng trống trước heading, xóa artifact OCR) — KHÔNG commit (sản phẩm)
+- `output/books/zuo-yi-ge-you-jing-jie-de-nu-zi/final/vi.epub` + `trilingual.epub` (rebuild) — KHÔNG commit (sản phẩm)
+- `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Audiobook chưa làm — chờ user duyệt EPUB xong.
+
+## 2026-08-12 — Bổ sung EPUB tam ngữ (có pinyin) `zuo-yi-ge-you-jing-jie-de-nu-zi`
+
+### Đã làm
+- User hỏi "có pinyin đâu nhỉ" — phát hiện EPUB ban đầu tạo từ `vi.md` (chỉ tiếng Việt), **thiếu pinyin** so với convention cuốn trước (`qie-yi-qing-shen-gong-bai-tou` có `final/tamngu.epub` + `trilingual.epub` tam ngữ).
+- **Tạo `final/tamngu.epub` từ `tamngu.md`** (584KB): pandoc + css + `-M title/author/lang=zh` + `--toc --toc-depth=2 --split-level=2`. Kết quả: 44 entries, 36 chapter files, TOC đủ 35 chương, mỗi dòng hiển thị **3 dòng: Hán → pinyin → Việt** (verify: 晚情 / wǎn qíng / Vãn Tình).
+- Copy `tamngu.epub` → `trilingual.epub` (thư mục gốc, đúng convention: trilingual.epub = bản tam ngữ).
+- Giữ `final/vi.epub` (bản chỉ Việt, 203KB) cho app "Đọc thử" fallback.
+- Xóa file test dư `final/vi.test.epub`.
+
+### File đổi
+- `output/books/zuo-yi-ge-you-jing-jie-de-nu-zi/final/tamngu.epub` (mới, 584KB) — KHÔNG commit (sản phẩm)
+- `output/books/zuo-yi-ge-you-jing-jie-de-nu-zi/trilingual.epub` (đã ghi đè = bản tam ngữ 584KB) — KHÔNG commit (sản phẩm)
+- Xóa `final/vi.test.epub` (file test) — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Audiobook chưa làm — chờ user duyệt EPUB tam ngữ.
+
+### Git
+- Chưa commit. Đề xuất: 1 commit docs (STATE.md + session_log.md) sau khi user duyệt.
+
+## 2026-08-12 — Setup GPU TTS + chạy lại 3 chương đầu `ban-co-nam-cho-ngoi`
+
+### Đã làm
+- **Setup GPU**: venv `working\venv-vieneu` nâng torch CPU → **torch 2.13.0+cu126** (`pip install --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps torch torchaudio`). RTX 3060 12GB nhận `cuda:0`. Cài thêm `transformers` (PyTorch backend v3turbo cần).
+- **Patch local vieneu**: `inference_v3_turbo.py::_load_mono` dùng `soundfile` thay `torchaudio.load` — torchaudio trên PyTorch path đòi `torchcodec` + FFmpeg shared DLL không có trên máy. Patch bằng soundfile (có sẵn) đọc WAV trực tiếp, không cần FFmpeg.
+- **`audiobook_long.py` thêm**: `--gpu` (khởi tạo `Vieneu(device="cuda")` qua helper `_create_tts`, tự fallback CPU nếu không có CUDA) + `--batch-size` (default 8). `generate_chapter_audio` dùng **`infer_batch`** (static batching, gom chunk theo batch) khi GPU — đo được 0.7-1.4s/chunk vs 4.1s/chunk khi infer đơn.
+- **Kết quả GPU**: RTF 0.14-0.16 (vs CPU 0.42) — nhanh ~6x. Chapter 14 phút audio tạo trong ~2.3 phút gen.
+- **Chạy lại 3 chương đầu `ban-co-nam-cho-ngoi` bằng GPU có nhạc nền**: ch01-03 mới (13.3/12.5/14.1 MB), mỗi chương 1 bài nhạc xoay trong `sach_ke_chuyen_10_lofi.mp3` + `sach_ke_chuyen_11_lofi.mp3`, volume 0.20, temp 0.3, top_k 10 (giữ tham số chốt). Cập nhật progress JSON (completed 1-3, pipeline v5, music_files/volume).
+
+### File đổi
+- `scripts/audiobook/audiobook_long.py` — thêm `--gpu`/`--batch-size`, helper `_create_tts`, `generate_chapter_audio` dùng `infer_batch` — **có commit** (code)
+- `working/venv-vieneu/...` (torch cu126, transformers, patch `inference_v3_turbo.py::_load_mono`) — KHÔNG commit (venv)
+- `output/books/ban-co-nam-cho-ngoi/audiobook/ch0{1,2,3}.mp3` — KHÔNG commit (sản phẩm)
+- `working/progress_audio/ban-co-nam-cho-ngoi.json` — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- 9 chương còn lại (4-12) của `ban-co-nam-cho-ngoi` chưa chạy lại GPU — chạy `--chapter 4 5 ... 12 --gpu --music auto --music-volume 0.20 --temperature 0.3 --top-k 10` khi muốn.
+- Khi chạy nền: stdout bị buffer → log trống dù process chạy. Nên chạy trực tiếp (không nền) hoặc thêm `-u`/flush.
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code (`audiobook_long.py`) + 1 commit docs (STATE + session_log) sau khi user duyệt.
+
+## 2026-08-12 — GPU toàn pipeline: MinerU + PaddleOCR (tách venv OCR)
+
+### Đã làm
+- **`.venv` (project, chứa MinerU)**: nâng torch → 2.13.0+cu126 (RTX 3060 `cuda:0`). `mineru_extract.py --device auto` giờ tự dùng GPU. Đã **gỡ sạch paddlepaddle-gpu/paddleocr/paddlex khỏi `.venv`** vì paddle GPU + torch CUDA trong cùng 1 tiến trình xung đột cuDNN DLL (`cudnn_cnn64_9.dll`/`shm.dll` WinError 127).
+- **Tạo venv mới `working\venv-ocr`** (Python 3.11, KHÔNG torch): paddlepaddle-gpu **3.3.1** (index `https://www.paddlepaddle.org.cn/packages/stable/cu126/`) + paddleocr **3.7.0** + paddlex 3.7.2. Test thực tế: OCR GPU chạy (device 0, Compute Capability 8.6). Lưu ý: paddle 3.3.1 cần CUDNN 9.9, máy có 9.5 — chỉ là warning, chạy ổn.
+- **`ocr_paddle.py` sửa sang API paddleocr 3.x**:
+  - Khởi tạo: `PaddleOCR(lang=..., device='gpu'/'cpu')` (bỏ `use_gpu`/`use_angle_cls`/`show_log` — 3.7 từ chối các tham số này), fallback API 2.x.
+  - `ocr_anh()`: dùng `predict()` → `rec_texts` (thay `ocr()` API cũ), fallback 2.x.
+  - **Tự relaunch qua venv-ocr**: nếu env hiện tại thiếu paddleocr nhưng `working/venv-ocr` có → `subprocess.run` chạy lại bằng venv-ocr (CREATE_NO_WINDOW). Verify: chạy bằng `.venv` python → relaunch → OCR GPU thành công.
+- **Kết quả**: cả 3 công đoạn nặng đều GPU — MinerU (`.venv`/torch), PaddleOCR (`venv-ocr`/paddle), TTS (`venv-vieneu`/torch). Mỗi cái 1 venv riêng, không xung đột.
+
+### File đổi
+- `scripts/extract/ocr_paddle.py` — API 3.x + tự relaunch venv-ocr — **có commit** (code)
+- `.venv` (torch cu126, gỡ paddle) — KHÔNG commit (venv)
+- `working/venv-ocr/` (mới, paddle GPU + paddleocr) — KHÔNG commit (venv)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Nếu muốn hết warning CUDNN 9.9 vs 9.5: cài paddle bản khớp CUDNN 9.5 hoặc nâng cudnn torch — không bắt buộc (chạy ổn).
+- 9 chương còn lại (4-12) `ban-co-nam-cho-ngoi` chưa chạy lại GPU.
+
+### Git
+- Chưa commit. Đề xuất: gộp chung commit code (`audiobook_long.py` + `ocr_paddle.py`) + 1 commit docs khi user duyệt.
+
+## 2026-08-12 — Dịch lại toàn bộ `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` + audiobook GPU
+
+### Đã làm
+- User yêu cầu "dịch lại như cuốn sách mới, ghi đè dữ liệu cũ, dọn thư mục cũ" → **xóa sạch** toàn bộ data cũ của slug (extracted, chunks, progress, qa, progress_audio, output/books, glossary).
+- **Pipeline từ đầu**: extract EPUB (`做一个刚刚好的女子 不攀附,不将就 (晚情).epub`, 55 mục) → raw.md 130.968 ký tự → **QC fail** vì 60 dòng `---` + 55 dòng `xml version=...` (rác extract EPUB) → làm sạch → QC OK. Detect `zh-Hans` → chunk smart 71 chunk (109.434 đơn vị) → glossary 26 thuật ngữ → skeleton trilingual 71 chunk.
+- **Fix bug**: `init_trilingual_skeleton.py` import `add_pinyin` sai path (thiếu `scripts/pinyin/`); `batch_manifest.py` + `batch_qa.py` thiếu `sys.stdout.reconfigure(encoding='utf-8')` (lỗi cp1252 khi in tiếng Trung/Việt).
+- **Dịch 71/71 chunk**: sub-agent (general) dịch song song 3 chunk/lượt — mỗi agent đọc `working/_dich/chunk_XXX.src.txt` (tách từ original_text) → dịch → ghi `.vi.txt` → tôi merge vào JSON bằng `_merge_vi.py` (kiểm tra số dòng khớp 100%). Chunk 0 dịch bằng agent trực tiếp. Tổng ~24 lượt agent, **QA batch 71/71 OK, 0 lỗi**.
+- **Merge**: `tamngu.md` (1.79MB) + `vi.md` (0.59MB, 3395 dòng) — lưu ý merge_chunks tạo tên `<slug>_trilingual.md`/`_translated.md` → rename sang `tamngu.md`/`vi.md`.
+- **EPUB**: `vi.epub` (0.18MB) + `tamngu.epub` (0.68MB) + copy → `trilingual.epub` (0.68MB). Cảnh báo ảnh Image0000X.jpg không fetch được (ảnh chưa extract ra images/) — không ảnh hưởng nội dung.
+- **Audiobook GPU toàn cuốn đang chạy**: `--gpu --batch-size 8 --music auto --music-volume 0.20 --temperature 0.3 --top-k 10` (50 chương, mỗi chương ~2.5 phút, ~2-2.5 giờ). Chương 1 xong 12.8MB.
+
+### File đổi
+- `scripts/translate/init_trilingual_skeleton.py` — fix path add_pinyin — **có commit** (code)
+- `scripts/translate/batch_manifest.py`, `scripts/qa/batch_qa.py` — thêm stdout utf-8 — **có commit** (code)
+- `working/_dich/` (71 .src.txt + .vi.txt), `working/_read_chunk.py`, `_write_chunk.py`, `_merge_vi.py`, `_split_src.py` — helper tạm — KHÔNG commit
+- `working/extracted|chunks|progress/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/` — KHÔNG commit (sản phẩm)
+- `glossary/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing.csv` — KHÔNG commit (sản phẩm)
+- `output/books/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/` (tamngu.md, vi.md, 3 epub, audiobook) — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Audiobook toàn cuốn **đã chạy xong 50/50 chương** (435.6MB, ~7.9 giờ audio, gen ~70 phút GPU). Lưu ý: `--music auto` ghi metadata chỉ 1 file nhạc nhưng thực tế xoay nhiều bài.
+- Helper tạm `working/_dich/` + `_*.py` đã dọn xong.
+
+## 2026-08-12 — Fix lỗi font EPUB (Calibre hiển thị ký tự có dấu thành `?`)
+
+### Đã làm
+- User báo "file epub bị lỗi font" khi mở trong **Calibre**: ký tự có dấu (pinyin `nǐ tuǒ`, tiếng Việt `Sự thỏa hiệp`) hiển thị thành `?`.
+- **Verify nội dung file KHÔNG lỗi**: đọc XHTML bằng Python UTF-8 → Hán `你的妥协，成全你了吗？`, pinyin `nǐ de tuǒ xié`, Việt `Sự thỏa hiệp` đều đúng, 1614 ký tự có dấu. Nguyên nhân = Calibre thiếu font render các glyph này (EPUB cũ dùng `font-family: serif` generic, `lang="en-US"`).
+- **Fix**: nhúng font **NotoSerifSC-VF.ttf** (từ `C:\Windows\Fonts`, hỗ trợ Hán + Latin mở rộng + dấu Việt) vào EPUB:
+  1. CSS mới `@font-face` + `font-family: "NotoSerifSC", serif` cho body/h1-3/p/tam-ngữ.
+  2. pandoc `--epub-embed-font NotoSerifSC-VF.ttf` (file ~25MB).
+  3. **Post-fix path**: pandoc ghi `url("fonts/...")` trong CSS ở `EPUB/styles/` → sửa thành `url("../fonts/...")` (zip rewrite).
+- **Kết quả**: `trilingual.epub` + `final/tamngu.epub` (15.4MB) + `final/vi.epub` (14.9MB) đều nhúng font. Verify: FONT-FACE OK, path `../fonts/` đúng.
+
+### File đổi
+- `output/books/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/{trilingual.epub, final/tamngu.epub, final/vi.epub}` — KHÔNG commit (sản phẩm, đã ghi đè bản cũ)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+- Ghi nhận: quy trình fix font EPUB (embed font + sửa path) — có thể áp dụng cho các cuốn ZH khác khi cần.
+
+### Còn dở
+- Không có — user cần mở lại EPUB trong Calibre để xác nhận font đã hiển thị đúng.
+
+## 2026-08-12 — Fix lỗi `?` tiếng Việt (lần 2 — tìm ra nguyên nhân THẬT: mojibake chunk 1)
+
+### Đã làm
+- User báo "vẫn bị lỗi ? ở chỗ tiếng việt" + hỏi "bạn đang tạo epub bằng gì" → trả lời: **pandoc** (make_epub.py).
+- **Điều tra sâu**: kiểm tra font Noto Serif SC + Arial Unicode MS đều CÓ glyph tiếng Việt (ạ/ả/ẽ/ợ) → **không phải vấn đề font**. Quét nguồn: `vi.md` chứa `Trong m?t nh?m ng??i ph?n ??i` → **mojibake trong chính bản dịch**.
+- **Root cause**: chỉ chunk 1 bị hỏng (1071 ký tự `?` giữa chữ) — vì tôi ghi chunk 1 bằng `Get-Content | python _write_chunk.py 1` (pipe qua PowerShell dùng encoding cp1252 làm hỏng dấu Việt). Các chunk 2-70 agent ghi file `.vi.txt` UTF-8 → sạch (quét lại 0 mojibake).
+- **Fix**: dịch lại chunk 1 → ghi file UTF-8 → Python đọc file ghi vào JSON (đúng encoding) → merge lại `vi.md` + `tamngu.md` → rebuild 3 EPUB (vẫn nhúng font Noto Serif SC) → verify: 0 mojibake, `Trong một nhóm người phản đối` đúng, font path đúng.
+- ⚠️ **Rút kinh nghiệm**: không bao giờ pipe text tiếng Việt qua PowerShell — phải ghi file UTF-8 rồi đọc bằng Python (đúng như cách `_merge_vi.py` đã làm cho các chunk khác).
+
+### File đổi
+- `working/progress/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/chunk_001.json` — sửa translated_text đúng — KHÔNG commit
+- `output/books/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/{final/vi.md, final/tamngu.md, trilingual.epub, final/tamngu.epub, final/vi.epub}` — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- User mở lại EPUB trong Calibre xác nhận.
+- `ban-co-nam-cho-ngoi` 9 chương (4-12) chưa chạy lại GPU (việc cũ).
+
+## 2026-08-13 — Chạy lại audiobook chương 1-2 sau khi sửa vi.md
+
+### Đã làm
+- User: "vi.md sửa ok chưa thì chạy lại cho tôi" — verify `vi.md` 0 mojibake (459.261 ký tự).
+- Audiobook dùng nguồn `output/books/<slug>/final/vi.md` (find_vi_md). Vì `vi.md` đổi (fingerprint 33a5b45e ≠ cũ a9ddcf70) nhưng progress JSON vẫn đánh dấu 50 chương xong → script không tự chạy lại.
+- User chọn **chỉ tạo lại chương 1-2** (nơi chứa chunk 1 đã sửa): `audiobook_long.py --chapter 1 2 --force --gpu --batch-size 8 --music auto --music-volume 0.20 --temperature 0.3 --top-k 10`.
+- Kết quả: ch01.mp3 (7.6MB) + ch02.mp3 (9.7MB) tạo lại từ vi.md mới, 48 chương còn lại giữ nguyên (nội dung không đổi). Tổng 50 MP3 / 430.3MB. Progress JSON giờ chỉ ghi 2 chương (do --force reset) — nếu chạy tiếp cần `--force` hoặc reconcile.
+
+### File đổi
+- `output/books/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/audiobook/{ch01,ch02}.mp3` — KHÔNG commit (sản phẩm)
+- `working/progress_audio/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing.json` — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code + 1 commit docs khi user duyệt.
+
+## 2026-08-13 — Sửa hiển thị progress audiobook: in dần từng nhóm batch
+
+### Đã làm
+- User feedback: khi chạy audiobook GPU, log in **một loạt 60/60 sau khi chapter xong** (vì code gọi `infer_batch` cho toàn bộ chunk rồi mới in) — muốn **nhảy dần từng dòng 1/60, 2/60...** như cũ.
+- Thử `--progress single` (\r ghi đè 1 dòng) nhưng user muốn giữ kiểu in nhiều dòng — chỉ cần in theo thời gian thực.
+- **Fix thật**: chia `infer_batch` thành các **nhóm batch_size** trong `generate_chapter_audio` — mỗi nhóm infer xong in ngay các chunk của nhóm đó (dòng nhảy dần theo nhóm). Bỏ hết code `\r`/`_progress`/`--progress` (revert).
+- Test chương 9 ban-co-nam-cho-ngoi: log nhảy dần `[batch 1/69] [batch 2/69]...` đúng ý (bị timeout test nhưng chỉ là giới hạn lệnh).
+- Khôi phục progress JSON ban-co-nam-cho-ngoi (bị reset rỗng do `--force` test) → 12 chương đầy đủ. ch09 giữ bản audio cũ hợp lệ.
+
+### File đổi
+- `scripts/audiobook/audiobook_long.py` — chia batch thành nhóm, in dần — **có commit** (code)
+- `working/progress_audio/ban-co-nam-cho-ngoi.json` — khôi phục — KHÔNG commit (sản phẩm)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code + 1 commit docs khi user duyệt.
+
+## 2026-08-13 — Cập nhật dich.md theo quy trình thực tế
+
+### Đã làm
+- User yêu cầu kiểm tra `dich.md` xem quy trình có cần chỉnh sửa gì không → rà soát, đối chiếu với thực tế phiên.
+- **Cập nhật dich.md**:
+  - **B. Extract**: thêm bước làm sạch rác extract EPUB (`xml version=...`, `---`) khi QC fail; ghi chú `--device auto` dùng GPU.
+  - **I. Merge**: thêm `--output-dir` tường minh (merge_chunks tự dò PROJECT_ROOT lệch); ghi chú rename `<slug>_trilingual.md`→`tamngu.md`, `<slug>_translated.md`→`vi.md`; thêm bước verify mojibake sau merge.
+  - **J. EPUB**: thêm quy trình nhúng font Noto Serif SC cho sách ZH (pandoc `--epub-embed-font` + CSS `@font-face` + fix path `../fonts/`) — tránh Calibre hiển thị `?`.
+  - **K. Audiobook**: thêm lệnh generate audiobook GPU đầy đủ (`--gpu --batch-size 8 --music auto --music-volume 0.20 --temp 0.3 --top-k 10`), ghi chú log nhảy dần từng nhóm batch, `-u` khi chạy nền, chạy lại `--chapter N --force` khi vi.md đổi.
+  - **Ghi chú chung**: thêm mục kinh nghiệm (không pipe tiếng Việt qua PowerShell, fix cp1252, path add_pinyin, xung đột cuDNN tách venv).
+
+### File đổi
+- `.opencode/command/dich.md` — cập nhật quy trình — **có commit** (config/code)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Cải tổ thư mục input theo trạng thái xử lý
+
+### Đã làm
+- User muốn: nhìn `input/` là biết sách nào đã dịch / đã tạo audio → chọn phương án **thư mục con**.
+- **Tạo script `scripts/manage_input.py`**: dò `output/books/<slug>/final/vi.md` (đã dịch) + `<slug>/audiobook/*.mp3` (đã audio) → map file input → slug (khớp chữ Latin + bảng map thủ công cho tên tiếng Trung, loại trừ file " 2."/" 3.") → di chuyển vào `input/chua-lam/` | `input/da-dich/` | `input/da-audio/`. Có `--check` (chỉ báo cáo).
+- **Đã di chuyển 13 file hiện tại**: chua-lam 4 (刚刚好的女子 2/3.pdf, 我在豪门, 有多想要), da-dich 3 (EU-BIM, 且以情深, 有境界), da-audio 6 (Ban Co Nam, Rung Na-uy, Đắc Nhân Tâm, 不攀附, 有风骨 x2).
+- **Tạo `input/README.md`** giải thích cấu trúc + cách dùng.
+- **Cập nhật `dich.md`**: mục A/B tìm file trong 3 thư mục con (không chỉ gốc input/), bước K thêm chạy `manage_input.py` sau pipeline.
+
+### File đổi
+- `scripts/manage_input.py` — script mới — **có commit** (code)
+- `input/` (cấu trúc thư mục con + README) — KHÔNG commit (file gốc)
+- `.opencode/command/dich.md` — cập nhật quy trình — **có commit** (config)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Thêm quy tắc bắt buộc cập nhật input/ vào AGENTS.md
+
+### Đã làm
+- User yêu cầu: khi dịch hoặc tạo audio xong, **bước cuối phải cập nhật input/** để người dùng biết trạng thái sách.
+- **Cập nhật AGENTS.md** (quy tắc bắt buộc, agent đọc mỗi phiên):
+  - Mô tả `/dich`: thêm "BƯỚC CUỐI CÙNG (bắt buộc) chạy `python scripts\manage_input.py`".
+  - Vòng lặp pipeline: thêm **bước 12. Cập nhật input/ (BẮT BUỘC)**.
+  - Cấu trúc thư mục: mô tả input chia 3 thư mục con (`chua-lam/`, `da-dich/`, `da-audio/`).
+- `dich.md` đã có bước này từ trước (dòng 106).
+
+### File đổi
+- `AGENTS.md` — thêm quy tắc bắt buộc — **có commit** (docs)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Thêm rotate session_log + /start /done cho Command Code
+
+### Đã làm
+- User hỏi session_log có tự xoá không → trả lời: không, chỉ append mãi (đã 71KB/45 entry). Chọn phương án C (script tự động rotate).
+- **Tạo `scripts/rotate_session_log.py`**: khi `docs/session_log.md` > 100KB (`--max-kb`), dời entry cũ hơn 3 tháng (`--keep-months`) vào `docs/session_log_archive/<YYYY-MM>.md` (theo tháng), file chính giữ mào đầu + entry gần nhất. Có `--check` (chỉ báo cáo). **Đã test thật**: archive 2 entry cũ vào đúng file tháng, file chính giữ entry mới — hoạt động đúng; session_log thật không bị ảnh hưởng (71KB giữ nguyên).
+- **Tạo `/start` + `/done` cho Command Code** tại `.commandcode/commands/` (đúng vị trí project-level theo docs Command Code). `/done` bổ sung: chạy rotate + chạy `manage_input.py` (cập nhật input/) trước khi đề xuất commit. Giữ bản `.opencode/command/` cũ (legacy).
+- **Cập nhật AGENTS.md**: ghi chú rotate tự động + 2 command ở `.commandcode/commands/`.
+
+### File đổi
+- `scripts/rotate_session_log.py` — script mới — **có commit** (code)
+- `.commandcode/commands/start.md`, `.commandcode/commands/done.md` — mới — **có commit** (config)
+- `AGENTS.md` — ghi chú rotate + command — **có commit** (docs)
+- `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Khi session_log > 100KB, rotate tự chạy trong `/done`; hoặc chạy tay `python scripts\rotate_session_log.py`.
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Thêm /dich vào Command Code
+
+### Đã làm
+- User yêu cầu cho `/dich` vào Command Code (cùng với /start /done đã làm).
+- **Copy `.opencode/command/dich.md` → `.commandcode/commands/dich.md`** (vị trí project-level của Command Code). Nội dung đã cập nhật đầy đủ (merge --output-dir, EPUB nhúng font, audiobook GPU, manage_input, ghi chú kinh nghiệm).
+- `.commandcode/commands/` hiện có: `start.md`, `done.md`, `dich.md` (+ `dual-Agent.md` có sẵn).
+- Cập nhật AGENTS.md: `/dich` nằm ở cả `.commandcode/commands/` (Command Code) + `.opencode/command/` (legacy).
+
+### File đổi
+- `.commandcode/commands/dich.md` — mới — **có commit** (config)
+- `AGENTS.md` — cập nhật command — **có commit** (docs)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Thêm script gộp glossary tự động + verify memory
+
+### Đã làm
+- User duyệt 2 nâng cấp từ phân tích: gộp glossary tự động + verify memory.
+- **`scripts/process/merge_glossary.py`** (mới): gộp glossary cuốn (`glossary/<slug>.csv`, cột `source,target,notes`) ↔ glossary thể loại (`glossary/genres/<genre>.csv`, cột `source,target,type,note,genre,book`) **2 chiều**:
+  - genres → cuốn: đưa thuật ngữ chung của thể loại vào cuốn (Agent dịch không đoán lại).
+  - cuốn → genres: bổ sung thuật ngữ mới của cuốn vào kho thể loại kèm cột `book=<slug>`.
+  - **Không đè mục đã có** (so theo `source`), ghi UTF-8 atomic. Có `--book-to-genre-only` / `--genre-to-book-only` / `--check` / `--books-dir` / `--genres-dir` (test an toàn).
+  - Test: dữ liệu tạm + bản sao glossary thật (qie-yi → tien-hiep: cuốn nhận 22 thuật ngữ, genre nhận 5 mục mới); idempotent (lần 2 báo 0 mục mới).
+- **`scripts/verify_memory.py`** (mới): kiểm tra Memory Bank cuối phiên — STATE.md có nhắc sách trong `output/books/` không (bỏ qua test/archive như `long-test`), session_log có entry hôm nay + đủ mục `Đã làm`/`Git` không, session_log có cần rotate (>100KB) không, AGENTS.md còn nhắc đọc memory không. Exit code 0 = OK / 1 = cảnh báo / 2 = lỗi nghiêm trọng.
+  - Test: phát hiện đúng 2 sách `dac-nhan-tam`, `rung-na-uy` chưa nhắc trong STATE → **đã thêm 2 sách vào STATE.md** → verify đạt EXIT 0.
+- **Cập nhật AGENTS.md**: bước 5 Glossary thêm lệnh chạy `merge_glossary.py`; mục BỘ NHỚ PHIÊN thêm lệnh bắt buộc `python scripts\verify_memory.py` cuối phiên.
+- **Cập nhật dich.md**: mục E thêm bước gộp glossary (bước 4).
+
+### File đổi
+- `scripts/process/merge_glossary.py` — script mới — **có commit** (code)
+- `scripts/verify_memory.py` — script mới — **có commit** (code)
+- `AGENTS.md`, `.opencode/command/dich.md` — cập nhật quy trình — **có commit** (docs/config)
+- `docs/STATE.md` — thêm 2 sách `dac-nhan-tam` + `rung-na-uy` + mục Đang làm — **có commit** (docs)
+- `docs/session_log.md` — entry này — **có commit** (docs)
+
+### Còn dở
+- `working/test_merge/` (dữ liệu test tạm) chưa xóa được do permission deny trên `Remove-Item` — không ảnh hưởng (nằm trong working/, gitignored). Có thể xóa tay.
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code (2 script mới) + 1 commit docs (AGENTS/dich/STATE/session_log) khi user duyệt.
+
+## 2026-08-13 — Thêm kho glossary theo tác giả (authors) + hỗ trợ --author
+
+### Đã làm
+- User hỏi gộp glossary theo tác giả hay thể loại ok hơn → phân tích dữ liệu thật: các cuốn Vãn Tình trùng nhiều thuật ngữ (`晚情/Vãn Tình`, `女人`, `幸福`, `成熟`, `独立`, `善良`, `优雅`, `不攀附/不将就`...) → **gộp theo tác giả đáng hơn** cho tản văn; thể loại (tiên hiệp) vẫn dùng cho thuật ngữ kỹ thuật chung. User duyệt "có ok nhé".
+- **Nâng cấp `merge_glossary.py`**: refactor thành hàm `merge_scope()` dùng chung, hỗ trợ **cả `--genre` lẫn `--author`** (có thể truyền cùng lúc), thêm cờ `--authors-dir`, đổi `--book-to-genre-only`/`--genre-to-book-only` thành `--book-to-scope-only`/`--scope-to-book-only` (giữ tương thích mục đích). Kho author cột `source,target,type,note,author,book`.
+- **Tạo `glossary/authors/van-tinh.csv`** (47 thuật ngữ): gộp 3 cuốn Vãn Tình đã dịch (`qie-yi-qing-shen-gong-bai-tou` 5, `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` 24, `zuo-yi-ge-you-jing-jie-de-nu-zi` 18) qua `--book-to-scope-only` — mỗi mục kèm cột `book=<slug>` nguồn.
+- **Test thật**: giả lập sách Vãn Tình mới chỉ có `晚情` → chạy `--author van-tinh` nhận thêm **46 thuật ngữ chung** (tác giả, khái niệm, nhà xuất bản), `晚情` không bị trùng; chạy lại lần 2 = 0 mục mới (idempotent).
+- **Cập nhật AGENTS.md** (bước 5 Glossary: thêm `--author` + kho authors), **dich.md** (mục E: thêm bước author), **STATE.md** (mục Đang làm).
+
+### File đổi
+- `scripts/process/merge_glossary.py` — nâng cấp hỗ trợ --author — **có commit** (code)
+- `glossary/authors/van-tinh.csv` — kho mới — **KHÔNG commit** (sản phẩm, theo chính sách repo code-only)
+- `AGENTS.md`, `.opencode/command/dich.md` — cập nhật quy trình — **có commit** (docs/config)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- `working/test_author/` (thư mục test rỗng) chưa xóa do OneDrive lock — không ảnh hưởng (gitignored).
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code + 1 commit docs khi user duyệt.
+
+## 2026-08-13 — Dọn dẹp + chuẩn hóa toàn bộ thư mục glossary/
+
+### Đã làm
+- User yêu cầu kiểm tra thư mục glossary/ còn nhiều CSV → phát hiện và xử lý toàn bộ.
+- **Phát hiện file rác**: `you-feng-gu-nu-zi.csv` (105 dòng, 68 dòng trùng source) — xác minh trùng **100%** (37/37 thuật ngữ) với `zuo-yi-ge-you-feng-gu-de-nu-zi.csv` (cùng cuốn "Làm người phụ nữ có phong thái") → **đã xóa** file rác, giữ file sạch.
+- **Thêm chế độ `--normalize` vào `merge_glossary.py`**: dedupe (bỏ dòng trùng source), gộp `gender`/`notes` vào `note`, thêm cột `type`/`book`, chuẩn hóa về cột chuẩn. Chạy `--normalize` (không đối số) = xử lý toàn bộ thư mục.
+- **Chuẩn hóa 7 file cuốn** (`eu-bim`, `qie-yi-qing`, `zuo-yi-ge-3`, `wan-qing`, `zuo-yi-ge`, `you-feng-gu-de`, `you-jing-jie`) → cột `source,target,type,note,book`; **3 kho author** (`van-tinh`, `vi-duong`, `khang-tinh-van`) → cột `source,target,type,note,author,book`. Không mất dữ liệu (số dòng giữ nguyên, chỉ dedupe file rác).
+- **Tạo 2 kho author mới**: `vi-duong` (48 mục, gộp 2 cuốn Vi Dương `zuo-yi-ge-3` + `you-feng-gu-de` — trùng 72% nên gộp đáng giá), `khang-tinh-van` (35 mục, 1 cuốn `zuo-yi-ge`).
+- **Test thật**: sách Vi Dương mới chỉ có `微阳` → chạy `--author vi-duong` nhận **47 thuật ngữ chung** từ kho; idempotent.
+- **Backup trước khi xử lý**: `working/glossary_backup_20260813_150604/` (an toàn, giữ nguyên).
+- **Cập nhật AGENTS.md** (bước 5: thêm `vi-duong`, `khang-tinh-van` + `--normalize`), **dich.md** (mục E), **STATE.md**.
+
+### File đổi
+- `scripts/process/merge_glossary.py` — thêm `--normalize` — **có commit** (code)
+- `glossary/*.csv`, `glossary/authors/*.csv` — dọn/chuẩn hóa/tạo kho — **KHÔNG commit** (sản phẩm, repo code-only)
+- `AGENTS.md`, `.opencode/command/dich.md` — cập nhật — **có commit** (docs/config)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- `working/test_vd/`, `working/test_norm/` (thư mục test rỗng) chưa xóa do OneDrive lock — không ảnh hưởng (gitignored).
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code + 1 commit docs khi user duyệt.
+
+## 2026-08-13 — Tinh chỉnh verify_memory: lọc thư mục output tên đầy đủ
+
+### Đã làm
+- Sau khi dọn glossary, verify_memory báo **8 cảnh báo nhiễu**: các thư mục `output/books/` có tên sách đầy đủ (có dấu/space/tiếng Trung, VD `Ban Co Nam Cho Ngoi - Nguyen Nhat Anh`, `做一个有境界的女子...`) — là output cũ của user lưu theo tên hiển thị, **không phải slug** do pipeline tạo.
+- **Fix `verify_memory.py`**: chỉ đối chiếu STATE.md với thư mục có tên **dạng slug hợp lệ** (regex `^[a-z0-9]+(-[a-z0-9]+)*$` — chữ thường + gạch ngang + số). Bỏ qua thư mục tên đầy đủ (output cũ, không quản lý trong STATE).
+- Kết quả: verify_memory đạt EXIT 0, sạch cảnh báo nhiễu.
+
+### File đổi
+- `scripts/verify_memory.py` — lọc slug — **có commit** (code)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit code + docs khi user duyệt.
+
+## 2026-08-13 — Đổi tên thư mục output/books theo tên sách gốc
+
+### Đã làm
+- User muốn thư mục output đặt tên theo **tên sách gốc** (tên file input) để dễ quản lý → xác nhận "đổi tên + sửa mọi code".
+- **Đổi tên 8 thư mục** output/books theo tên file input: ban-co-nam-cho-ngoi → `Ban Co Nam Cho Ngoi - Nguyen Nhat Anh`, dac-nhan-tam → `Đắc Nhân Tâm - Dale Carnegie`, eu-bim → `EU-BIM-Task-Group-Handbook-V2.1`, qie-yi-qing-shen → `且以情深共白头：婚前看情感，婚后靠相处 (晚情)`, rung-na-uy → `Rung Na-uy - Haruki Murakami`, wan-qing → `做一个刚刚好的女子  不攀附, 不将就 (晚情)`, you-feng-gu → `做一个有风骨的女子`, you-jing-jie → `做一个有境界的女子  不自轻,不自弃 (晚情)`.
+- **Xoá 4 cuốn không có file input** (user duyệt): `la-nam-trong-la`, `zuo-yi-ge-gang-gang-hao-de-nu-zi`, `-3`, `long-test`.
+- **Tạo `metadata.json`** mỗi thư mục output: `{"slug": "<slug-cũ>", "title": "<tên-gốc>", "source_file": "<file input>"}`.
+- **Sửa code**: `audiobook_long.py` (thêm `find_book_dir` đọc metadata; sửa find_vi_md/reconcile/out_dir — test OK), `manage_input.py` + `verify_memory.py` (đọc metadata), desktop `MainViewModel.cs` (`GetBookStatus` nhận bookDir+displayTitle, quét input đệ quy, `UpdateBookStatus` dùng Title) + `BookStatus.cs` (thêm field Title). **Build desktop 0 lỗi**.
+- **Cập nhật docs**: dich.md (I/J/K dùng `<tên-sách-gốc>`) + đồng bộ `.commandcode/commands/dich.md`; STATE.md (bảng sách + cột thư mục, bỏ 4 cuốn); AGENTS.md (cấu trúc output).
+
+### File đổi
+- `scripts/audiobook/audiobook_long.py`, `scripts/manage_input.py`, `scripts/verify_memory.py` — **có commit** (code)
+- `desktop/ViewModels/MainViewModel.cs`, `desktop/Models/BookStatus.cs` — **có commit** (code)
+- `output/books/` (8 thư mục đổi tên + metadata.json, xoá 4) — KHÔNG commit (sản phẩm)
+- `.opencode/command/dich.md`, `.commandcode/commands/dich.md` — **có commit** (config)
+- `docs/STATE.md`, `docs/session_log.md`, `AGENTS.md` — **có commit** (docs)
+
+### Còn dở
+- Desktop cần chạy thử runtime (build đã 0 lỗi).
+- 4 cuốn đã xoá có thể làm lại nếu có file input.
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — File EPUB cuối đặt tên theo tên sách input
+
+### Đã làm
+- User yêu cầu: file sản phẩm cuối (EPUB) đặt tên theo tên sách input.
+- **Đổi tên `trilingual.epub` → `<tên-sách-input>.epub`** cho 4 cuốn ZH (đọc `metadata.json` → `source_file` bỏ đuôi): 且以情深共白头, 做一个刚刚好的女子 不攀附, 做一个有境界的女子, 做一个有风骨的女子. `final/vi.epub` (bản tiếng Việt thuần) giữ nguyên.
+- **Sửa desktop** `FindPreviewEpub`: ưu tiên tìm `<tên-sách-input>.epub` từ metadata.json (trước trilingual.epub/vi.epub/any). **Build 0 lỗi**.
+- **Cập nhật dich.md** (mục J): quy tắc tên EPUB cuối = tên file input (giữ rác nếu có) + đồng bộ `.commandcode/commands/dich.md`.
+
+### File đổi
+- `output/books/<4 cuốn ZH>/<tên-sách-input>.epub` (rename từ trilingual.epub) — KHÔNG commit (sản phẩm)
+- `desktop/ViewModels/MainViewModel.cs` — FindPreviewEpub — **có commit** (code)
+- `.opencode/command/dich.md`, `.commandcode/commands/dich.md` — **có commit** (config)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Bỏ final/*.epub, chỉ giữ 1 EPUB gốc theo tên sách input
+
+### Đã làm
+- User yêu cầu: tamngu và vi chỉ cần file `.md` — không cần `final/tamngu.epub` / `final/vi.epub`.
+- **Xoá 6 file `final/*.epub`** (EU-BIM vi.epub, 且以情深 tamngu.epub, 不攀附 tamngu+vi, 有境界 tamngu+vi).
+- **Cấu trúc cuối mỗi cuốn**: 1 file EPUB duy nhất ở gốc tên `<tên-sách-input>.epub` (chỉ cuốn ZH) + `final/*.md` (`vi.md`, `tamngu.md`, `songngu.md`).
+- **Cập nhật dich.md** (mục J): chỉ tạo 1 EPUB gốc theo tên input, KHÔNG tạo final/*.epub + đồng bộ `.commandcode/commands/dich.md`.
+
+### File đổi
+- `output/books/<các cuốn>/final/*.epub` (xoá 6 file) — KHÔNG commit (sản phẩm)
+- `.opencode/command/dich.md`, `.commandcode/commands/dich.md` — **có commit** (config)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Master glossary: gom toàn bộ về 1 file, tự tách khi phình
+
+### Đã làm
+- User muốn **gọn glossary về 1 CSV duy nhất** để agent đọc tiết kiệm token, có cột chia theo cuốn/tác giả, **tự tách nhiều file khi phình** → triển khai cách A.
+- **`scripts/common/glossary_lib.py`** (mới): đọc `glossary/master.csv` (+ master_001.csv... khi tách), `filter_for_book(rows, slug)` lọc thuật ngữ áp dụng cho cuốn (ưu tiên mục riêng của cuốn → mục cùng author/genre → mục chung), `split_master_if_needed()` tự tách khi >300 dòng. CLI test: `--book/--info/--list-files`.
+- **`scripts/common/build_master.py`** (mới): gộp lần đầu từ các file cuốn/genres/authors cũ → `master.csv` (346 thuật ngữ, cột `source,target,type,note,book,author,genre`).
+- **`scripts/process/merge_glossary.py`** (rewrite master-based): `--book <slug> --author <a> [--genre <g>]` gộp thuật ngữ cuốn mới vào master (không đè); `--normalize` dedupe; `--check/--info` báo cáo.
+- **Sửa các script dùng glossary** → đọc từ master qua `glossary_lib`: `run_pipeline.py` (step_qa), `glossary_qa.py` (thêm `--book-slug`), `translate_helper.py` (tự lấy glossary từ master khi không có `--glossary`), `translate.py` (QA dùng `--book-slug`).
+- **Fix root cause `_common.py`**: `PROJECT_ROOT` đổi sang `Path(__file__).resolve().parent.parent` — trước đây import qua path tương đối (`scripts/translate/../common`) làm PROJECT_ROOT lệch → glossary_lib trỏ sai thư mục. **Cũng fix luôn bug `merge_chunks.py` ghi output sai vị trí** (đã ghi chú trong STATE từ lâu).
+- **Dọn thư mục**: xóa 7 file cuốn cũ + authors/ + genres/tien-hiep.csv (đã gộp vào master, backup `working/glossary_backup_*`); giữ `master.csv` + `_template.*` + `_fields.md` + `genres/tien-hiep.md` (tài liệu thể loại).
+- **Test end-to-end đạt**: `translate_helper --prepare` nhúng 47 thuật ngữ từ master vào prompt; `glossary_qa --book-slug` lọc 47 mục; `run_pipeline --from-step 8 --to-step 8` QA 56 chunk OK; `merge_glossary --book sach-moi --author vi-duong` thêm vào master + tự tách master_001 khi vượt ngưỡng (test với ngưỡng 10, sau đó gộp lại).
+
+### File đổi
+- `scripts/common/glossary_lib.py`, `scripts/common/build_master.py` — mới — **có commit** (code)
+- `scripts/process/merge_glossary.py` — rewrite master-based — **có commit** (code)
+- `scripts/common/_common.py` — fix PROJECT_ROOT .resolve() — **có commit** (code)
+- `scripts/pipeline/run_pipeline.py`, `scripts/qa/glossary_qa.py`, `scripts/translate/translate_helper.py`, `scripts/translate/translate.py` — dùng master — **có commit** (code)
+- `glossary/master.csv` — file trung tâm (346 dòng) — **KHÔNG commit** (sản phẩm, repo code-only)
+- `AGENTS.md`, `.opencode/command/dich.md` — cập nhật quy trình master — **có commit** (docs/config)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- `working/test_master/` (thư mục test rỗng) chưa xóa do OneDrive lock — vô hại.
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code (glossary_lib + build_master + merge_glossary + _common + 4 script sửa) + 1 commit docs (AGENTS/dich/STATE/session_log) khi user duyệt.
+
+## 2026-08-13 — Bổ sung metadata.json đầy đủ + rà soát tham chiếu cấu trúc mới
+
+### Đã làm
+- User hỏi metadata.json cần thêm gì + đảm bảo các file liên quan cập nhật theo cấu trúc mới.
+- **Bổ sung metadata.json** cho 8 cuốn: thêm `author`, `language` (zh/en/vi), `genre`, `has_audio`, `has_epub`, `epub_file`, `created` (giữ slug/title/source_file). `has_audio`/`has_epub`/`epub_file` tự dò từ thư mục.
+- **Rà soát tham chiếu cấu trúc cũ**: scripts (trilingual = mode dịch, không phải file), desktop `FindPreviewEpub` (đã ưu tiên tên input, fallback trilingual/vi.epub vô hại — không file nào tồn tại nữa). **Không còn nơi nào phụ thuộc `trilingual.epub`/`final/vi.epub`/`final/tamngu.epub`**.
+- **Cập nhật dich.md** (mục I): quy tắc metadata.json đầy đủ (10 trường) + đồng bộ `.commandcode/commands/dich.md`.
+
+### File đổi
+- `output/books/<8 cuốn>/metadata.json` — bổ sung trường — KHÔNG commit (sản phẩm)
+- `.opencode/command/dich.md`, `.commandcode/commands/dich.md` — **có commit** (config)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit code + docs khi user duyệt.
+
+## 2026-08-13 — Dọn thư mục glossary: chỉ còn master + template
+
+### Đã làm
+- User xác nhận giữ `_template.md` + `_template.csv` (translate.py cần để tạo glossary cuốn mới).
+- **Đã xóa**: `_fields.md` (không script nào dùng — tài liệu cột cũ), `genres/tien-hiep.md` (tài liệu thể loại, không script đọc, đã gộp hết vào master), `genres/` (thư mục rỗng), **`authors/`** (rỗng — xóa qua `cmd rmdir` sau khi Python bị OneDrive lock).
+- **Thư mục `glossary/` giờ tối giản hoàn toàn**: `master.csv` (346 thuật ngữ, file trung tâm) + `_template.csv` + `_template.md`.
+
+### File đổi
+- `glossary/_fields.md`, `glossary/genres/tien-hiep.md` — xóa — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit docs khi user duyệt.
+
+## 2026-08-13 — Dọn output/_archive
+
+### Đã làm
+- User hỏi output/_archive cần dọn không → kiểm tra: 9.5MB gồm bản lưu 2 cuốn đã xoá (zuo-gang-gang-1, -3), bản cũ trước đổi tên, thư mục test audio.
+- User duyệt → **xoá toàn bộ `output/_archive/`**.
+- Dọn tham chiếu: AGENTS.md bỏ dòng `output/_archive/` (legacy). `verify_memory.py` giữ `_archive` trong SKIP_OUTPUT_DIRS (vô hại, an toàn nếu user tạo lại).
+
+### File đổi
+- `output/_archive/` — xoá — KHÔNG commit (sản phẩm)
+- `AGENTS.md` — bỏ tham chiếu — **có commit** (docs)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp commit docs khi user duyệt.
+

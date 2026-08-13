@@ -9,16 +9,18 @@
 
 ## 📚 Các cuốn sách
 
-| Slug | Ngôn ngữ | Giai đoạn | Ghi chú / Bước tiếp theo |
-|------|:--------:|-----------|--------------------------|
-| `zuo-yi-ge-gang-gang-hao-de-nu-zi` | ZH | ✅ Hoàn tất | EPUB + audiobook (67 chương). Tác giả Khang Tĩnh Văn |
-| `zuo-yi-ge-gang-gang-hao-de-nu-zi-3` | ZH | ✅ Hoàn tất | EPUB + audiobook (65 chương). Tác giả Vi Dương |
-| `zuo-yi-ge-you-feng-gu-de-nu-zi` | ZH | ✅ Hoàn tất | EPUB + audiobook (85 chương). Tác giả Vi Dương |
-| `ban-co-nam-cho-ngoi` | VI | ✅ Hoàn tất | Audiobook (12 chương). Tác giả Nguyễn Nhật Ánh |
-| `la-nam-trong-la` | VI | ✅ Hoàn tất | Audiobook (9 chương). Tác giả Nguyễn Nhật Ánh |
-| `eu-bim-task-group-handbook-v2-1` | EN | 📗 Dịch xong | Handbook kỹ thuật BIM/Twin Transition (EU). Đã dịch 9/9 chunk, songngu.md + vi.md + vi.epub. Audiobook chưa làm (sách tài liệu kỹ thuật, tùy chọn) |
-| `eu-bim-task-group-handbook-v2-1` | EN | 🔶 Dịch | Handbook BIM/Twin Transition EU (9 chunks). Đã complete 1,4,5,6,7,8 (08-07, nhiều worker song song), còn chunk 2,3 |
-| `qie-yi-qing-shen-gong-bai-tou` | ZH | ✅ Hoàn tất | Tản văn tình yêu/hôn nhân của Vãn Tình (58 chunks, 08-12). Đã dịch đủ + QA 0 lỗi + merge (tamngu.md 1.38MB, vi.md 483KB) + trilingual.epub (150KB). Audiobook chưa làm (tùy chọn) |
+> Thư mục output đặt tên theo **tên sách gốc** (tên file input); mỗi thư mục có `metadata.json` ghi `slug` nội bộ. Slug vẫn dùng cho progress/chunks/glossary/audio.
+
+| Slug (nội bộ) | Thư mục output (tên gốc) | Ngôn ngữ | Giai đoạn | Ghi chú / Bước tiếp theo |
+|---|---|:--------:|-----------|--------------------------|
+| `zuo-yi-ge-you-feng-gu-de-nu-zi` | `做一个有风骨的女子` | ZH | ✅ Hoàn tất | EPUB + audiobook (85 chương). Tác giả Vi Dương |
+| `ban-co-nam-cho-ngoi` | `Ban Co Nam Cho Ngoi - Nguyen Nhat Anh` | VI | ✅ Hoàn tất | Audiobook (12 chương). Tác giả Nguyễn Nhật Ánh. **3 chương đầu đã chạy lại bằng GPU (RTF 0.15) có nhạc nền** |
+| `dac-nhan-tam` | `Đắc Nhân Tâm - Dale Carnegie` | VI | ✅ Hoàn tất | Audiobook. Tác giả Dale Carnegie |
+| `rung-na-uy` | `Rung Na-uy - Haruki Murakami` | VI | ✅ Hoàn tất | Audiobook. Tác giả Haruki Murakami |
+| `eu-bim-task-group-handbook-v2-1` | `EU-BIM-Task-Group-Handbook-V2.1` | EN | 📗 Dịch xong | Handbook kỹ thuật BIM/Twin Transition (EU). Đã dịch 9/9 chunk, songngu.md + vi.md + vi.epub. Audiobook chưa làm (sách tài liệu kỹ thuật, tùy chọn) |
+| `qie-yi-qing-shen-gong-bai-tou` | `且以情深共白头：婚前看情感，婚后靠相处 (晚情)` | ZH | ✅ Hoàn tất | Tản văn tình yêu/hôn nhân của Vãn Tình (58 chunks, 08-12). Đã dịch đủ + QA 0 lỗi + merge (tamngu.md 1.38MB, vi.md 483KB) + trilingual.epub (150KB). Audiobook chưa làm (tùy chọn) |
+| `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` | `做一个刚刚好的女子  不攀附, 不将就 (晚情)` | ZH | ✅ Hoàn tất | Audiobook 50/50 chương GPU + EPUB nhúng font |
+| `zuo-yi-ge-you-jing-jie-de-nu-zi` | `做一个有境界的女子  不自轻,不自弃 (晚情)` | ZH | ✅ Hoàn tất | Tản văn Vãn Tình: "Làm một người phụ nữ có cảnh giới" (56 chunks). Audiobook chưa làm (tùy chọn) |
 
 **Giai đoạn**: `⛁ Extract → 🔶 Dịch → ⚙️ QA/Merge → 📗 EPUB → 🎧 Audiobook → ✅ Hoàn tất`
 
@@ -26,9 +28,21 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Master glossary (08-13)**: gom toàn bộ glossary về **1 file `glossary/master.csv`** (346 thuật ngữ, cột `source,target,type,note,book,author,genre`) — bỏ mô hình nhiều file per-book. Tự tách `master_001.csv` khi >300 dòng. Script: `glossary_lib.py` (đọc/lọc theo book/author/genre), `merge_glossary.py` (gộp cuốn mới vào master), `build_master.py` (gộp lần đầu). Đã sửa `run_pipeline.py`, `glossary_qa.py`, `translate_helper.py`, `translate.py` dùng master. **Fix root cause `_common.py`**: PROJECT_ROOT dùng `.resolve()` — khỏi lệch khi import qua path tương đối (cũng fix luôn bug `merge_chunks.py` ghi sai vị trí). **Thư mục `glossary/` giờ tối giản**: chỉ còn `master.csv` + `_template.*` (cần cho translate.py tạo glossary cuốn mới); đã xóa `_fields.md`, `genres/tien-hiep.md`, các file cuốn cũ (backup `working/glossary_backup_*`). Xem chi tiết session_log.
+
+- **Cải tổ thư mục `input/` theo trạng thái (08-13)**: chia thành `input/chua-lam/` (chưa làm), `input/da-dich/` (đã dịch, chưa audio), `input/da-audio/` (đã dịch + audio). Script `scripts/manage_input.py` tự dò `output/books/` → di chuyển file input vào đúng thư mục; chạy sau mỗi pipeline (đã thêm vào `dich.md` bước K). Hiện trạng: chua-lam 4 file (2 PDF + 2 EPUB), da-dich 3, da-audio 6. Có `input/README.md` giải thích. `dich.md` mục A/B đã cập nhật tìm file trong thư mục con.
+
+- **GPU toàn pipeline đã setup (08-12)**: RTX 3060 12GB được dùng cho cả 3 công đoạn nặng:
+  - **TTS (venv `working\venv-vieneu`)**: torch 2.13.0+cu126 → `audiobook_long.py --gpu --batch-size 8` dùng `infer_batch` static batching, RTF 0.15 (nhanh ~6x CPU). Patch local `inference_v3_turbo.py::_load_mono` dùng soundfile (torchaudio cần torchcodec + FFmpeg shared không có).
+  - **MinerU (`.venv`)**: nâng torch 2.13.0+cu126 → `mineru_extract.py --device auto` tự nhận GPU. Đã gỡ sạch paddle/paddleocr/paddlex khỏi `.venv` (chúng xung đột cuDNN DLL với torch CUDA).
+  - **PaddleOCR (venv mới `working\venv-ocr`)**: paddlepaddle-gpu 3.3.1 (cu126) + paddleocr 3.7.0, **không có torch** → chạy GPU sạch (GPU Compute Capability 8.6, RTX 3060). `ocr_paddle.py` đã sửa sang API 3.x (`device='gpu'/'cpu'`, `predict()` → `rec_texts`) + cơ chế **tự relaunch qua venv-ocr** khi env hiện tại thiếu paddleocr. Lưu ý: cảnh báo CUDNN 9.9 (paddle) vs 9.5 (torch) — chạy ổn, chỉ là cảnh báo.
+  - ⚠️ **Không import torch + paddle trong cùng 1 tiến trình** (xung đột cuDNN DLL trên Windows) — các script đã tách venv riêng nên không gặp.
+- Sách `ban-co-nam-cho-ngoi` (Nguyễn Nhật Ánh): **3 chương đầu (ch01-03) đã chạy lại GPU có nhạc nền** — ch01 dùng `sach_ke_chuyen_10_lofi.mp3`, ch02 `sach_ke_chuyen_11_lofi.mp3`, ch03 `sach_ke_chuyen_10_lofi.mp3` (xoay trong 2 bài đã chỉ định). Progress JSON đã cập nhật 3 chương. Còn 9 chương (4-12) chưa chạy lại GPU — chạy `--chapter 4..12 --gpu` khi cần.
+
 - **Tính năng nhạc nền (music bed) audiobook — đã chốt (08-12)**: `audiobook_long.py` thêm `--music` (tên file trong `core/music/`, nhiều file cách dấu phẩy xoay theo chương) + `--music-volume`. Trộn nhạc DƯỚI giọng với ducking (khi đọc ~10%, khi nghỉ ~20% ở volume 0.20), crossfade loop, loudness normalize (mọi bài về RMS 0.18 — bài master to/nhỏ đều nghe đều), metadata bump pipeline v5 (đổi nhạc/volume tự tạo lại). Mức chốt: volume 0.20, MIN_RATIO 0.50. User sẽ bổ sung thêm music vào `core/music/` — pipeline tự dò + xoay + normalize, chỉ dùng đúng file có trong đó.
-- Sách `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` (tản văn Vãn Tình, ZH): đã dịch xong + merge + audiobook 3 chương đầu (ch01-03) có nhạc nền mỗi chương 1 bài. Audiobook cả cuốn chưa chạy.
+- Sách `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` (tản văn Vãn Tình, ZH): **✅ Hoàn tất (08-13)** — dịch lại toàn bộ từ đầu: dọn sạch data cũ, extract EPUB → QC → 71 chunk → glossary → skeleton → dịch 71/71 chunk (sub-agent song song, số dòng khớp 100%, QA 0 lỗi) → merge `tamngu.md` (1.79MB) + `vi.md` (0.59MB). **Audiobook GPU 50/50 chương** (430.3MB, ~7.9 giờ audio, nhạc nền xoay volume 0.20, temp 0.3, top_k 10). **EPUB + audio đã fix mojibake**: chunk 1 bị hỏng dấu Việt do pipe PowerShell (cp1252) → sửa đúng UTF-8 → merge lại → rebuild 3 EPUB (nhúng font Noto Serif SC ~15MB) → **chạy lại chương 1-2** từ vi.md mới (07.6MB + 9.7MB, fingerprint 33a5b45e). ⚠️ **Rút kinh nghiệm: KHÔNG pipe text tiếng Việt qua PowerShell — ghi file UTF-8 rồi đọc bằng Python.**
 - Sách `qie-yi-qing-shen-gong-bai-tou` (tản văn của Vãn Tình, ZH): ✅ Hoàn tất — dịch đủ 58/58 chunk, QA 0 lỗi, merge tamngu.md + vi.md, trilingual.epub. Audiobook chưa làm (ZH, tùy chọn).
+- Sách `zuo-yi-ge-you-jing-jie-de-nu-zi` (tản văn của Vãn Tình, ZH, 08-12): ✅ Hoàn tất — EPUB scan 281 trang đã OCR (PaddleOCR) → raw.md 105KB, chunk 56, dịch đủ 56/56 chunk (85.882 từ), QA 0 lỗi, merge tamngu.md (1.54MB) + vi.md (511KB) + trilingual.epub (155KB). Audiobook chưa làm (ZH, tùy chọn).
 - Sách `eu-bim-task-group-handbook-v2-1`: ✅ Hoàn tất (9/9 chunk, QA 0 lỗi) — đã merge + vi.md + vi.epub + images/. Audiobook optional (chưa làm). Còn chunk 2,3 đã hoàn tất hết theo log phiên 08-07.
 - Sửa lỗi preview "Đọc thử" EPUB trắng tinh trên desktop app (WPF) — **đã hoàn tất**: nguyên nhân là `BuildEpubCss()`/`ReapplyThemeColors` đọc WPF-UI brush từ `Application.Current.Resources` trả về màu trắng/gần trong suốt (`#08FFFFFF`, `#FFFFFFFF`) → `--bg-color: #FFFFFF` làm vùng đọc trắng. Fix: thêm `GetSafeColor()` kiểm tra alpha + luminance, fallback palette dark theme (`#1E1E1E` nền/`#E0E0E0` chữ/`#B0B0B0` phụ). Verify thực tế: log `bgHex=#1E1E1E`, pixel màn hình nền tối RGB(24-31). Build 0 lỗi/0 cảnh báo.
 - UI desktop tinh chỉnh phiên 08-08 (đã build 0 lỗi/0 cảnh báo, app chạy ổn):

@@ -13,7 +13,9 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
   - Cập nhật `docs/STATE.md` (giai đoạn sách, đang làm, còn nợ, quyết định).
   - Thêm 1 entry mới vào CUỐI `docs/session_log.md` (ngày, đã làm, file đổi, còn dở, git).
 - Ràng buộc git: 2 file này **CÓ commit** (thuộc phạm vi docs — không chứa sản phẩm; không bỏ vào .gitignore).
-- Command hỗ trợ: `/start` (đọc + tóm tắt trạng thái), `/done` (nhắc ghi bộ nhớ + đề xuất commit).
+- Command hỗ trợ: `/start` (đọc + tóm tắt trạng thái), `/done` (nhắc ghi bộ nhớ + rotate log + đề xuất commit), `/dich` (dịch trọn sách). Cả 3 nằm ở `.commandcode/commands/` (Command Code) + `.opencode/command/` (opencode legacy).
+- **Rotate session log tự động**: `docs/session_log.md` không tự xoá — khi > 100KB, chạy `python scripts\rotate_session_log.py` (trong `/done`) để dời entry cũ > 3 tháng vào `docs/session_log_archive/<YYYY-MM>.md`, file chính giữ gần nhất.
+- **CUỐI PHIÊN: chạy `python scripts\verify_memory.py`** để kiểm tra STATE.md + session_log đã đồng bộ chưa (báo nếu thiếu entry hôm nay / sách mới chưa nhắc / session_log cần rotate). Sửa các cảnh báo trước khi kết thúc.
 - Nguyên tắc: agent PHẢI tự đọc bộ nhớ khi bắt đầu — KHÔNG chờ người dùng nhắc.
 
 ## GIT — QUY TẮC BẮT BUỘC
@@ -44,20 +46,21 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
   - `new-branch` — tạo nhánh feature mới từ main
   - `push-branch` — push lên một nhánh do người dùng chọn (có bước xác nhận nhánh)
   - `push-main` — gộp nhánh hiện tại vào main rồi push (chỉ dùng khi được lệnh)
-  - `dich` — tự động dịch trọn một cuốn sách: chỉ cần file PDF/EPUB trong `input/`, lệnh chạy toàn bộ pipeline (extract → QC → detect lang → chunk → glossary → skeleton → dịch bằng AI chat → QA → merge → EPUB) rồi trả kết quả trong `output/<slug>/`. Nếu sách đã có chunk/progress thì dịch tiếp phần còn thiếu. Người dùng không phải làm bước thủ công nào.
+  - `dich` — tự động dịch trọn một cuốn sách: chỉ cần file PDF/EPUB trong `input/`, lệnh chạy toàn bộ pipeline (extract → QC → detect lang → chunk → glossary → skeleton → dịch bằng AI chat → QA → merge → EPUB → audiobook) rồi trả kết quả trong `output/<slug>/`. Nếu sách đã có chunk/progress thì dịch tiếp phần còn thiếu. Người dùng không phải làm bước thủ công nào. **BƯỚC CUỐI CÙNG (bắt buộc): chạy `python scripts\manage_input.py` để cập nhật `input/`** — file sách chuyển vào `input\chua-lam\` (chưa làm) / `input\da-dich\` (đã dịch) / `input\da-audio\` (đã dịch + audio), để người dùng nhìn input là biết sách xử lý đến đâu.
 
 ## VÒNG LẶP DỊCH SÁCH (pipeline)
 1. **Extract**: `scripts/pipeline/run_pipeline.py` (MinerU cho PDF, epub_extract cho EPUB) → `working/extracted/<slug>/raw.md`
 2. **QC**: `scripts/process/post_extract_qc.py`
 3. **Detect lang** + **OpenCC t2s** (nếu zh-Hant)
 4. **Chunk**: `scripts/process/chunk_text.py` strategy smart (ZH: min 1500/max 3000 chữ)
-5. **Glossary**: `scripts/process/generate_glossary.py` → CSV `glossary/<slug>.csv` (cột `source,target` bắt buộc)
+5. **Glossary**: `scripts/process/generate_glossary.py` → CSV `glossary/<slug>.csv` (bước trung gian). **Chạy `python scripts\process\merge_glossary.py --book <slug> --author <author> [--genre <genre>]`** để gộp vào **`glossary/master.csv`** (file trung tâm duy nhất, cột `source,target,type,note,book,author,genre`). Master **tự tách** thành `master_001.csv`, ... khi phình (>300 dòng) — `glossary_lib.py` tự gộp khi đọc. Mọi script (QA, translate, pipeline) tự lọc từ master theo slug qua `filter_for_book()` — **không cần file per-book**. Khi cần dọn: `--normalize` (dedupe) / `--check` / `--info`. Nếu master chưa có, gộp lần đầu bằng `python scripts\common\build_master.py`.
 6. **Skeleton trilingual**: `scripts/translate/init_trilingual_skeleton.py --chunks-dir ... --progress-dir ...` → progress JSON `{chunk_id, total_chunks, chapter, source_text, translated_text, word_count_source, word_count_translated, mode:'trilingual', original_text, pinyin_text}`
 7. **Dịch**: subagent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng BẰNG nhau), giữ heading `#`/`##`, giữ nguyên dòng `![...]` ảnh, bỏ `///` OCR dư, dùng glossary, `translated_at="2026-07-31T00:00:00"`, ghi `json.dumps(ensure_ascii=False, indent=2)` utf-8. (KHÔNG dùng Local AI — chất lượng kém, đã bỏ.)
 8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `scripts/qa/glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
 9. **Merge**: `scripts/output/merge_chunks.py --format trilingual --force` → `output/books/<slug>/final/tamngu.md`
 10. **EPUB**: `scripts/output/make_epub.py` (cần pandoc)
 11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `output/books/<slug>/final/vi.md` (bản dịch thuần Việt)
+12. **Cập nhật input/ (BẮT BUỘC)**: `python scripts\manage_input.py` — di chuyển file nguồn vào `input\da-dich\` (đã dịch) hoặc `input\da-audio\` (đã dịch + audio) để người dùng biết trạng thái.
 
 ## BƯỚC 11 — TẠO AUDIOBOOK (VieNeu-TTS v3 Turbo)
 
@@ -90,7 +93,8 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - Chunk cache để resume: `working/progress_audio/chunks/<slug>/` (tự xóa sau khi chapter xong)
 
 ## CẤU TRÚC THƯ MỤC QUAN TRỌNG
-- `input/` — file gốc PDF/EPUB, **KHÔNG commit**
+- `input/` — file gốc PDF/EPUB, **KHÔNG commit**. Chia 3 thư mục con theo trạng thái (tự động bởi `scripts/manage_input.py`): `chua-lam/` (chưa làm — **bỏ sách mới vào đây**), `da-dich/` (đã dịch, chưa audio), `da-audio/` (đã dịch + audio). Có `README.md` giải thích.
+- `output/books/` — sản phẩm, **KHÔNG commit**. Thư mục đặt tên theo **tên sách gốc** (tên file input); mỗi thư mục có `metadata.json` ghi `{"slug": "<slug-nội-bộ>", "title": "...", "source_file": "..."}`. Slug nội bộ dùng cho `working/progress`, `working/chunks`, `glossary`, `progress_audio`.
 - `working/extracted/`, `working/chunks/`, `working/qa/` — **KHÔNG commit**
 - `working/progress/<slug>/` — chunk đã dịch, **KHÔNG commit** (sản phẩm trung gian)
 - `working/progress_audio/` — progress + cache audiobook, **KHÔNG commit** (sản phẩm)
@@ -98,7 +102,6 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - `glossary/` — glossary cuốn, **KHÔNG commit** (sản phẩm)
 - `output/` — toàn bộ sản phẩm (final/*.md, ảnh, audiobook, epub), **KHÔNG commit**; giữ local/Drive
 - `output/samples/` — test samples, **KHÔNG commit**
-- `output/_archive/` — legacy, **KHÔNG commit**
 - `core/` — audio mẫu + reference voices dùng chung, **KHÔNG commit**
 - `core/voices/` — reference audio đã extract (WAV + JSON metadata), **KHÔNG commit**
 - Scripts chạy bằng `.venv\Scripts\python.exe` (Python 3.11)

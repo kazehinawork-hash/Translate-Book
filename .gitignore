@@ -35,7 +35,9 @@ input/
 output/
 glossary/
 
-# Working — CHỈ exclude cac/to/tái tạo được + SẢN PHẨM trung gian
+# Working — toàn bộ thư mục làm việc (venv, backup, sản phẩm trung gian) KHÔNG commit
+working/
+# Giữ các rule cũ (tường minh hơn, tránh sót)
 working/extracted/
 working/chunks/
 working/qa/
@@ -49,6 +51,8 @@ working/progress_audio/
 
 # Generated glossary prompts
 working/glossary_prompt*.txt
+# Thư mục working lạc (sinh khi path PROJECT_ROOT lệch)
+scripts/process/working/
 # venv audiobook (VieNeu-TTS)
 working/venv-vieneu/
 
@@ -76,6 +80,7 @@ output/**/audio_test/
 
 # Logs
 *.log
+*.log.err
 logs/
 
 # MinerU
