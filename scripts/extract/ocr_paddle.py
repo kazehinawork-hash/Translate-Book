@@ -40,6 +40,36 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from _common import setup_encoding  # noqa: E402
 
 
+# === NEW: Tự dùng venv OCR riêng (working/venv-ocr) ===
+# PaddleOCR 3.x + paddle GPU yêu cầu venv riêng (không có torch — tránh xung đột
+# cuDNN DLL với torch CUDA trong .venv chính dùng cho MinerU).
+# Nếu env hiện tại thiếu paddleocr nhưng venv-ocr có sẵn → relaunch bằng nó.
+def _relaunch_via_ocr_venv() -> None:
+    """Nếu đang chạy bằng python khác (thiếu paddleocr) nhưng có venv-ocr → chạy lại bằng venv-ocr."""
+    if HAS_PADDLEOCR:
+        return
+    project_root = Path(__file__).resolve().parents[2]
+    ocr_venv_py = project_root / 'working' / 'venv-ocr' / 'Scripts' / 'python.exe'
+    if not ocr_venv_py.exists():
+        return  # không có venv-ocr → để main() báo lỗi thiếu paddleocr
+    try:
+        from paddleocr import PaddleOCR  # noqa: F401
+        return  # env hiện tại thực ra có paddleocr (import muộn thành công)
+    except ImportError:
+        pass
+    print(f"Info: chay lai bang venv OCR: {ocr_venv_py}")
+    cmd = [str(ocr_venv_py), str(Path(__file__).resolve())] + sys.argv[1:]
+    try:
+        import subprocess
+        proc = subprocess.run(cmd, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        sys.exit(proc.returncode)
+    except Exception as e:
+        print(f"[WARN] Khong chay lai bang venv-ocr duoc ({e}) - tiep tuc bang env hien tai.", file=sys.stderr)
+
+
+_relaunch_via_ocr_venv()
+
+
 # Mapping ngôn ngữ phổ biến
 LANG_MAP = {
     'ch_sim': 'Chinese (Simplified)',
@@ -76,14 +106,32 @@ def detect_paddle_gpu() -> tuple[bool, str]:
 
 
 def ocr_anh(ocr_engine, image_path: Path, lang: str) -> str:
-    """OCR 1 ảnh, trả về text Markdown."""
-    result = ocr_engine.ocr(str(image_path), cls=True)
-    if not result or not result[0]:
+    """OCR 1 ảnh, trả về text Markdown.
+
+    API PaddleOCR 3.x: ``ocr_engine.predict(path)`` trả list dict,
+    mỗi dict có key ``rec_texts`` (list các dòng chữ nhận diện).
+    """
+    try:
+        result = ocr_engine.predict(str(image_path))
+    except AttributeError:
+        # Fallback API 2.x cũ (use_gpu, result[0] là list line)
+        result = ocr_engine.ocr(str(image_path), cls=True)
+        if not result or not result[0]:
+            return ''
+        lines = []
+        for line in result[0]:
+            if line and len(line) >= 2:
+                text = line[1][0]  # (text, confidence)
+                if text:
+                    lines.append(text)
+        return '\n\n'.join(lines)
+    if not result:
         return ''
     lines = []
-    for line in result[0]:
-        if line and len(line) >= 2:
-            text = line[1][0]  # (text, confidence)
+    for page in result:
+        if not isinstance(page, dict):
+            continue
+        for text in page.get('rec_texts') or []:
             if text:
                 lines.append(text)
     return '\n\n'.join(lines)
@@ -194,15 +242,22 @@ def main():
     paddle_lang = PADDLE_LANG_MAP.get(raw_lang, raw_lang)
     print(f"  PaddleOCR lang: {paddle_lang} (từ '{args.lang}')")
 
-    # Khởi tạo PaddleOCR
-    use_angle_cls = True
-    ocr_engine = PaddleOCR(
-        use_angle_cls=use_angle_cls,
-        lang=paddle_lang,
-        use_gpu=use_gpu,
-        show_log=False,
-    )
-    print("✓ PaddleOCR đã khởi tạo")
+    # Khởi tạo PaddleOCR (API 3.x: dùng device='gpu'/'cpu'; không có use_angle_cls/show_log)
+    device_str = 'gpu' if use_gpu else 'cpu'
+    try:
+        ocr_engine = PaddleOCR(
+            lang=paddle_lang,
+            device=device_str,
+        )
+    except (TypeError, ValueError):
+        # Fallback API 2.x cũ (use_gpu=)
+        ocr_engine = PaddleOCR(
+            use_angle_cls=True,
+            lang=paddle_lang,
+            use_gpu=use_gpu,
+            show_log=False,
+        )
+    print(f"✓ PaddleOCR đã khởi tạo (device: {device_str})")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
 

@@ -293,18 +293,62 @@ def mix_music_bed(voice, music_path, volume=MUSIC_VOLUME_DEFAULT,
     return mixed, os.path.basename(music_path)
 
 
+def find_book_dir(slug: str = None) -> str | None:
+    """Tìm thư mục sách trong output/books/ theo slug.
+
+    Thư mục output/books/ được đặt tên theo tên sách gốc (tên file input),
+    mỗi thư mục có metadata.json ghi {'slug': 'tên-slug-cũ', ...}.
+    - Nếu slug truyền vào: tìm thư mục có metadata.slug == slug.
+    - Nếu không truyền: trả về thư mục duy nhất có final/vi.md (nếu có đúng 1).
+    Trả về đường dẫn thư mục hoặc None.
+    """
+    books_dir = os.path.join(PROJECT_ROOT, "output", "books")
+    if not os.path.isdir(books_dir):
+        return None
+    found = []
+    for d in sorted(os.listdir(books_dir)):
+        dpath = os.path.join(books_dir, d)
+        if not os.path.isdir(dpath):
+            continue
+        # Đọc metadata.json nếu có
+        meta_slug = None
+        meta_path = os.path.join(dpath, "metadata.json")
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta_slug = json.load(f).get("slug")
+            except Exception:
+                meta_slug = None
+        if slug:
+            if meta_slug == slug or d == slug:
+                return dpath
+        else:
+            # Không truyền slug: xét thư mục có final/vi.md
+            if os.path.exists(os.path.join(dpath, "final", "vi.md")):
+                found.append(dpath)
+    if slug is None and len(found) == 1:
+        return found[0]
+    return None
+
+
 def find_vi_md(slug: str = None) -> tuple:
     """Tìm file -vi.md. Trả về (path, slug).
 
     Tìm theo thứ tự:
-    1. output/books/<slug>/final/vi.md (cấu trúc mới)
+    1. output/books/<thư mục theo tên gốc>/final/vi.md (cấu trúc mới, map qua metadata.json)
     2. output/<slug>/<slug>-vi.md (cấu trúc cũ, backward compat)
     """
     books_dir = os.path.join(PROJECT_ROOT, "output", "books")
     output_dir = os.path.join(PROJECT_ROOT, "output")
 
     if slug:
-        # Thử cấu trúc mới trước
+        # Cấu trúc mới: map slug -> thư mục (tên gốc)
+        book_dir = find_book_dir(slug)
+        if book_dir:
+            new_path = os.path.join(book_dir, "final", "vi.md")
+            if os.path.exists(new_path):
+                return new_path, slug
+        # Fallback: tên thư mục = slug
         new_path = os.path.join(books_dir, slug, "final", "vi.md")
         if os.path.exists(new_path):
             return new_path, slug
@@ -316,7 +360,7 @@ def find_vi_md(slug: str = None) -> tuple:
 
     # Auto-detect: tìm -vi.md trong books/ và output/
     candidates = []
-    # Cấu trúc mới: output/books/<slug>/final/vi.md
+    # Cấu trúc mới: output/books/<tên gốc>/final/vi.md
     if os.path.isdir(books_dir):
         for d in sorted(os.listdir(books_dir)):
             vi_path = os.path.join(books_dir, d, "final", "vi.md")
@@ -969,12 +1013,19 @@ def _save_audio_cache(path: str, audio, signature: str) -> None:
 
 def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7,
                            top_k=20, chunk_dir=None, force=False,
-                           repetition_penalty=1.5, top_p=0.95):
-    """Generate audio cho 1 chapter với cache kiểm tra được tham số."""
-    raw_chunks = []
+                           repetition_penalty=1.5, top_p=0.95,
+                           use_batch=False, batch_size=8):
+    """Generate audio cho 1 chapter với cache kiểm tra được tham số.
+
+    - use_batch=True (GPU): gom các chunk chưa cache thành nhóm, gọi infer_batch
+      (static batching) — nhanh hơn nhiều lần so với infer từng chunk.
+    - use_batch=False (CPU): generate từng chunk như cũ.
+    """
+    raw_audio = [None] * len(chunks)
     total_gen_time = 0
 
-    # 1. Generate hoặc load cache — chỉ thu thập audio chunks, chưa chèn silence
+    # 1. Xác định chunk đã có cache (dùng lại) và chunk cần generate
+    to_gen = []  # list of (idx, chunk_text)
     for i, (chunk, ends_para) in enumerate(chunks):
         if chunk_dir and not force:
             chunk_wav = os.path.join(chunk_dir, f"{i:04d}.wav")
@@ -983,31 +1034,76 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
             audio = _load_cached_audio(chunk_wav, chunk_wav + ".sig", signature)
             if audio is not None:
                 print(f"      [{i+1:3d}/{len(chunks)}] ⏭  dùng lại cache")
-                raw_chunks.append(audio)
+                raw_audio[i] = audio
                 continue
+        to_gen.append((i, chunk))
 
+    # 2. Generate phần chưa có — batch theo NHÓM (GPU) hoặc từng chunk (CPU)
+    #    Chia to_gen thành các nhóm batch_size, mỗi nhóm infer xong in ngay
+    #    (progress nhảy dần 1/60, 2/60... chứ không đợi hết chapter mới in).
+    if use_batch and len(to_gen) > 1:
+        for g in range(0, len(to_gen), batch_size):
+            group = to_gen[g:g + batch_size]
+            texts = [c for _, c in group]
+            g_idxs = [i for i, _ in group]
+            t0 = time.time()
+            try:
+                wavs = tts.infer_batch(
+                    texts, voice=voice_name, style="doc_truyen",
+                    temperature=temperature, top_k=top_k,
+                    repetition_penalty=repetition_penalty, top_p=top_p,
+                    apply_watermark=False, batch_size=len(texts))
+            except Exception as e:
+                print(f"   ⚠️  infer_batch lỗi ({e}) — fallback về infer từng chunk.")
+                wavs = None
+            if wavs is None:
+                # Fallback: từng chunk trong nhóm
+                for idx, chunk in group:
+                    audio, elapsed = generate_chunk_audio(
+                        tts, voice_name, chunk, idx, len(chunks), temperature, top_k,
+                        repetition_penalty, top_p)
+                    total_gen_time += elapsed
+                    if chunk_dir:
+                        _save_audio_cache(
+                            os.path.join(chunk_dir, f"{idx:04d}.wav"), audio,
+                            _audio_cache_signature(chunk, voice_name, temperature,
+                                                   top_k, repetition_penalty, top_p))
+                    raw_audio[idx] = audio
+                continue
+            elapsed = time.time() - t0
+            total_gen_time += elapsed
+            for idx, audio in zip(g_idxs, wavs):
+                audio = audio.squeeze()
+                dur = len(audio) / SAMPLE_RATE
+                print(f"      [batch {idx+1:3d}/{len(chunks)}] {dur:.1f}s | \"{chunks[idx][0][:40]}...\"")
+                if chunk_dir:
+                    _save_audio_cache(
+                        os.path.join(chunk_dir, f"{idx:04d}.wav"), audio,
+                        _audio_cache_signature(chunks[idx][0], voice_name, temperature,
+                                               top_k, repetition_penalty, top_p))
+                raw_audio[idx] = audio
+            to_gen = [t for t in to_gen if raw_audio[t[0]] is None]
+    for idx, chunk in to_gen:
         audio, elapsed = generate_chunk_audio(
-            tts, voice_name, chunk, i, len(chunks), temperature, top_k,
+            tts, voice_name, chunk, idx, len(chunks), temperature, top_k,
             repetition_penalty, top_p)
         total_gen_time += elapsed
-
         if chunk_dir:
             _save_audio_cache(
-                os.path.join(chunk_dir, f"{i:04d}.wav"), audio,
+                os.path.join(chunk_dir, f"{idx:04d}.wav"), audio,
                 _audio_cache_signature(chunk, voice_name, temperature, top_k,
                                        repetition_penalty, top_p))
+        raw_audio[idx] = audio
 
-        raw_chunks.append(audio)
-
-    # 2. Ghép: fade ngắn ở 2 đầu mỗi chunk (chống click), chèn silence theo loại
+    # 3. Ghép: fade ngắn ở 2 đầu mỗi chunk (chống click), chèn silence theo loại
     #    ranh giới thật: hết câu/ngắt đoạn (dài) > cắt giữa câu (ngắn, gần như liền).
     combined = []
-    for i, audio in enumerate(raw_chunks):
+    for i, audio in enumerate(raw_audio):
         # Fade out 2-3ms cuối + fade in 2-3ms đầu của chunk → âm kết thúc về 0
         # trước khi gặp silence → hết "click"/"pop" tại chỗ nối (không ảnh hưởng cảm nhận).
         audio = _edge_fade(audio, CROSSFADE_MS)
         combined.append(audio)
-        if i < len(raw_chunks) - 1:
+        if i < len(raw_audio) - 1:
             chunk_text = chunks[i][0]
             ends_para = chunks[i][1]
             # Ngắt đoạn (heading/end) hoặc hết câu → nghỉ dài; cắt giữa câu → nghỉ ngắn
@@ -1018,9 +1114,9 @@ def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7
     combined.append(make_silence(SILENCE_CHAPTER_END))
 
     final = np.concatenate(combined)
-    # 3. Normalize toàn chapter (giữ nguyên dynamic range)
+    # 4. Normalize toàn chapter (giữ nguyên dynamic range)
     final = _normalize(final, NORM_MASTER)
-    # 4. Fade in/out ở đầu/cuối chapter (áp dụng lên audio samples, không phải silence)
+    # 5. Fade in/out ở đầu/cuối chapter (áp dụng lên audio samples, không phải silence)
     final = _apply_fade(final)
 
     return final, total_gen_time
@@ -1142,18 +1238,19 @@ def audio_progress_metadata(voice: str, temperature: float, top_k: int,
 
 
 def reconcile_existing_outputs(slug: str) -> list:
-    """Quét output寻找 file chương đã tồn tại.
+    """Quét output tìm file chương đã tồn tại.
 
-    Tìm trong output/books/<slug>/audiobook/ (mới) và output/<slug>/ (cũ).
-    Trả về list chapter number đã có file audio.
+    Tìm trong output/books/<thư mục theo tên gốc>/audiobook/ (mới, map qua
+    metadata.json) và output/<slug>/ (cũ). Trả về list chapter number đã có audio.
     """
     found = []
-    # Cấu trúc mới
-    new_dir = os.path.join(PROJECT_ROOT, "output", "books", slug, "audiobook")
+    # Cấu trúc mới: thư mục theo tên gốc (map slug qua find_book_dir)
+    book_dir = find_book_dir(slug)
+    new_dir = os.path.join(book_dir, "audiobook") if book_dir else None
     # Cấu trúc cũ
     old_dir = os.path.join(PROJECT_ROOT, "output", slug)
     for out_dir in [new_dir, old_dir]:
-        if os.path.isdir(out_dir):
+        if out_dir and os.path.isdir(out_dir):
             pattern = re.compile(rf"^(?:{re.escape(slug)}-)?ch(\d+)\.(?:mp3|wav)$")
             for fn in os.listdir(out_dir):
                 m = pattern.match(fn)
@@ -1261,6 +1358,28 @@ def merge_all_chapters(slug: str, out_dir: str, chapters: list, bitrate: str = "
         print(f"   ✅ MP3: {mp3}")
 
 
+def _create_tts(args) -> "object":
+    """Khởi tạo VieNeu-TTS v3 Turbo theo chế độ chạy (GPU/CPU).
+
+    - GPU (--gpu): dùng PyTorch/CUDA (model gốc fp32/bf16 + static batching).
+    - CPU (mặc định): dùng ONNX Runtime int8 (nhanh, torch-free).
+    """
+    import vieneu
+    if args.gpu:
+        import torch
+        if not torch.cuda.is_available():
+            print("   ⚠️  --gpu được chỉ định nhưng không tìm thấy CUDA — chạy CPU thay thế.")
+            return vieneu.Vieneu()
+        dev = f"cuda:{torch.cuda.current_device()}"
+        print(f"   ⚡ GPU: {torch.cuda.get_device_name(torch.cuda.current_device())} ({dev})")
+        return vieneu.Vieneu(device=dev)
+    print("   💻 Backend: CPU (ONNX Runtime int8)")
+    kwargs = {}
+    if args.threads and args.threads > 0:
+        kwargs["threads"] = args.threads
+    return vieneu.Vieneu(**kwargs)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Tạo audiobook từ -vi.md")
     parser.add_argument("--slug", help="Book slug (auto-detect nếu bỏ trống)")
@@ -1292,8 +1411,16 @@ def main():
                         help="Trộn nhạc nền DƯỚI giọng đọc. Truyền tên file trong core/music/ "
                              "(vd: --music sach_ke_chuyen_lofi.mp3), 'auto' = chọn file có sẵn, "
                              "nhiều file cách dấu phẩy để xoay theo chương. Mặc định tắt.")
+    parser.add_argument("--music-auto", action="store_true",
+                        help="Tự chọn nhạc theo nội dung chương bằng AI (Deepseek) — thông minh hơn xoay đều")
     parser.add_argument("--music-volume", type=float, default=None,
                         help=f"Volume nhạc nền trung bình 0..1 (default: {MUSIC_VOLUME_DEFAULT})")
+    parser.add_argument("--gpu", action="store_true",
+                        help="Chạy TTS trên GPU (CUDA) — nhanh hơn nhiều nếu có NVIDIA. Mặc định: CPU/ONNX.")
+    parser.add_argument("--batch-size", type=int, default=8,
+                        help="Số chunk gộp mỗi forward khi chạy GPU (default: 8). Lớn hơn = nhanh hơn, tốn VRAM hơn.")
+    parser.add_argument("--threads", type=int, default=0,
+                        help="Số intra-op threads cho ONNX/CPU (0 = mặc định engine). Chỉ áp dụng khi chạy CPU.")
     args = parser.parse_args()
 
     if args.pronounce_json:
@@ -1322,8 +1449,7 @@ def main():
         print(f"   Text ({len(passage)} chars): \"{passage[:80]}...\"")
 
         print("\n🎙️ Loading VieNeu-TTS v3 Turbo...")
-        import vieneu
-        tts = vieneu.Vieneu()
+        tts = _create_tts(args)
 
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from manage_voice import resolve_voice, get_voice_path
@@ -1373,8 +1499,12 @@ def main():
     else:
         selected = chapters
 
-    # Output dir: output/books/<slug>/audiobook/
-    out_dir = os.path.join(PROJECT_ROOT, "output", "books", slug, "audiobook")
+    # Output dir: output/books/<thư mục theo tên gốc>/audiobook/
+    book_dir = find_book_dir(slug)
+    if not book_dir:
+        # Tạo mới nếu chưa có (sách mới): thư mục theo slug (sẽ được đặt tên gốc sau)
+        book_dir = os.path.join(PROJECT_ROOT, "output", "books", slug)
+    out_dir = os.path.join(book_dir, "audiobook")
     os.makedirs(out_dir, exist_ok=True)
 
     # Nhạc nền (music bed): resolve danh sách file dùng cho các chapter
@@ -1402,6 +1532,13 @@ def main():
                 print(f"🎵 Nhạc nền: {', '.join(music_files)} (volume {music_volume:.0%}, xoay theo chương)")
             else:
                 print("   ⚠️  Không có nhạc nền hợp lệ — tắt")
+    elif args.music_auto:
+        # Chế độ AI: mỗi chương tự gợi ý nhạc theo nội dung (suggest_music.py, có cache)
+        avail = list_music_files()
+        if not avail:
+            print("   ⚠️  core/music/ trống — tắt nhạc nền (đặt file .mp3/.wav vào core/music/)")
+        else:
+            print(f"🎵 Nhạc nền: TỰ ĐỘNG theo nội dung (AI) — {len(avail)} bài có trong core/music/ (volume {music_volume:.0%})")
 
     # 3. Load progress
     progress = load_progress(slug)
@@ -1436,8 +1573,7 @@ def main():
 
     # 4. Load TTS
     print("\n🎙️ Loading VieNeu-TTS v3 Turbo...")
-    import vieneu
-    tts = vieneu.Vieneu()
+    tts = _create_tts(args)
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from manage_voice import resolve_voice, get_voice_path
@@ -1528,7 +1664,8 @@ def main():
                 tts, voice_name, chunks, num,
                 temperature=args.temperature, top_k=args.top_k,
                 chunk_dir=chunk_dir, force=args.force,
-                repetition_penalty=args.repetition_penalty, top_p=args.top_p)
+                repetition_penalty=args.repetition_penalty, top_p=args.top_p,
+                use_batch=args.gpu, batch_size=args.batch_size)
         except Exception as e:
             print(f"   ❌ Failed at chapter {num}: {e}")
             print(f"   💾 Progress saved (chunk cache giữ lại để resume). Run again to resume.")
@@ -1536,7 +1673,30 @@ def main():
             return
 
         # Trộn nhạc nền DƯỚI giọng đọc (music bed) nếu có
-        if music_files:
+        if args.music_auto:
+            # Chế độ AI (agent): đọc bản đồ gợi ý nhạc theo nội dung chương từ file JSON
+            # (do agent chấm cảm xúc từng chương và ghi vào working/progress_audio/music_map.json).
+            music_name = None
+            map_path = os.path.join(PROJECT_ROOT, "working", "progress_audio", "music_map.json")
+            try:
+                if os.path.exists(map_path):
+                    music_map = json.load(open(map_path, encoding="utf-8"))
+                    # Map lưu theo dạng {"slug": {chapter_num: "file.mp3"}}
+                    per_book = music_map.get(slug, {})
+                    music_name = per_book.get(str(num))
+            except Exception as e:
+                print(f"   ⚠️  Lỗi đọc bản đồ nhạc ({e}) — dùng xoay đều")
+            if not music_name:
+                avail = list_music_files()
+                if avail:
+                    music_name = avail[(num - 1) % len(avail)]
+            if music_name:
+                music_path = os.path.join(MUSIC_DIR, music_name)
+                audio, used = mix_music_bed(audio, music_path, volume=music_volume,
+                                            chapter_num=num, music_list=[music_name])
+                if used:
+                    print(f"   🎵 Nhạc nền (agent): {used} (chapter {num})")
+        elif music_files:
             music_name = music_files[(num - 1) % len(music_files)]
             music_path = os.path.join(MUSIC_DIR, music_name)
             audio, used = mix_music_bed(audio, music_path, volume=music_volume,
