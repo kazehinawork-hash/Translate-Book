@@ -675,6 +675,21 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
     # Paragraph cuối cùng → section end
     if current:
         paragraphs.append((" ".join(current), True))
+
+    # Gộp paragraph ngắn (< 50 ký tự, thường là câu hội thoại đứng riêng) vào
+    # paragraph liền TRƯỚC để model TTS có đủ ngữ cảnh — chunk 1 câu ngắn đứng
+    # riêng khiến model hallucinate (bịa thêm nội dung dài / đọc lặp câu).
+    # Không gộp vào heading (heading không phải câu đọc).
+    merged_paras = []
+    for p_text, p_end in paragraphs:
+        if merged_paras and len(p_text) < 50 and len(merged_paras[-1][0]) > 2 \
+                and not merged_paras[-1][0].startswith("Chương"):
+            prev_text, prev_end = merged_paras[-1]
+            merged_paras[-1] = (prev_text + " " + p_text, p_end or prev_end)
+        else:
+            merged_paras.append((p_text, p_end))
+    paragraphs = merged_paras
+
     return paragraphs
 
 
@@ -849,11 +864,14 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
             chunks.append((_ensure_sentence_ending(current.strip()), para_section_end))
 
     # Gộp các chunk NHỎ liền kề (nhất là câu hội thoại ngắn đứng riêng) để model
-    # có đủ ngữ cảnh, tránh sinh lặp khi chunk quá ngắn. Duyệt từ đầu: nếu chunk i
-    # + chunk i+1 <= max_chars → gộp (giữ flag para_end của chunk sau).
-    # NGOẠI LỆ: không gộp nếu câu ĐẦU của chunk sau lặp cụm từ đầu của câu CUỐI
+    # có đủ ngữ cảnh, tránh sinh lặp/hallucinate khi chunk quá ngắn. Duyệt từ đầu:
+    # nếu chunk i + chunk i+1 <= max_chars → gộp (giữ flag para_end của chunk sau).
+    # NGOẠI LỆ 1: không gộp nếu câu ĐẦU của chunk sau lặp cụm từ đầu của câu CUỐI
     # chunk trước (vd "một số đứa ở lại..." / "một số đứa chuyển...") — 2 câu song
     # song cạnh nhau khiến model TTS dễ kẹt lặp; tách riêng sẽ hết.
+    # NGOẠI LỆ 2 (ưu tiên hơn): chunk cực ngắn (< 50 ký tự) LUÔN được gộp dù có
+    # song song — vì chunk 1 câu ngắn đứng riêng khiến model hallucinate (bịa thêm
+    # nội dung dài) nghiêm trọng hơn nhiều so với nguy cơ lặp do 2 câu song song.
     def _first_words(s, n=3):
         return tuple(s.split()[:n])
 
@@ -867,15 +885,42 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
         c = _first_words(cur_sents[0])
         return len(p) >= 2 and len(c) >= 2 and p[0] == c[0] and (p[1] == c[1] or p[1] in c)
 
+    def _should_merge(prev, cur):
+        """Quyết định có gộp chunk cur vào prev không."""
+        total = len(prev) + len(cur) + 1
+        # Chunk cực ngắn → gộp kể cả khi hơi vượt max_chars (tối đa TTS_MAX_CHARS,
+        # giới hạn an toàn của model) — 1 câu ngắn đứng riêng nguy hiểm hơn nhiều
+        # so với chunk hơi dài.
+        if len(cur) < 50 or len(prev) < 50:
+            return total <= TTS_MAX_CHARS
+        if total > max_chars:
+            return False
+        return not _is_parallel(prev, cur)
+
     merged = []
     for text, para_end in chunks:
-        if merged and len(merged[-1][0]) + len(text) + 1 <= max_chars \
-                and not _is_parallel(merged[-1][0], text):
+        if merged and _should_merge(merged[-1][0], text):
             prev_text, prev_para = merged[-1]
             merged[-1] = (prev_text + " " + text, para_end or prev_para)
         else:
             merged.append((text, para_end))
-    chunks = merged
+
+    # Lượt 2: chunk ngắn còn sót (chưa gộp được vào trước vì chunk trước đầy) →
+    # gộp vào chunk SAU nếu còn chỗ. Duyệt ngược để gộp an toàn.
+    merged2 = []
+    i = 0
+    while i < len(merged):
+        text, para_end = merged[i]
+        if (len(text) < 50 and i + 1 < len(merged)
+                and _should_merge(text, merged[i + 1][0])):
+            # Gộp text vào đầu chunk sau
+            next_text, next_end = merged[i + 1]
+            merged2.append((text + " " + next_text, para_end or next_end))
+            i += 2
+        else:
+            merged2.append((text, para_end))
+            i += 1
+    chunks = merged2
 
     return chunks
 
