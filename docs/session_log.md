@@ -1173,3 +1173,200 @@
 ### Git
 - Chưa commit. Đề xuất: gộp commit docs khi user duyệt.
 
+## 2026-08-13 — Nâng cấp master.csv: chuẩn hóa trùng dịch + note + type + check-dup
+
+### Đã làm
+- User hỏi master.csv cần nâng cấp gì → phân tích tìm 3 vấn đề: 3 từ trùng dịch khác nhau, 229 note tiếng Anh, type đều = term.
+- **Chuẩn hóa 3 từ trùng dịch** (19 dòng): `修养`→Tu dưỡng, `尊严`→Nhân phẩm, `善良`→Tốt bụng. Hết source trùng target khác.
+- **Dịch 239 note Anh→Việt** (Women→Phụ nữ, Happiness→Hạnh phúc, Book title→Tên sách...).
+- **Thêm `infer_type()` vào `merge_glossary.py`**: tự phân loại character/place/phrase/term khi gộp cuốn mới (dựa trên note + blacklist từ Hán thông dụng). Test: 晚情→character, 青岛出版社→term, LCA→phrase.
+- **Thêm `--check-dup` vào `merge_glossary.py`**: phát hiện source trùng target khác (exit 1 nếu có), chặn tích lũy thêm.
+- **Trả lời user**: sách mới có thuật ngữ mới → CÓ tự động cập nhật vào master qua `merge_glossary.py --book <slug> --author <a>` (đã có trong /dich mục E).
+- Test: `--check-dup` 0 trùng, translate_helper vẫn nhúng glossary chuẩn (`尊严`→Nhân phẩm, note tiếng Việt).
+
+### File đổi
+- `glossary/master.csv` — chuẩn hóa trùng + note — **KHÔNG commit** (sản phẩm, repo code-only)
+- `scripts/process/merge_glossary.py` — thêm infer_type + --check-dup — **có commit** (code)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code (merge_glossary) + 1 commit docs khi user duyệt.
+
+## 2026-08-13 — Hoàn tất audiobook GPU + nhạc nền cho Bạn Có Nằm Chờ Ngồi (12/12 chương)
+
+### Đã làm
+- User yêu cầu tạo audio cho `input\da-audio\Ban Co Nam Cho Ngoi - Nguyen Nhat Anh.epub`. Trạng thái: 12 chương đã có MP3 nhưng chỉ ch01-03 chạy GPU + nhạc nền (12/08), ch04-11 là bản CPU cũ (10/08), ch12 chạy 13/08 không nhạc.
+- **Chạy lại ch04-12 GPU + nhạc nền**: `audiobook_long.py --slug ban-co-nam-cho-ngoi --chapter 4..12 --force --gpu --batch-size 8 --temperature 0.3 --top-k 10 --repetition-penalty 1.5 --top-p 0.95 --music sach_ke_chuyen_10_lofi.mp3,sach_ke_chuyen_11_lofi.mp3 --music-volume 0.2`. Vì progress JSON ghi cả 12 chương completed nên cần `--force` để ép regen.
+- **Chạy lại ch01-03 GPU + nhạc nền** (user yêu cầu "chạy lại cho tôi cả chương 1 đến chương 3"): chạy `--chapter 1 2 3 --force` cùng tham số. Chú ý: lần đầu chạy không `--force` bị skip vì `reconcile_existing_outputs` dò thấy file cũ → dùng `--force`.
+- **Gộp progress JSON**: do `--force` reset completed_chapters (lần 4-12 → [4..12], lần 1-3 → [1..3]), đã gộp thủ công thành [1..12] và cộng dồn total_gen_time (5068s) + total_audio_time (11399s ~ 3h10).
+- **Verify**: 12/12 file MP3 có duration hợp lệ (11:58–21:30, tổng ~3h10, ~197MB), progress JSON đủ 12 chương + metadata nhạc nền (2 bài xoay, volume 0.2). `ch01_old.mp3` là bản CPU cũ giữ lại.
+
+### File đổi
+- `output/books/Ban Co Nam Cho Ngoi - Nguyen Nhat Anh/audiobook/ch01-12.mp3` — tạo lại GPU + nhạc nền — **KHÔNG commit** (sản phẩm)
+- `working/progress_audio/ban-co-nam-cho-ngoi.json` — gộp 12 chương — **KHÔNG commit** (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit docs (STATE + session_log) khi user duyệt.
+
+## 2026-08-13 — Benchmark GPU batch_size → chuẩn mới --batch-size 16
+
+### Đã làm
+- User hỏi tốc độ tạo audio đã ok chưa → chạy benchmark đo RTF thật trên chunks chương 1 (giữ nguyên tham số sampling temp 0.3/top_k 10/rep 1.5).
+- Kết quả: **batch 8 (cũ) RTF 0.185 → batch 16 RTF 0.120 (~2x nhanh hơn)**, batch 32 (0.122) không nhanh hơn nữa (VRAM bão hòa). batch 4 (0.223) chậm nhất.
+- Kiểm tra chất lượng batch 8 vs 16 trên 6 chunks: RMS 0.1126 vs 0.1123, centroid 3045 vs 3144 Hz, duration 73.6 vs 75.2s — tương đương, không suy giảm (sai khác do sampling ngẫu nhiên).
+- User quyết định: **áp dụng `--batch-size 16` cho các sách sau** (giữ nguyên temp 0.3, top_k 10). Ghi nhớ vào AGENTS.md + STATE.md.
+
+### File đổi
+- `AGENTS.md` — thêm chuẩn GPU `--batch-size 16` (mục Scripts + Env) — **có commit** (docs)
+- `docs/STATE.md` — cập nhật chuẩn TTS GPU — **có commit** (docs)
+- `working/bench_gpu_batch.py`, `working/bench_quality.py` — script benchmark tạm — **KHÔNG commit** (có thể xóa sau)
+- `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit docs khi user duyệt.
+
+## 2026-08-13 — Chạy lại audiobook Bạn Có Nằm Chờ Ngồi: batch 16 + nhạc nền volume 0.15
+
+### Đã làm
+- User yêu cầu: (1) nhạc nền hơi to, chỉnh nhỏ một chút; (2) chạy nhanh hơn nhưng giữ nguyên chất lượng audio.
+- **Giảm volume nhạc nền 0.20 → 0.15** (nhỏ hơn một chút, vẫn nghe rõ).
+- **Chạy lại toàn bộ 12 chương GPU với `--batch-size 16`** (chuẩn mới từ benchmark trước) + `--music-volume 0.15`, giữ nguyên temp 0.3, top_k 10, rep 1.5 — chất lượng audio không đổi.
+- Kết quả: 12/12 chương tạo lại (22:04–23:08, ~4-6 phút/chương — nhanh ~2x so với batch 8 trước). Tổng gen 3976s / 11415s audio → RTF ~0.35 end-to-end (gồm mixing/convert). Duration hợp lệ (11:47–21:31, tổng ~3h09). Progress JSON: 12 chương, music_volume 0.15.
+- Verify: 12/12 MP3 duration đọc được, nhạc nền xoay 2 bài giữ nguyên.
+
+### File đổi
+- `output/books/Ban Co Nam Cho Ngoi - Nguyen Nhat Anh/audiobook/ch01-12.mp3` — tạo lại GPU batch 16 + volume 0.15 — **KHÔNG commit** (sản phẩm)
+- `working/progress_audio/ban-co-nam-cho-ngoi.json` — music_volume 0.15 — **KHÔNG commit** (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit docs khi user duyệt.
+
+## 2026-08-14 — Fix lỗi TTS đọc lặp câu (hallucinate chunk ngắn) + chạy lại audiobook
+
+### Đã làm
+- User báo "1 câu nhưng nói tận 2 lần" → điều tra toàn diện.
+- **Xác nhận source text sạch** (vi.md không có dòng trùng bất thường — chỉ hội thoại lặp tự nhiên).
+- **Viết script dò lặp audio** (self-similarity trên waveform 8kHz): không bắt được lặp đơn giản vì lỗi là **hallucinate** — model bịa thêm nội dung dài liên tục, không lặp nguyên câu.
+- **Root cause (bằng định vị chunk → audio)**: chunk **cực ngắn (< 50 ký tự)** đứng riêng khiến model hallucinate. Ví dụ rõ nhất: ch05 câu "màu đỏ là màu hoa hồng." (23 ký tự) → audio **67.7 giây** (model bịa thêm nội dung). Phân tích: 2 cụm nói 24s + 39.6s từ 1 câu ngắn.
+- **Fix triệt để trong `audiobook_long.py`**:
+  1. `extract_chapter_text`: gộp paragraph ngắn (<50 ký tự) vào paragraph trước (trừ heading "Chương").
+  2. `smart_chunk`: `_should_merge` gộp chunk ngắn cả 2 chiều (vào trước, lượt 2 vào sau), cho phép vượt max_chars lên tới TTS_MAX_CHARS (320) khi gộp chunk ngắn — nguy cơ hallucinate > nguy cơ chunk hơi dài.
+- **Kết quả chunking mới**: 0 chunk < 50 ký tự trong 12 chương (trước: 9), max chunk 317 (≤ 320 an toàn).
+- **Chạy lại 12 chương GPU batch 16 + nhạc nền volume 0.15** (00:06–01:08, ~6 phút/chương). Verify: ch05 đoạn từng hallucinate giờ đọc 1.5s; dò lặp toàn bộ 0 phát hiện; duration tổng 189.2 phút (~3h09, hợp lệ 11.9–21.5 phút/chương). Progress JSON đủ 12 chương.
+
+### File đổi
+- `scripts/audiobook/audiobook_long.py` — fix chunk ngắn (extract + smart_chunk) — **có commit** (code)
+- `output/books/Ban Co Nam Cho Ngoi - Nguyen Nhat Anh/audiobook/ch01-12.mp3` — tạo lại — **KHÔNG commit** (sản phẩm)
+- `working/progress_audio/ban-co-nam-cho-ngoi.json` — cập nhật — **KHÔNG commit** (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code (audiobook_long) + 1 commit docs khi user duyệt.
+
+## 2026-08-14 — Nâng cấp vieneu 3.2.5 + rà soát cập nhật các repo khác
+
+### Đã làm
+- User hỏi VieNeu trên GitHub có bản cập nhật không → phát hiện **v3.2.5 ra hôm nay 13/08/2026** (máy đang 3.2.4). Nội dung: chia chunk theo ranh giới câu + nhận biết trích dẫn (fix vỡ câu trong dấu ngoặc — đúng lớp vấn đề hallucinate đã gặp), max_new_frames 300→600, style deprecated, pin sea-g2p==0.8.4.
+- **Nâng cấp `vieneu` 3.2.4 → 3.2.5** trong `working/venv-vieneu` (kèm sea-g2p 0.8.3→0.8.4).
+- **Phải áp lại patch local `_load_mono`** dùng soundfile — bản cài mới ghi đè patch cũ, torchaudio.load lại lỗi torchcodec/FFmpeg. Đã patch lại, test sample GPU OK (RTF 0.65 gồm warm-up).
+- **Test end-to-end ch01** với vieneu 3.2.5: chạy xong 5 phút 21s, MP3 hợp lệ 13.3MB.
+- **Rà soát các repo khác trong dự án** (kiểm tra PyPI):
+  - **mineru** 3.4.4 = bản mới nhất ✅ (không cần nâng)
+  - **paddleocr** 3.7.0 = bản mới nhất ✅ (không cần nâng)
+  - **torch** 2.13.0 = bản mới nhất ✅ (không cần nâng)
+  - **sea-g2p** 0.8.4 = bản mới nhất ✅ (nâng kèm vieneu)
+
+### File đổi
+- `working/venv-vieneu` — vieneu 3.2.5 + sea-g2p 0.8.4 + patch `_load_mono` — **KHÔNG commit** (venv)
+- `output/books/Ban Co Nam Cho Ngoi - Nguyen Nhat Anh/audiobook/ch01.mp3` — test chạy lại — **KHÔNG commit** (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit docs khi user duyệt.
+
+## 2026-08-14 — Nâng cấp prompt dịch: hướng dẫn văn chương "láng"
+
+### Đã làm
+- User: "VieNeu ngon rồi, phần dịch cần cải thiện cho văn chương lại láng" → rà soát prompt dịch hiện tại.
+- Phát hiện: prompt `translate_helper.py::build_prompt` (dùng cho interactive + tham chiếu agent) chỉ có 9 rule khô khan (giữ format, glossary, tỷ lệ đoạn) — **thiếu hoàn toàn hướng dẫn chất lượng văn chương**.
+- **Thêm phần `## LITERARY QUALITY` (8 quy tắc)** vào cả 2 nhánh prompt (bilingual EN + trilingual ZH):
+  1. Dịch cả câu/đoạn, không dịch từng từ
+  2. Câu Hán dài → tách tự nhiên, giữ tỷ lệ đoạn 1:1
+  3. Nhịp điệu, tránh lặp từ, tỉnh lược đại từ
+  4. Khẩu ngữ hội thoại tự nhiên như người Việt nói
+  5. Xưng hô nhất quán theo quan hệ nhân vật
+  6. Tái hiện cảm xúc/hình ảnh, chuyển thành ngữ tương đương
+  7. Ưu tiên từ thuần Việt
+  8. Tránh dịch máy: bỏ "một cách", "những điều", "mà còn" lặp
+- Cập nhật cả file template `prompts/translate_prompt.md` cho đồng bộ.
+- Verify: syntax OK. Sách mới dịch sẽ tự áp dụng hướng dẫn này (cải thiện độ mượt của bản dịch tương lai).
+
+### File đổi
+- `scripts/translate/translate_helper.py` — thêm LITERARY QUALITY — **có commit** (code)
+- `prompts/translate_prompt.md` — thêm LITERARY QUALITY — **có commit** (code/docs)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit code/docs khi user duyệt.
+
+## 2026-08-14 — Nâng chất lượng dịch "láng như nhà văn": book profile + ví dụ cứng/láng
+
+### Đã làm
+- User yêu cầu "làm để AI dịch mượt mà và văn chương lại láng như nhà văn" → phân tích 3 nguyên nhân gốc: (1) dịch từng chunk nhỏ mất giọng văn chung, (2) không có bản mẫu chất lượng, (3) không có bước đọc lại. Đề xuất 4 hạng mục, user duyệt **nhóm #1+#2+#4**.
+- **#1 Hồ sơ văn chương (book profile)**: script mới `scripts/translate/create_book_profile.py` — in vài chunk đại diện (đầu/giữa/cuối) + khung hồ sơ; agent phân tích và viết `working/profile/<slug>.md` gồm: tác giả/thể loại/giọng văn, **hệ xưng hô từng cặp nhân vật**, cách xử lý hội thoại, thành ngữ đặc trưng, **1 đoạn dịch mẫu chuẩn "láng"**, lưu ý riêng. Test trên `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing` hoạt động tốt (71 chunks, in 3 chunk đại diện).
+- **#2 Ví dụ "cứng vs láng"**: thêm vào LITERARY QUALITY của `translate_helper.py::build_prompt` (cả trilingual ZH + bilingual EN) + `prompts/translate_prompt.md` — 2 câu mẫu (Hán + EN) kèm bản dịch cứng (máy móc) vs láng (nhà văn), yêu cầu agent đạt chuẩn "Láng".
+- **#4 Cập nhật dich.md**: thêm bước **F2** (tạo profile trước khi dịch) + sửa bước G (mỗi batch đọc profile + tuân thủ LITERARY QUALITY) — đồng bộ cả `.commandcode/commands/dich.md` + `.opencode/command/dich.md`.
+- Verify: syntax 2 script OK, script profile chạy thử thành công.
+
+### File đổi
+- `scripts/translate/create_book_profile.py` — mới — **có commit** (code)
+- `scripts/translate/translate_helper.py` — thêm ví dụ cứng/láng — **có commit** (code)
+- `prompts/translate_prompt.md` — thêm ví dụ — **có commit** (docs)
+- `.commandcode/commands/dich.md`, `.opencode/command/dich.md` — bước F2 + G — **có commit** (config)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit code (script mới + helper) + 1 commit config/docs khi user duyệt.
+
+## 2026-08-14 — Bổ sung "GIỮ HỒN bản gốc" vào quy tắc dịch
+
+### Đã làm
+- User: "dịch lại láng nhưng vẫn phải giữ được cái hồn cái chất của văn bản gốc" → bổ sung nguyên tắc giữ hồn vào hệ thống dịch.
+- **Thêm quy tắc #2 "⭐ GIỮ HỒN BẢN GỐC"** vào `## LITERARY QUALITY` (nay là "láng nhưng GIỮ HỒN") trong `translate_helper.py::build_prompt` (cả nhánh trilingual ZH + bilingual EN) + `prompts/translate_prompt.md`:
+  - "láng" chỉ là cách diễn đạt; KHÔNG thêm ý, bớt ý, đổi logic, làm mềm sắc thái hay cường điệu nguyên tác
+  - Giữ nguyên: giọng điệu, quan điểm người kể, thái độ tác giả, chi tiết, số liệu, thứ tự kể
+  - Câu gốc nặng nề → dịch nặng nề; gốc mềm mại → dịch mềm mại — không "làm đẹp" thêm
+- **Cập nhật `create_book_profile.py`** mục 5 (đoạn dịch mẫu): bản mẫu phải GIỮ HỒN — đúng ý/sắc thái/giọng điệu, không thêm bớt chỉ để "cho đẹp".
+- Verify: syntax OK cả 2 script.
+
+### File đổi
+- `scripts/translate/translate_helper.py` — thêm quy tắc giữ hồn — **có commit** (code)
+- `prompts/translate_prompt.md` — thêm quy tắc giữ hồn — **có commit** (docs)
+- `scripts/translate/create_book_profile.py` — mục mẫu giữ hồn — **có commit** (code)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit code/docs khi user duyệt.
+
+## 2026-08-14 — Nâng cấp QA mức A tối đa: QA văn chương miễn phí
+
+### Đã làm
+- User muốn nâng cấp QA mức A lên tối đa (bắt lỗi văn chương miễn phí, 0 token) trước khi cân nhắc mức B (AI sửa).
+- **Nâng cấp `scripts/qa/glossary_qa.py`** thêm `qa_van_chuong()` — 4 kiểm tra mới:
+  1. **Lặp từ liền kề trong câu** (≥3 lần cùng từ, bỏ từ dừng như "là/và/của/có...") — bắt "cô ấy... cô ấy", "tôi x5"
+  2. **Cụm "dịch máy" dùng nhiều** (≥3 lần): "một cách", "những điều", "mà còn", "tuy nhiên", "đã được", "đối với", "vô cùng"... (22 cụm)
+  3. **Câu >90 chữ** — dấu hiệu dịch bám cấu trúc gốc, cứng
+  4. **Tỷ lệ từ Hán-Việt >30%** — nghi dịch sát từng chữ
+- Chèn vào luồng `qa_sach_text` — mục "Chất lượng văn chương (bản dịch)" trong báo cáo, chỉ áp cho bản Dịch.
+- **Test trên `ban-co-nam-cho-ngoi/vi.md`**: bắt được **31× "một cách"**, **15× "đối với"**, 7× "những điều", 5× "mà còn", **82 chỗ lặp từ** (vd "tôi x5") — chứng minh bản dịch hiện có vẫn có thể cải thiện, và sách tương lai sẽ được QA tự động gắn cờ.
+- Sửa 2 lỗi syntax do ngoặc kép lồng f-string; tinh chỉnh ngưỡng lặp 3 (thay vì 2) để không quá nhạy với văn kể ngôi thứ nhất.
+
+### File đổi
+- `scripts/qa/glossary_qa.py` — thêm QA văn chương — **có commit** (code)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit code/docs khi user duyệt.
+

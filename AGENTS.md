@@ -75,11 +75,11 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 
 ### Scripts
 - `scripts/audiobook/manage_voice.py` — Quản lý reference audio: extract (có `--auto` VAD), save WAV + metadata, list/info/delete/set-active/active, preview, validate chất lượng (duration/sample rate/peak)
-- `scripts/audiobook/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, `--first`/`--chapter N`/`--sample`/`--force`/`--voice NAME`/`--temperature`/`--top-k`/`--bitrate`/`--no-read-titles`/`--keep-wav`/`--merge`, resume checkpoint (theo chapter + theo chunk), retry, auto MP3
+- `scripts/audiobook/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, `--first`/`--chapter N`/`--sample`/`--force`/`--voice NAME`/`--temperature`/`--top-k`/`--bitrate`/`--no-read-titles`/`--keep-wav`/`--merge`, resume checkpoint (theo chapter + theo chunk), retry, auto MP3. **Chuẩn GPU (08-13)**: `--gpu --batch-size 16` — benchmark RTF 0.12 (nhanh ~2x so với batch-size 8 cũ), chất lượng tương đương. Áp dụng cho mọi sách sau. **Nhạc nền chuẩn (08-13)**: `--music-volume 0.15` (user chốt mức này, nhạc nhỏ hơn 0.20 cũ).
 
 ### Env
 - venv: `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)
-- Chạy trên **CPU** (ONNX Runtime), RTF ~0.42, không cần GPU
+- Chạy GPU: `--gpu --batch-size 16` (RTF ~0.12, chuẩn từ 08-13 — benchmark nhanh ~2x batch 8 cũ, chất lượng tương đương). CPU (ONNX Runtime) RTF ~0.42, chỉ dùng khi không có GPU
 - 14 preset voices, emotion tags ([cười]/[thở dài]/[hắng giọng]), 3 styles (tu_nhien/tin_tuc/doc_truyen)
 - Voice clone cần 3-8s reference audio sạch
 
