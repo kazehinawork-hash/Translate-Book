@@ -41,6 +41,12 @@ Luồng tổng quát:
 - ZH: `python scripts\translate\init_trilingual_skeleton.py --chunks-dir working\chunks\<slug> --progress-dir working\progress\<slug>` → tạo `working\progress\<slug>\chunk_<NNN>.json` (`mode=trilingual`, `original_text` 1 câu/dòng, `translated_text` rỗng).
 - EN: chạy script tương tự (vẫn tạo được skeleton). Nếu script LỖI với EN: tự tạo `working\progress\<slug>\chunk_<NNN>.json` tối giản cho từng chunk gốc với fields: `chunk_id`, `total_chunks`, `chapter`, `source_text` (bằng `text` của chunk gốc), `translated_text` (`''`), `word_count_source`, `word_count_translated` (`0`), `mode` (`'bilingual'`), `translated_at` (`''`). Ghi bằng `json.dumps(ensure_ascii=False, indent=2)` UTF-8.
 
+## F2. Hồ sơ văn chương (book profile) — TRƯỚC KHI DỊCH (08-14)
+- Chạy `python scripts\translate\create_book_profile.py --chunks-dir working\chunks\<slug> --progress-dir working\progress\<slug>` — script in ra vài chunk đại diện (đầu/giữa/cuối) + khung hồ sơ.
+- **Đọc các chunk đó, tự phân tích và viết `working\profile\<slug>.md`** (UTF-8) gồm: tác giả/thể loại/giọng văn, hệ xưng hô từng cặp nhân vật, cách xử lý hội thoại, thành ngữ đặc trưng, **1 đoạn dịch mẫu chuẩn "láng"**, lưu ý riêng.
+- Nếu profile đã tồn tại → giữ nguyên, không tạo lại.
+- **Khi dịch mỗi chunk (bước G): ĐỌC profile này** và bám giọng văn/xưng hô/chuẩn mẫu — đây là yêu cầu bắt buộc để bản dịch nhất quán và mượt.
+
 ## G. Dịch theo batch (bạn tự dịch — AI chat)
 Tạo manifest một lần sau khi có skeleton:
 ```powershell
@@ -52,8 +58,8 @@ Mỗi lượt Agent chỉ nhận một batch:
 python scripts\translate\batch_manifest.py claim --slug <slug> --chunks-dir working\chunks\<slug> --progress-dir working\progress\<slug> --worker <agent-id>
 ```
 
-1. Đọc JSON của đúng các `chunk_ids` trong batch đã claim; không quét hoặc tự nhận chunk ngoài manifest. Nguồn là `original_text` (trilingual) hoặc `source_text` (bilingual).
-2. Dịch theo thứ tự chunk, giữ glossary/ngữ cảnh chung. Trilingual phải giữ đúng số dòng; giữ heading `#`/`##`, dòng ảnh `![...]`, dòng trống, số/ISBN/URL; bỏ `///` OCR dư.
+1. Đọc JSON của đúng các `chunk_ids` trong batch đã claim; không quét hoặc tự nhận chunk ngoài manifest. Nguồn là `original_text` (trilingual) hoặc `source_text` (bilingual). **Đọc `working\profile\<slug>.md` (nếu có) trước khi dịch** để bám giọng văn/xưng hô/mẫu chuẩn.
+2. Dịch theo thứ tự chunk, giữ glossary/ngữ cảnh chung. Trilingual phải giữ đúng số dòng; giữ heading `#`/`##`, dòng ảnh `![...]`, dòng trống, số/ISBN/URL; bỏ `///` OCR dư. Tuân thủ `## LITERARY QUALITY` trong prompt (dịch cả câu/đoạn, tránh lặp từ, hội thoại tự nhiên, xưng hô nhất quán, thuần Việt).
 3. Sau khi kiểm tra từng chunk, cập nhật riêng `working/progress/<slug>/chunk_<NNN>.json` với `translated_text`, `translated_at`, `word_count_translated`; giữ nguyên field khác và dùng UTF-8/`ensure_ascii=False`.
 4. Chạy QA nhanh đúng các chunk trong batch:
 ```powershell
