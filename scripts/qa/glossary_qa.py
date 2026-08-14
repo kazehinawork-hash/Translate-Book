@@ -166,6 +166,149 @@ def kiem_tra_dong_trong(text: str, nguong: int = 5) -> list[int]:
     return ket_qua
 
 
+# ========== QA VĂN CHƯƠNG (mức A mở rộng — miễn phí, 0 token) ==========
+
+# Cụm "dịch máy" điển hình — báo khi dùng quá nhiều lần trong 1 chunk
+CUM_DICH_MAY = [
+    'một cách', 'một mực', 'những điều', 'mà còn', 'tuy nhiên', 'tuy vậy',
+    'vô cùng', 'cực kỳ', 'hết sức', 'rất là', 'không ngừng', 'liên tục',
+    'đã được', 'được biết đến', 'có thể nói rằng', 'điều này có nghĩa là',
+    'theo như', 'đối với', 'về phần', 'trong đó', 'bởi vì', 'chính là',
+]
+CUM_DICH_MAY_NGUONG = 3  # ≥3 lần/chunk thì cảnh báo
+
+# Từ Hán-Việt phổ biến — tỷ lệ cao = nghi dịch sát từng chữ (cứng)
+# (chỉ dùng để ước lượng, không phải danh sách đầy đủ)
+HAN_VIET_PHU_BIEN = re.compile(
+    r'(?:nhưng|hoặc|cũng|vẫn|đã|đang|sẽ|và|với|của|cho|từ|trong|ngoài|trên|dưới|'
+    r'cảm|giác|nhận|thức|biết|hiểu|nghĩ|thấy|nghe|nói|hỏi|trả|lời|thời|gian|'
+    r'không|gian|cuộc|sống|tình|yêu|hạnh|phúc|gia|đình|công|việc|thành|công|'
+    r'thất|bại|quan|hệ|con|người|phụ|nữ|đàn|ông|trẻ|em|bạn|bè|chính|mình)'
+)
+
+
+def kiem_tra_lap_tu_lien_ke(text: str, nguong: int = 3) -> list[tuple[int, str]]:
+    """Phát hiện từ lặp liền kề trong câu (vd "cô ấy ... cô ấy", "làm việc ... làm việc").
+
+    Trả về [(dòng, đoạn_lỗi)]. Chỉ báo khi đại từ/thường từ lặp ≥ 3 lần trong
+    cùng 1 câu (lặp 2 lần như "tôi ... tôi" trong câu dài là tự nhiên với văn
+    kể chuyện ngôi thứ nhất) — dấu hiệu dịch cứng/bám cấu trúc gốc.
+    """
+    ket_qua = []
+    for i, dong in enumerate(text.splitlines(), 1):
+        nd = dong.strip()
+        if not nd or nd.startswith('#') or nd.startswith('!'):
+            continue
+        # Tách câu theo dấu câu kết thúc
+        import re as _re
+        cau_bo = _re.split(r'(?<=[.!?…])\s+', nd)
+        TU_DUNG = {
+            'là', 'và', 'của', 'có', 'được', 'cho', 'với', 'không', 'nhưng',
+            'một', 'những', 'các', 'này', 'kia', 'đó', 'đây', 'rồi', 'còn',
+            'đã', 'đang', 'sẽ', 'để', 'ra', 'vào', 'lên', 'xuống', 'đi', 'về',
+        }
+        for cau in cau_bo:
+            tu = _re.findall(r'[a-zà-ỹA-ZÀ-Ỹ_]{2,}', cau)
+            # Đếm từ xuất hiện ≥ nguong lần (bỏ từ dừng, tên riêng đầu câu)
+            dem = {}
+            for t in tu:
+                tl = t.lower()
+                if tl in TU_DUNG or len(tl) < 3:
+                    continue
+                dem[tl] = dem.get(tl, 0) + 1
+            lap = {t: c for t, c in dem.items() if c >= nguong}
+            if lap:
+                mot_so = ', '.join(f'"{t}" x{c}' for t, c in sorted(lap.items()))
+                trich = nd[:60] + '...' if len(nd) > 60 else nd
+                ket_qua.append((i, f'{trich} [lặp: {mot_so}]'))
+                break
+    return ket_qua
+
+
+def kiem_tra_cum_dich_may(text: str, nguong: int = CUM_DICH_MAY_NGUONG) -> list[tuple[int, str, int]]:
+    """Phát hiện cụm "dịch máy" dùng quá nhiều lần trong chunk.
+
+    Trả về [(dòng, cụm, số_lần)] khi 1 cụm xuất hiện ≥ nguong lần.
+    """
+    ket_qua = []
+    for cum in CUM_DICH_MAY:
+        dem = text.count(cum)
+        if dem >= nguong:
+            # Tìm dòng đầu tiên chứa cụm
+            for i, dong in enumerate(text.splitlines(), 1):
+                if cum in dong:
+                    ket_qua.append((i, cum, dem))
+                    break
+    return ket_qua
+
+
+def kiem_tra_cau_dai(text: str, nguong_chu: int = 90) -> list[tuple[int, int, str]]:
+    """Phát hiện câu quá dài (dấu hiệu dịch bám cấu trúc gốc, cứng).
+
+    Trả về [(dòng, độ_dài_chữ, đoạn_trích)].
+    """
+    ket_qua = []
+    import re as _re
+    for i, dong in enumerate(text.splitlines(), 1):
+        nd = dong.strip()
+        if not nd or nd.startswith('#') or nd.startswith('!'):
+            continue
+        for cau in _re.split(r'(?<=[.!?…])\s+', nd):
+            so_chu = len(cau.split())
+            if so_chu > nguong_chu:
+                ket_qua.append((i, so_chu, cau[:80] + '...' if len(cau) > 80 else cau))
+    return ket_qua
+
+
+def kiem_tra_ti_le_han_viet(text: str) -> float | None:
+    """Ước lượng tỷ lệ từ Hán-Việt trong văn bản (0..1).
+
+    Chỉ dùng làm tín hiệu cảnh báo — tỷ lệ cao → nghi dịch sát chữ, cứng.
+    Trả về None nếu không đủ từ để đo.
+    """
+    import re as _re
+    tu = _re.findall(r'[a-zà-ỹA-ZÀ-Ỹ]+', text)
+    if len(tu) < 50:
+        return None
+    dem = sum(1 for t in tu if HAN_VIET_PHU_BIEN.search(t))
+    return dem / len(tu)
+
+
+def qa_van_chuong(text: str) -> list[str]:
+    """Chạy toàn bộ QA văn chương (mức A mở rộng). Trả về các dòng cảnh báo."""
+    bao = []
+
+    lap = kiem_tra_lap_tu_lien_ke(text)
+    if lap:
+        bao.append(f"- ⚠️ Lặp đại từ/câu liền kề: {len(lap)} chỗ")
+        for dong, nd in lap[:5]:
+            bao.append(f"  - Dòng {dong}: `{nd[:80]}`")
+        if len(lap) > 5:
+            bao.append(f"  - ... và {len(lap) - 5} chỗ khác")
+
+    cum = kiem_tra_cum_dich_may(text)
+    if cum:
+        bao.append(f"- ⚠️ Cụm 'dịch máy' dùng nhiều: {len(cum)} loại")
+        for dong, c, dem in cum[:5]:
+            bao.append(f'  - Dòng {dong}: "{c}" x{dem}')
+        if len(cum) > 5:
+            bao.append(f"  - ... và {len(cum) - 5} loại khác")
+
+    dai = kiem_tra_cau_dai(text)
+    if dai:
+        bao.append(f"- ⚠️ Câu quá dài (>90 chữ, dễ cứng): {len(dai)} câu")
+        for dong, so_chu, nd in dai[:5]:
+            bao.append(f"  - Dòng {dong} ({so_chu} chữ): `{nd[:60]}`")
+        if len(dai) > 5:
+            bao.append(f"  - ... và {len(dai) - 5} câu khác")
+
+    hv = kiem_tra_ti_le_han_viet(text)
+    if hv is not None and hv > 0.30:
+        bao.append(f"- ⚠️ Tỷ lệ từ Hán-Việt ~{hv*100:.0f}% (cao — nghi dịch sát từng chữ, chưa 'láng')")
+
+    return bao
+
+
 # ========== HÀM CHÍNH: QA SÁCH (Markdown) ==========
 
 def qa_sach_text(
@@ -302,6 +445,15 @@ def qa_sach_text(
         else:
             bao_cao.append("- ✅ Không có dòng trống quá nhiều")
         bao_cao.append("")
+
+    # QA văn chương (mức A mở rộng) — chỉ áp dụng cho bản Dịch (tiếng Việt)
+    bao_cao.append("## Chất lượng văn chương (bản dịch)")
+    van_chuong = qa_van_chuong(text_dich)
+    if van_chuong:
+        bao_cao.extend(van_chuong)
+    else:
+        bao_cao.append("- ✅ Không phát hiện dấu hiệu dịch máy/cứng")
+    bao_cao.append("")
 
     co_loi = False
     for line in bao_cao:

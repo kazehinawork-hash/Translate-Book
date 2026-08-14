@@ -156,6 +156,28 @@ Chúng tôi đi dạo trong công viên。
 7. Output ONLY the trilingual blocks \u2014 no extra text before or after
 8. Preserve markdown tables and LaTeX formulas EXACTLY as they are.
 
+## LITERARY QUALITY (v\u0103n ch\u01b0\u01a1ng l\u00e1ng nh\u01b0ng GI\u1eee H\u1ed2N \u2014 b\u1eaft bu\u1ed9c, \u00e1p d\u1ee5ng cho d\u00f2ng ti\u1ebfng Vi\u1ec7t)
+1. D\u1ecbch C\u1ea2 C\u00c2U, C\u1ea2 \u0110O\u1ea0N, kh\u00f4ng d\u1ecbch t\u1eebng t\u1eeb m\u1ed9t \u2014 b\u1ea3n Vi\u1ec7t ph\u1ea3i \u0111\u1ecdc t\u1ef1 nhi\u00ean nh\u01b0 v\u0103n Vi\u1ec7t g\u1ed1c, kh\u00f4ng m\u00e1y m\u00f3c b\u00e1m c\u1ea5u tr\u00fac c\u00e2u H\u00e1n
+2. \u2b50 GI\u1eee H\u1ed2N B\u1ea2N G\u1ed0C: \u201cl\u00e1ng\u201d ch\u1ec9 l\u00e0 c\u00e1ch di\u1ec5n \u0111\u1ea1t; tuy\u1ec7t \u0111\u1ed1i KH\u00d4NG th\u00eam \u00fd, b\u1edbt \u00fd, \u0111\u1ed5i logic, l\u00e0m m\u1ec1m s\u1eafc th\u00e1i hay c\u01b0\u1eddng \u0111i\u1ec7u c\u1ee7a nguy\u00ean t\u00e1c. Gi\u1eef nguy\u00ean: gi\u1ecdng \u0111i\u1ec7u (ch\u00e2m bi\u1ebfm/tr\u1eef t\u00ecnh/gay g\u1eaft), quan \u0111i\u1ec3m ng\u01b0\u1eddi k\u1ec3, th\u00e1i \u0111\u1ed9 t\u00e1c gi\u1ea3 v\u1edbi nh\u00e2n v\u1eadt/s\u1ef1 vi\u1ec7c, c\u00e1c chi ti\u1ebft c\u1ee5 th\u1ec3, s\u1ed1 li\u1ec7u, th\u1ee9 t\u1ef1 k\u1ec3. N\u1ebfu c\u00e2u g\u1ed1c \u00fd n\u1eb7ng n\u1ec1, b\u1ea3n d\u1ecbch ph\u1ea3i n\u1eb7ng n\u1ec1; n\u1ebfu g\u1ed1c m\u1ec1m m\u1ea1i, b\u1ea3n d\u1ecbch m\u1ec1m m\u1ea1i \u2014 kh\u00f4ng \u201cl\u00e0m \u0111\u1eb9p\u201d th\u00eam cho kh\u00e1c \u00fd
+3. C\u00e2u H\u00e1n d\u00e0i: \u0111\u01b0\u1ee3c ph\u00e9p t\u00e1ch th\u00e0nh 2-3 c\u00e2u ng\u1eafn t\u1ef1 nhi\u00ean h\u01a1n cho ti\u1ebfng Vi\u1ec7t; c\u00e2u v\u1ee5n c\u00f3 th\u1ec3 n\u1ed1i l\u1ea1i \u2014 m\u1ed7i c\u00e2u H\u00e1n v\u1eabn gi\u1eef \u0111\u00fang 1 d\u00f2ng H\u00e1n + 1 d\u00f2ng pinyin + 1 d\u00f2ng Vi\u1ec7t
+4. Nh\u1ecbp \u0111i\u1ec7u & \u00e2m thanh: \u01b0u ti\u00ean c\u00e2u c\u00f3 v\u1ea7n, c\u00f3 nh\u1ecbp, tr\u00e1nh l\u1eb7p t\u1eeb ng\u1eef li\u00ean ti\u1ebfp; thay \u0111\u1ea1i t\u1eeb tr\u00f9ng b\u1eb1ng c\u00e1ch t\u1ec9nh l\u01b0\u1ee3c ho\u1eb7c \u0111\u1ed5i c\u00e1ch di\u1ec5n \u0111\u1ea1t
+5. Kh\u1ea9u ng\u1eef & h\u1ed9i tho\u1ea1i: d\u1ecbch nh\u01b0 ng\u01b0\u1eddi Vi\u1ec7t th\u1ef1c s\u1ef1 n\u00f3i chuy\u1ec7n, gi\u1eef s\u1eafc th\u00e1i; KH\u00d4NG d\u1ecbch s\u00e1t ch\u1eef l\u00e0m tho\u1ea1i c\u1ee9ng nh\u1eafc
+6. X\u01b0ng h\u00f4: ch\u1ecdn v\u00e0 gi\u1eef NH\u1ea4T QU\u00c1N m\u1ed9t h\u1ec7 x\u01b0ng h\u00f4 ph\u00f9 h\u1ee3p theo m\u1ed1i quan h\u1ec7 nh\u00e2n v\u1eadt; kh\u00f4ng tr\u00e1o \u0111\u1ed5i gi\u1eefa ch\u1eebng
+7. C\u1ea3m x\u00fac & h\u00ecnh \u1ea3nh: t\u00e1i hi\u1ec7n c\u1ea3m x\u00fac nguy\u00ean t\u00e1c b\u1eb1ng t\u1eeb ng\u1eef ti\u1ebfng Vi\u1ec7t gi\u00e0u h\u00ecnh \u1ea3nh; th\u00e0nh ng\u1eef H\u00e1n kh\u00f3 hi\u1ec3u khi d\u1ecbch s\u00e1t th\u00ec chuy\u1ec3n sang t\u01b0\u01a1ng \u0111\u01b0\u01a1ng ti\u1ebfng Vi\u1ec7t t\u1ef1 nhi\u00ean (t\u01b0\u01a1ng \u0111\u01b0\u01a1ng v\u1ec1 \u00fd v\u00e0 s\u1eafc th\u00e1i, kh\u00f4ng \u0111\u1ed5i \u00fd)
+8. Thu\u1ea7n Vi\u1ec7t: \u01b0u ti\u00ean t\u1eeb thu\u1ea7n Vi\u1ec7t ho\u1eb7c H\u00e1n-Vi\u1ec7t \u0111\u00e3 th\u00f4ng d\u1ee5ng; tr\u00e1nh l\u1ea1m d\u1ee5ng t\u1eeb H\u00e1n-Vi\u1ec7t kh\u00f3 hi\u1ec3u khi c\u00f3 t\u1eeb Vi\u1ec7t thay th\u1ebf
+9. Tr\u00e1nh d\u1ecbch m\u00e1y: kh\u00f4ng c\u00f3 c\u1ee5m "m\u1ed9t c\u00e1ch", "nh\u1eefng \u0111i\u1ec1u", "m\u00e0 c\u00f2n", "tuy nhi\u00ean" l\u1eb7p \u2014 \u0111\u1ecdc l\u1ea1i b\u1ea3n d\u1ecbch nh\u01b0 v\u0103n xu\u00f4i Vi\u1ec7t thu\u1ea7n
+
+### V\u00cd D\u1ee4 CHU\u1ea8N (b\u1ea3n c\u1ee9ng vs b\u1ea3n l\u00e1ng)
+C\u00e2u H\u00e1n: \u201c\u5979\u5fc3\u91cc\u5f88\u96be\u8fc7\uff0c\u4f46\u662f\u5979\u5f3a\u5fcd\u7740\u6ce1\u6ca1\u6709\u8ba9\u6cea\u6c34\u6d41\u4e0b\u6765\u3002\u201d
+- \ud83d\udee1\ufe0f B\u1ea3n c\u1ee9ng (m\u00e1y m\u00f3c): \u201cTrong l\u00f2ng c\u00f4 \u1ea5y r\u1ea5t kh\u00f3 ch\u1ecbu, nh\u01b0ng c\u00f4 \u1ea5y c\u1ed1 n\u00ecn l\u1ea1i kh\u00f4ng \u0111\u1ec3 n\u01b0\u1edbc m\u1eaft ch\u1ea3y xu\u1ed1ng.\u201d (l\u1eb7p "c\u00f4 \u1ea5y", c\u1ee9ng)
+- \u2705 B\u1ea3n l\u00e1ng (nh\u00e0 v\u0103n): \u201cL\u00f2ng c\u00f4 qu\u1ea9n qu\u1ea1i, nh\u01b0ng c\u00f4 n\u00e9n h\u1ebft v\u00e0o trong, kh\u00f4ng \u0111\u1ec3 m\u1ed9t gi\u1ecdt n\u01b0\u1edbc m\u1eaft r\u01a1i xu\u1ed1ng.\u201d (h\u00ecnh \u1ea3nh, t\u1ec9nh l\u01b0\u1ee3c \u0111\u1ea1i t\u1eeb, nh\u1ecbp t\u1ef1 nhi\u00ean)
+
+C\u00e2u H\u00e1n: \u201c\u4ed6\u4e0d\u505c\u5730\u5de5\u4f5c\uff0c\u4e00\u76f4\u5de5\u4f5c\u5230\u5f88\u665a\u3002\u201d
+- \ud83d\udee1\ufe0f C\u1ee9ng: \u201cAnh \u1ea5y kh\u00f4ng ng\u1eebng l\u00e0m vi\u1ec7c, m\u1ed9t m\u1ef1c l\u00e0m vi\u1ec7c \u0111\u1ebfn r\u1ea5t mu\u1ed9n.\u201d (l\u1eb7p "l\u00e0m vi\u1ec7c")
+- \u2705 L\u00e1ng: \u201cAnh mi\u1ebft m\u00e0i l\u00e0m \u0111\u1ebfn khuya.\u201d (g\u1ecdn, t\u1ef1 nhi\u00ean, kh\u00f4ng l\u1eb7p)
+
+B\u1ea3n d\u1ecbch c\u1ee7a b\u1ea1n ph\u1ea3i \u0111\u1ea1t chu\u1ea9n \u201cL\u00e1ng\u201d nh\u01b0 c\u00e1c v\u00ed d\u1ee5 tr\u00ean, kh\u00f4ng ph\u1ea3i chu\u1ea9n \u201cC\u1ee9ng\u201d.
+
 ## GLOSSARY
 {glossary_text if glossary_text else '(No glossary provided)'}
 
@@ -175,13 +197,35 @@ You are a professional translator. Your task is to translate the chunk below fro
 ## RULES
 1. Preserve ALL formatting: paragraphs, headings, lists, emphasis, line breaks
 2. Keep proper nouns, brand names in original unless they have widely accepted Vietnamese translations
-3. Use the GLOSSARY below \u2014 NEVER deviate from these translations
+3. Use the GLOSSARY below — NEVER deviate from these translations
 4. Do NOT add explanations, notes, or translator comments
 5. Do NOT translate content inside code blocks, URLs, or placeholder tags
 6. Maintain the original tone and style
 7. Output ONLY the translated text
 8. CRITICAL: Maintain a strictly 1:1 paragraph ratio! Do NOT merge multiple short paragraphs into one, and do NOT split one paragraph into many.
 9. Preserve markdown tables and LaTeX formulas EXACTLY as they are.
+
+## LITERARY QUALITY (văn chương láng nhưng GIỮ HỒN — bắt buộc)
+1. Dịch CẢ CÂU, CẢ ĐOẠN, không dịch từng từ một — bản dịch phải đọc tự nhiên như văn Việt gốc, không máy móc bám cấu trúc câu gốc
+2. ⭐ GIỮ HỒN BẢN GỐC: "láng" chỉ là cách diễn đạt; tuyệt đối KHÔNG thêm ý, bớt ý, đổi logic, làm mềm sắc thái hay cường điệu của nguyên tác. Giữ nguyên: giọng điệu (châm biếm/trữ tình/gay gắt), quan điểm người kể, thái độ tác giả với nhân vật/sự việc, chi tiết cụ thể, số liệu, thứ tự kể. Nếu câu gốc ý nặng nề, bản dịch phải nặng nề; nếu gốc mềm mại, bản dịch mềm mại — không "làm đẹp" thêm cho khác ý
+3. Câu gốc dài (đặc biệt tiếng Trung): được phép tách thành 2-3 câu ngắn tự nhiên hơn cho tiếng Việt; câu vụn có thể nối lại — miễn GIỮ NGUYÊN số đoạn văn (paragraph ratio 1:1)
+4. Nhịp điệu & âm thanh: ưu tiên câu có vần, có nhịp, tránh lặp từ ngữ liên tiếp (trừ khi cố ý nhấn mạnh); thay đại từ trùng lặp bằng cách tỉnh lược hoặc đổi cách diễn đạt
+5. Khẩu ngữ & hội thoại: dịch như người Việt thực sự nói chuyện, giữ sắc thái (hài hước, giận dữ, ngập ngừng, mỉa mai); KHÔNG dịch sát chữ làm thoại cứng nhắc
+6. Xưng hô: chọn và giữ NHẤT QUÁN một hệ xưng hô phù hợp (tôi/bạn, tôi/cậu, anh/em, mày/tao...) theo mối quan hệ nhân vật; không tráo đổi giữa chừng
+7. Cảm xúc & hình ảnh: tái hiện cảm xúc của nguyên tác bằng từ ngữ tiếng Việt giàu hình ảnh; nếu thành ngữ gốc khó hiểu khi dịch sát, chuyển sang thành ngữ/tương đương tiếng Việt tự nhiên (tương đương về ý và sắc thái, không đổi ý)
+8. Thuần Việt: ưu tiên từ thuần Việt hoặc từ Hán-Việt đã thông dụng; tránh dịch lạm dụng từ Hán-Việt khó hiểu khi có từ Việt thay thế
+9. Tránh dịch máy: không có cụm "một cách" (thay bằng trạng từ/cụm tự nhiên), "những điều", "mà còn", "tuy nhiên" lặp — đọc lại bản dịch như văn xuôi Việt thuần
+
+### VÍ DỤ CHUẨN (bản cứng vs bản láng)
+Câu EN: "She felt very sad inside, but she held back and didn't let the tears fall."
+- 🛡️ Bản cứng (máy móc): "Cô ấy cảm thấy rất buồn trong lòng, nhưng cô ấy kìm lại và không để những giọt nước mắt rơi xuống." (lặp "cô ấy", cứng)
+- ✅ Bản láng (nhà văn): "Lòng cô quặn thắt, nhưng cô nén hết vào trong, không để một giọt nước mắt rơi xuống." (hình ảnh, tỉnh lược đại từ, nhịp tự nhiên)
+
+Câu EN: "He worked nonstop, working until very late."
+- 🛡️ Cứng: "Anh ấy làm việc không ngừng, làm việc đến rất muộn." (lặp "làm việc")
+- ✅ Láng: "Anh miệt mài làm đến khuya." (gọn, tự nhiên, không lặp)
+
+Bản dịch của bạn phải đạt chuẩn "Láng" như các ví dụ trên, không phải chuẩn "Cứng".
 
 ## GLOSSARY
 {glossary_text if glossary_text else '(No glossary provided)'}
