@@ -1370,3 +1370,248 @@
 ### Git
 - Chưa commit. Đề xuất: gộp vào commit code/docs khi user duyệt.
 
+## 2026-08-14 — Audiobook qie-yi-qing-shen-gong-bai-tou 75/75 chương + nhạc nền AI theo cảm xúc
+
+### Đã làm
+- User yêu cầu tạo audio cho `input/da-dich/且以情深共白头...epub` (Vãn Tình, tản văn hôn nhân ZH).
+- **Nhạc nền AI theo nội dung (điểm mới)**: user hỏi "có phân tích chương chọn nhạc không" → phát hiện đang chạy xoay đều; user muốn AI phân tích → **agent tự đọc toàn bộ 75 chương** (từ `detect_chapters`), chấm cảm xúc từng chương (buồn/vui/ngọt/trầm/hài...) và **ghi `music_map.json`** (75 chương → 1 bài nhạc phù hợp mood mỗi chương). Sau đó chạy `--music-auto` để script đọc bản đồ này.
+- **Không dùng Deepseek API** (không có key) — agent (chính là AI) tự phân tích, 0 token, không cần config.
+- **Chạy GPU batch 16 + volume 0.15**: lần đầu chạy tới ch19 thì user khởi động lại máy → dừng; sau đó **resume tự động** từ ch20 (checkpoint theo chương), hoàn tất 75/75.
+- Kết quả: 75 MP3, ~8.5 giờ audio (30.554s), RMS đo được ~0.033 (nhạc nền đúng mức 0.15). `ch05` 1.6 min, `ch30` 4.4 min, `ch75` 4.0 min — hợp lệ.
+- **Cập nhật metadata** `has_audio=true` + `epub_file` (trước đây false dù đã có audiobook).
+- **Chuyển input**: file từ `da-dich` → `da-audio` (7 file). Lưu ý `manage_input.py` chỉ quét file ở gốc `input/`, không quét thư mục con — chuyển thủ công.
+- `music_map.json` giờ có 2 cuốn (zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing 50 chương + qie-yi-qing-shen-gong-bai-tou 75 chương).
+
+### File đổi
+- `output/books/且以情深共白头：婚前看情感，婚后靠相处 (晚情)/audiobook/ch01-75.mp3` — tạo mới — **KHÔNG commit** (sản phẩm)
+- `working/progress_audio/qie-yi-qing-shen-gong-bai-tou.json` — 75 chương — **KHÔNG commit** (sản phẩm)
+- `working/progress_audio/music_map.json` — thêm cuốn này — **KHÔNG commit** (sản phẩm)
+- `output/books/.../metadata.json` — has_audio=true — **KHÔNG commit** (sản phẩm)
+- `input/da-audio/` — file chuyển vào — **KHÔNG commit** (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: gộp vào commit docs khi user duyệt.
+
+## 2026-08-14 — Tách lệnh pipeline: /dich (chỉ dịch), /audio (chỉ audio), /dich_audio (cả hai)
+
+### Đã làm
+- User yêu cầu tách: `/dich` chỉ dịch, `/audio` chỉ tạo audio, `/dich_audio` làm cả hai (trước đây /dich gộp luôn audio).
+- **`.commandcode/commands/dich.md`**: bỏ phần K (audiobook) → chỉ A→J (extract → dịch → QA → merge → EPUB); đổi description; kết thúc bằng "K. Tổng kết" (in path + **cập nhật metadata.json** + cập nhật input → da-dich).
+- **`.commandcode/commands/audio.md` (mới)**: toàn bộ phần audiobook — A. Xác định sách, B. Nhạc nền AI theo nội dung (music_map, agent tự phân tích nếu chưa có), C. Tạo GPU (batch 16, music-auto, volume 0.15), D. QA audio, E. Cập nhật metadata + input → da-audio, F. Tổng kết.
+- **`.commandcode/commands/dich_audio.md` (mới)**: chạy /dich rồi /audio — có xử lý sách đã dịch dở.
+- **Đồng bộ `.opencode/command/`** (copy 3 file, fc /b xác nhận khớp).
+- **AGENTS.md** dòng command: thêm /audio + /dich_audio; **STATE.md** dòng cuối cập nhật 3 lệnh.
+
+### File đổi
+- `.commandcode/commands/dich.md` — bỏ audiobook — **có commit** (config)
+- `.commandcode/commands/audio.md`, `dich_audio.md` — mới — **có commit** (config)
+- `.opencode/command/dich.md`, `audio.md`, `dich_audio.md` — đồng bộ — **có commit** (config)
+- `AGENTS.md`, `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Git
+- Chưa commit. Đề xuất: 1 commit config (3 lệnh) + 1 commit docs khi user duyệt.
+
+## 2026-08-14 — Dịch lại chunk 12-14 (cuốn you-duo-xiang-yao-jiu-you-duo-xing-fu-wan-qing)
+
+### Đã làm
+- User yêu cầu dịch lại 3 chunk (12, 13, 14) sang tiếng Việt giọng văn "láng" theo book profile.
+- Dịch `working/ocr_tmp/chunk_012_orig.txt` (171 dòng), `chunk_013` (190), `chunk_014` (179) → `chunk_*_vi.txt` tương ứng.
+- Giữ NGUYÊN 1:1 số dòng (dùng difflib xác nhận: 0 delete/insert, 0 replace lệch). Không sửa file JSON.
+
+### File đổi
+- `working/ocr_tmp/chunk_012_vi.txt`, `chunk_013_vi.txt`, `chunk_014_vi.txt` — sản phẩm dịch, KHÔNG commit
+
+### Còn dở
+- Chờ gộp vào progress JSON (nếu user muốn thay bản dịch cũ).
+
+### Git
+- Không commit (chỉ tạo file sản phẩm + entry docs này).
+
+
+## 2026-08-14 — Dịch trọn sách 有多想要，就有多幸福 (晚情著) [ZH, ảnh OCR]
+
+### Đã làm
+- Pipeline /dich (chỉ dịch, KHÔNG audiobook) cho EPUB toàn ảnh 320 trang (không văn bản).
+- OCR PaddleOCR (GPU, venv-ocr) 320 ảnh → raw.md 113.380 ký tự; dọn dòng trang/rác, detect zh-Hans (không OpenCC).
+- Chunk ZH: 32 chunk (min1500/max3000/overlap200). Glossary 19 thuật ngữ → merge master.csv (--author 晚情 --genre van-tinh).
+- Skeleton trilingual (progress JSON, original/pinyin/translated). Tạo book profile (working/profile/<slug>.md).
+- Dịch 32/32 chunk (đa số subagent, chunk 21-23 main agent tự dịch sau 4 lần subagent flaky). QA từng batch ok; QA toàn bộ 32 chunk ok (0 lỗi).
+- Merge: tamngu.md (1.8MB) + vi.md (456KB). Tạo 2 EPUB (tam ngữ 537KB + thuần Việt 144KB) bằng pandoc; CSS epub_style.css. Không embed font CJK (không có sẵn).
+- Sắp xếp output: output/books/有多想要，就有多幸福 (晚情著)/final/{tamngu.md, vi.md, <tên-gốc>.epub, <tên-gốc>-vi.epub} + metadata.json (slug you-duo-xiang-yao-jiu-you-duo-xing-fu-wan-qing).
+- Chuyển input thủ công: input/chua-lam/ → input/da-dich/ (manage_input không map được tên tiếng Trung không Latin).
+
+### Kinh nghiệm
+- Subagent dịch chunk ZH→VI thỉnh thoảng trả rỗng/refusal (flaky) — khi gặp, main agent tự dịch hoặc giao lại subagent với orig.txt sạch + chỉ thị ghi Write tool.
+
+### File đổi
+- output/books/有多想要，就有多幸福 (晚情著)/final/* — sản phẩm, KHÔNG commit
+- working/progress/.../chunk_*.json, working/chunks/..., working/profile/... — KHÔNG commit (sản phẩm trung gian)
+- input/da-dich/有多想要，就有多幸福 (晚情著).epub — KHÔNG commit (sản phẩm)
+- docs/STATE.md, docs/session_log.md — có commit (docs)
+
+## 2026-08-13 — Dịch lại cuốn `有多想要，就有多幸福` (Vãn Tình) — slug mới you-duo-xiang-jiu-you-duo-xing-fu
+
+### Bối cảnh
+- User yêu cầu "dịch lại" `input/da-dich/有多想要，就有多幸福 (晚情著).epub`. Cuốn này ĐÃ có bản dịch cũ (slug `you-duo-xiang-yao-jiu-you-duo-xing-fu-wan-qing`, output trong thư mục tên tiếng Trung) — bản cũ theo cấu trúc cũ, chưa nhúng font.
+- Tôi dịch lại với **slug mới** `you-duo-xiang-jiu-you-duo-xing-fu` + cấu trúc output chuẩn mới.
+
+### Đã làm
+- EPUB là bản scan toàn ảnh (320 JPG) → extract 320 ảnh → **OCR PaddleOCR GPU** (venv-ocr) → raw.md 112K ký tự → QC OK, zh-Hans.
+- 55 chunk → glossary 24 thuật ngữ → skeleton trilingual 55 → **dịch 55/55** (sub-agent 1 chunk/lượt, khớp dòng 1-1, QA 0 lỗi).
+- Merge tamngu.md (1.8MB) + vi.md (0.48MB, 0 mojibake) + 3 EPUB nhúng font Noto Serif SC (~15MB).
+
+### Kinh nghiệm (bổ sung)
+- Agent dịch giao 3 chunk/lượt hay lỗi giữa chừng; giao **1 chunk/lượt + nhấn mạnh khớp dòng 1-1** thì 100% thành công.
+
+### File đổi
+- `output/books/you-duo-xiang-jiu-you-duo-xing-fu/` (final md + 3 epub) — KHÔNG commit (sản phẩm)
+- `working/extracted|chunks|progress/you-duo-xiang-jiu-you-duo-xing-fu/` — KHÔNG commit
+- `glossary/you-duo-xiang-jiu-you-duo-xing-fu.csv` — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- ⚠️ **Đã sửa tên thư mục output** cho khớp convention: `output/books/you-duo-xiang-jiu-you-duo-xing-fu` → `output/books/有多想要，就有多幸福 (晚情著)` (tên = tên file input, như các cuốn khác). Slug nội bộ `you-duo-xiang-jiu-you-duo-xing-fu` vẫn dùng cho working/progress, glossary, progress_audio. Đã tạo `metadata.json`.
+- ⚠️ **Đã sửa rule EPUB**: cuốn này trước đó tạo thừa `final/tamngu.epub` + `final/vi.epub` + `trilingual.epub` — giờ chỉ còn **1 EPUB duy nhất** `有多想要，就有多幸福 (晚情著).epub` ở gốc (tên = file input), final/ chỉ có `.md`. Đã cập nhật `dich.md` (thêm **CHECKLIST bắt buộc** mục K) + AGENTS.md (rule EPUB rõ) để Agent không lệch rule nữa.
+- Audiobook chưa làm.
+
+## 2026-08-14 — OCR lại cuốn `有多想要，就有多幸福` bằng MinerU (bỏ PaddleOCR)
+
+### Bối cảnh
+- User: "dùng MinerU để OCR cuốn này được không, tôi thấy PaddleOCR ko uy tín lắm" → kiểm tra: MinerU không nhận EPUB trực tiếp nhưng OCR **từng ảnh** được (pipeline, GPU). Test 1 ảnh: **MinerU text liền mạch, đúng đoạn văn — tốt hơn PaddleOCR rõ rệt** (PaddleOCR cắt dòng vụn theo ảnh).
+- User duyệt "OCR lại bằng MinerU" → dịch lại toàn bộ từ đầu.
+
+### Đã làm
+- Extract 320 ảnh → **OCR MinerU GPU** (`mineru_extract.py --backend pipeline --device auto` từng ảnh, checkpoint theo ảnh) → raw.md 111K ký tự (318/320 có text; trang 118, 254 là ảnh minh họa trống).
+- Xóa data cũ (chunks/progress/glossary/final bản PaddleOCR) → QC OK → 55 chunk → glossary → skeleton → **dịch 55/55** (sub-agent 1 chunk/lượt, khớp dòng 1-1, QA 0 lỗi) → merge tamngu.md (1.8MB) + vi.md (0.48MB, 0 mojibake).
+- **EPUB đúng rule**: 1 file `有多想要，就有多幸福 (晚情著).epub` ở gốc (nhúng font Noto Serif SC), final/ chỉ `.md`.
+
+### Kinh nghiệm
+- **EPUB scan → ưu tiên OCR bằng MinerU** (từng ảnh, pipeline/GPU) thay PaddleOCR — chất lượng text tốt hơn hẳn. PaddleOCR chỉ là fallback cuối.
+- MinerU mỗi ảnh ~10-30s → 320 ảnh ~1.5-2 giờ; có checkpoint resume.
+
+### File đổi
+- `output/books/有多想要，就有多幸福 (晚情著)/` (final md + 1 epub) — KHÔNG commit (sản phẩm)
+- `working/extracted|chunks|progress/you-duo-xiang-jiu-you-duo-xing-fu/` — KHÔNG commit
+- `glossary/you-duo-xiang-jiu-you-duo-xing-fu.csv` — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+## 2026-08-15 — Hoàn tất cuốn `有多想要，就有多幸福` (bản cuối: chương + gộp câu)
+
+### Đã làm
+- Tiếp nối phiên trước (OCR MinerU + dịch 55 chunk): user duyệt mẫu 3 chương đầu (cấu trúc `## Chương N` + gộp câu + bỏ số trang).
+- **Tạo `scripts/process/mark_chapters.py`**: tách chương từ mục lục sách scan → đánh dấu `## Chương N: <tên>`, **xóa toàn bộ `## Trang N`**. Chạy trên raw.md → 71 chương, 0 trang.
+- **Tạo `scripts/output/merge_sentences.py`**: gộp câu sau merge — nối các dòng OCR nửa câu thành câu hoàn chỉnh, **bỏ số trang dính vào câu** (giữ ISBN/năm/SĐT), xử lý cả bản Việt (gộp đoạn) lẫn tam ngữ (mỗi câu 1 khối Hán/pinyin/Việt).
+- **Dịch tiếp 52 chunk còn lại** (3-54) bằng sub-agent → **55/55 chunk, QA 0 lỗi** → merge → gộp câu → **vi.md 346 dòng sạch (71 chương, 0 Trang)**, tamngu.md 14345 dòng.
+- **EPUB cuối**: 1 file `有多想要，就有多幸福 (晚情著).epub` (nhúng font Noto Serif SC), đúng rule.
+- Cập nhật `dich.md` (bước OCR scan dùng MinerU + mark_chapters + merge_sentences) + AGENTS.md.
+
+### File đổi
+- `scripts/process/mark_chapters.py`, `scripts/output/merge_sentences.py` — mới — **có commit** (code)
+- `output/books/有多想要，就有多幸福 (晚情著)/` (final md + 1 epub) — KHÔNG commit (sản phẩm)
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Audiobook chưa làm.
+
+### Git
+- Chưa commit. Đề xuất: commit docs (STATE.md + session_log.md) khi user duyệt.
+
+## 2026-08-17 — Dịch lại + audiobook cuốn `且以情深共白头：婚前看情感，婚后靠相处 (晚情)` theo chuẩn văn chương mới
+
+### Bối cảnh
+- User yêu cầu "dịch lại và tạo audio cuốn này input\da-audio\且以情深共白头：婚前看情感，婚后靠相处 (晚情).epub" — dịch lại theo chuẩn văn chương "láng" mới (đã triển khai 08-14: LITERARY QUALITY + book profile), sau đó tạo audiobook.
+- Sách đã từng dịch (bản cũ) + audiobook cũ 75 chương (08-14). Cần dịch lại từ đầu, không tận dụng bản cũ.
+
+### Đã làm
+- **Profile văn chương**: `working/profile/qie-yi-qing-shen-gong-bai-tou.md` (giọng tản văn tâm sự, hóm hỉnh; hệ xưng hô A Ngạn/em-anh, tớ/cậu bạn thân, chị/em độc giả; đoạn dịch mẫu chuẩn "láng").
+- **Reset + skeleton mới**: xóa progress cũ → `init_trilingual_skeleton.py --force` → 58 chunk sạch, `batch_manifest.json` mới.
+- **Dịch 58/58 chunk** bằng sub-agent 1 chunk/lượt (8 lượt song song), mỗi chunk đọc profile → dịch → ghi `translated_text` (số dòng khớp 100%, giữ heading/`---`/số). Tổng ~84K từ Việt.
+- **Fix chunk 14**: bản dịch gộp 2 câu gốc làm 1 dòng (49→48) → tách đúng 2 dòng.
+- **QA**: glossary_qa → Hán sót 0.0% (8 ký tự), không mojibake, không dòng lặp. Cảnh báo heuristic (592 chỗ lặp đại từ, 12 cụm dịch máy, 23 câu dài) chấp nhận được với tản văn.
+- **Đồng bộ mục lục**: phát hiện mục lục trong chunk 0 giữ tên bài cũ, không khớp heading body mới (vd "Tôi là chỗ dựa của anh" vs "Anh là chỗ dựa của em") → thay mục lục chunk 0 bằng body headings → merge lại vi.md + tamngu.md (65/65 khớp).
+- **EPUB**: 1 file duy nhất `且以情深共白头：婚前看情感，婚后靠相处 (晚情).epub` (nhúng font Noto Serif SC, fix path font trong zip).
+- **Audiobook**: xóa 75 MP3 cũ + progress cũ → chạy `audiobook_long.py --slug qie-yi-qing-shen-gong-bai-tou --voice active --temperature 0.3 --top-k 10 --repetition-penalty 1.5 --music-auto --music-volume 0.15 --gpu --batch-size 16 --no-read-titles` (nền ~2h, exit 0) → **75/75 chương**, ~6.4 giờ audio (23129s), 369MB. Chương 5 test trước (37.5s gen / 97s audio). Music map AI đọc từ `music_map.json` (slug đã có 75 mục từ bản cũ — nội dung chương giữ nguyên cấu trúc nên dùng lại được).
+- **QA audio**: `audio_qa.py --slug "且以情深共白头：婚前看情感，婚后靠相处 (晚情)"` → 75 file MP3 đều OK (báo 79 do đếm cả heading `##` phụ, không phải lỗi — detect_chapters thực tế ra 75).
+- **Cập nhật**: metadata.json (has_audio=true), input đã ở `da-audio/` (đúng), STATE.md + session_log.md.
+
+### File đổi
+- `working/profile/qie-yi-qing-shen-gong-bai-tou.md` — mới — KHÔNG commit (sản phẩm)
+- `working/progress/qie-yi-qing-shen-gong-bai-tou/chunk_*.json` (58) — dịch mới — KHÔNG commit
+- `working/qa/qie-yi-qing-shen-gong-bai-tou/` (source_zh, vi_only, report) — KHÔNG commit
+- `output/books/且以情深共白头：婚前看情感，婚后靠相处 (晚情)/final/{tamngu.md, vi.md}` — merge mới — KHÔNG commit
+- `output/books/且以情深共白头：婚前看情感，婚后靠相处 (晚情)/audiobook/ch01-75.mp3` (75 file, 369MB) — KHÔNG commit
+- `output/books/且以情深共白头：婚前看情感，婚后靠相处 (晚情)/且以情深共白头：婚前看情感，婚后靠相处 (晚情).epub` — KHÔNG commit
+- `working/progress_audio/qie-yi-qing-shen-gong-bai-tou.json` — progress mới — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Không. Sách đã hoàn tất toàn bộ (dịch lại chuẩn văn chương + EPUB + audiobook).
+- (Ghi nhớ) Lần sau nếu mục lục trong chunk 0 giữ tên cũ: đồng bộ mục lục chunk 0 với body headings trước khi merge.
+
+### Git
+- Chưa commit. Đề xuất: commit docs (STATE.md + session_log.md) khi user duyệt.
+
+## 2026-08-18 — Dịch lại + audiobook cuốn `做一个刚刚好的女子  不攀附, 不将就 (晚情)` theo chuẩn văn chương mới
+
+### Bối cảnh
+- User yêu cầu "tiếp tục đi": dịch LẠI toàn bộ + tạo audiobook mới cho `input\da-audio\做一个刚刚好的女子  不攀附, 不将就 (晚情).epub` (lệnh /dich_audio), tương tự 2 cuốn Vãn Tình gần nhất (qie-yi 08-17, you-duo-xiang 08-16) — theo chuẩn văn chương "láng" mới.
+- Sách từng dịch (bản cũ 08-13, chuẩn trước "láng") + audiobook cũ 50 chương. Cần dịch lại từ đầu.
+- Slug nội bộ `zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing`; thư mục output `output/books/做一个刚刚好的女子  不攀附, 不将就 (晚情)/`. Data extract/chunk 71 sẵn từ trước (dùng lại).
+
+### Đã làm
+- **Profile + title map + glossary**: `working/profile/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing.md` (giọng "chị cả tâm sự" Vãn Tình, xưng hô tôi/cô-các cô, cậu/tớ bạn thân; 3 đoạn mẫu "láng"), `...-titles.json` (51 mục （01）...（50）+ Lời bạt), `...-glossary.txt` (47 mục từ master lọc theo book+author).
+- **Reset + skeleton mới**: xóa progress cũ → `init_trilingual_skeleton.py` → 71 chunk sạch, `batch_manifest.py create` 24 batch.
+- **Helper script mới**: `scripts/translate/save_translation_file.py` — ghi translated_text từ file vi (UTF-8), verify số dòng khớp, set word_count + translated_at, không đụng original/pinyin.
+- **Dịch 71/71 chunk** bằng sub-agent 1 chunk/lượt (9 đợt song song): mỗi chunk đọc profile → dịch dòng-đối-dòng → ghi progress (số dòng khớp 100%, giữ heading/ảnh/ngoặc kép, bỏ `///`). Tổng ~343K từ Việt / ~109K từ gốc. Relaunch lại các chunk sub-agent trả kết quả rỗng (5,12,17,20,24,38,41,43,45) → đều thành công.
+- **QA**: `batch_qa.py` → fix chunk 58 (4 dòng `”` bị thay bằng dòng trống → điền lại) → 71/71 OK. `glossary_qa.py` → fix **chunk 49 để sót Hán** (55 dòng chưa dịch, Hán sót 1602/92.4%) → relaunch sub-agent dịch lại hoàn toàn → 0 Hán. Quét toàn bộ 71 chunk: **Hán sót 0.0%**, không mojibake, không dòng lặp. Cảnh báo heuristic mềm chấp nhận với tản văn.
+- **Merge**: `merge_chunks.py --format trilingual` → tamngu.md (1.86MB); không format → vi.md (600KB). Đồng bộ mục lục OK (cả TOC + body heading đều từ titles.json).
+- **EPUB**: 1 file duy nhất `做一个刚刚好的女子  不攀附, 不将就 (晚情).epub` (~15.5MB) — nhúng font Noto Serif SC (CSS @font-face + `--epub-embed-font` + fix path `fonts/`→`../fonts/` trong zip), 13 ảnh Image0000X.jpg → `images/`, `--toc --split-level=2`. Xóa EPUB cũ `...(z-library.sk...).epub`.
+- **Audiobook**: xóa 50 MP3 cũ + progress cũ (`cmd /c rd /s /q` khi OneDrive read-only) → `audiobook_long.py --slug zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing --voice active --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10 --gpu --batch-size 16 --no-read-titles` → **50/50 chương**, ~7.4 giờ audio (26561s), gen 9536s (RTF 0.36), 405MB. Music map AI: slug đã có 50 mục trong `music_map.json` (nội dung chương giữ cấu trúc → dùng lại).
+- **QA audio**: `audio_qa.py --slug "做一个刚刚好的女子  不攀附, 不将就 (晚情)"` → báo 52 (đếm cả heading bìa + Lời bạt) — **chấp nhận**, detect_chapters thực tế 50, 50/50 MP3 tồn tại + size hợp lệ (giống case qie-yi 08-17). Đã xóa 3 dòng artifact `## [N] text0000X.html` trong chunk 0 khỏi vi.md + tamngu.md → rebuild EPUB.
+- **Cập nhật**: metadata.json (source_file=`做一个刚刚好的女子  不攀附, 不将就 (晚情).epub`, has_audio=true, has_epub=true), input đã ở `da-audio/` (đúng trạng thái), STATE.md + session_log.md.
+
+### File đổi
+- `scripts/translate/save_translation_file.py` — mới — có commit (code)
+- `working/profile/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing.md` + `-titles.json` + `-glossary.txt` — mới — KHÔNG commit (sản phẩm)
+- `working/progress/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/chunk_*.json` (71) — dịch mới — KHÔNG commit
+- `working/qa/zuo-yi-ge-gang-gang-hao-de-nu-zi-wan-qing/` (vi_only, report) — KHÔNG commit
+- `output/books/做一个刚刚好的女子  不攀附, 不将就 (晚情)/final/{tamngu.md, vi.md}` — merge mới — KHÔNG commit
+- `output/books/做一个刚刚好的女子  不攀附, 不将就 (晚情)/audiobook/ch01-50.mp3` (50 file, 405MB) — KHÔNG commit
+- `output/books/做一个刚刚好的女子  不攀附, 不将就 (晚情)/做一个刚刚好的女子  不攀附, 不将就 (晚情).epub` — KHÔNG commit
+- `output/books/做一个刚刚好的女子  不攀附, 不将就 (晚情)/metadata.json` — cập nhật — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Không. Sách đã hoàn tất toàn bộ (dịch lại chuẩn văn chương + EPUB + audiobook).
+- (Tùy chọn) Dọn file tạm `working/_tmp/` (vi_chunk_*.txt, fix_font_path.py, del_chunks*.py, epub_font_style.css).
+
+### Git
+- Chưa commit. Đề xuất: commit docs (STATE.md + session_log.md) + script `save_translation_file.py` khi user duyệt.
+
+### Bối cảnh
+- Sách đã dịch xong từ 08-15 (71 chương, vi.md sạch). User yêu cầu tạo audiobook. File input đang ở `input/da-dich/`.
+
+### Đã làm
+- **Xác định sách**: slug nội bộ `you-duo-xiang-jiu-you-duo-xing-fu` (metadata.json). Phát hiện phiên trước đã tạo thử 8 chương với **cấu hình cũ** (volume 0.2, 1 bài nhạc cố định, slug tiếng Trung) — progress `working/progress_audio/有多想要，就有多幸福 (晚情著).json`.
+- **Music map AI (71 chương)**: đọc nội dung từng chương từ vi.md (trích preview), chấm cảm xúc (vui/hài/trầm/ấm/ngọt) → chọn nhạc phù hợp từ `core/music/` (13 bài) → ghi vào `working/progress_audio/music_map.json` (giữ 2 cuốn cũ). Mỗi chương 1 bài nhạc riêng.
+- **Tạo audiobook GPU**: `working\venv-vieneu\Scripts\python.exe -u scripts\audiobook\audiobook_long.py --slug you-duo-xiang-jiu-you-duo-xing-fu --gpu --batch-size 16 --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10` — chạy nền ~1h54, **71/71 chương** (exit 0). Script tự phát hiện metadata cũ khác (volume/nhạc) → tạo lại toàn bộ từ đầu theo chuẩn mới. Progress mới `working/progress_audio/you-duo-xiang-jiu-you-duo-xing-fu.json`: 71 chương, ~6h06 audio (22007s), gen 6475s (RTF ~0.29), volume 0.15, music_map từng chương.
+- **QA**: `python scripts\qa\audio_qa.py --slug "有多想要，就有多幸福 (晚情著)"` → **ok: true**, 71/71 chapter khớp vi.md, không lỗi. (Lưu ý: `audio_qa.py` resolve theo tên thư mục gốc, không qua metadata — phải truyền tên tiếng Trung thay vì slug nội bộ.)
+- **Cập nhật metadata.json**: `has_audio=true`, tự dò `has_epub=true` + `epub_file` (1 file epub gốc duy nhất).
+- **Chuyển input**: `input/da-dich/有多想要，就有多幸福 (晚情著).epub` → `input/da-audio/` (shutil.move).
+
+### File đổi
+- `working/progress_audio/music_map.json` — thêm slug `you-duo-xiang-jiu-you-duo-xing-fu` (71 chương) — KHÔNG commit (sản phẩm)
+- `working/progress_audio/you-duo-xiang-jiu-you-duo-xing-fu.json` — mới (progress chuẩn) — KHÔNG commit
+- `working/progress_audio/有多想要，就有多幸福 (晚情著).json` — progress cũ phiên trước, giữ lại (không dùng nữa) — KHÔNG commit
+- `output/books/有多想要，就有多幸福 (晚情著)/audiobook/ch01-71.mp3` (71 file, ~370MB) — KHÔNG commit (sản phẩm)
+- `output/books/有多想要，就有多幸福 (晚情著)/metadata.json` — has_audio=true — KHÔNG commit
+- `input/da-audio/有多想要，就有多幸福 (晚情著).epub` — chuyển từ da-dich — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Không. Sách đã hoàn tất toàn bộ (dịch + EPUB + audiobook).
+- (Tùy chọn) Dọn progress cũ `working/progress_audio/有多想要，就有多幸福 (晚情著).json` khi chắc chắn không cần.
+
+### Git
+- Chưa commit. Đề xuất: commit docs (STATE.md + session_log.md) khi user duyệt.

@@ -13,7 +13,7 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
   - Cập nhật `docs/STATE.md` (giai đoạn sách, đang làm, còn nợ, quyết định).
   - Thêm 1 entry mới vào CUỐI `docs/session_log.md` (ngày, đã làm, file đổi, còn dở, git).
 - Ràng buộc git: 2 file này **CÓ commit** (thuộc phạm vi docs — không chứa sản phẩm; không bỏ vào .gitignore).
-- Command hỗ trợ: `/start` (đọc + tóm tắt trạng thái), `/done` (nhắc ghi bộ nhớ + rotate log + đề xuất commit), `/dich` (dịch trọn sách). Cả 3 nằm ở `.commandcode/commands/` (Command Code) + `.opencode/command/` (opencode legacy).
+- Command hỗ trợ: `/start` (đọc + tóm tắt trạng thái), `/done` (nhắc ghi bộ nhớ + rotate log + đề xuất commit), `/dich` (chỉ DỊCH sách — extract → dịch → merge → EPUB), `/audio` (chỉ tạo AUDIO cho sách đã dịch — nhạc nền AI theo nội dung), `/dich_audio` (dịch + audio trong 1 lệnh). Các lệnh nằm ở `.commandcode/commands/` (Command Code) + `.opencode/command/` (opencode legacy).
 - **Rotate session log tự động**: `docs/session_log.md` không tự xoá — khi > 100KB, chạy `python scripts\rotate_session_log.py` (trong `/done`) để dời entry cũ > 3 tháng vào `docs/session_log_archive/<YYYY-MM>.md`, file chính giữ gần nhất.
 - **CUỐI PHIÊN: chạy `python scripts\verify_memory.py`** để kiểm tra STATE.md + session_log đã đồng bộ chưa (báo nếu thiếu entry hôm nay / sách mới chưa nhắc / session_log cần rotate). Sửa các cảnh báo trước khi kết thúc.
 - Nguyên tắc: agent PHẢI tự đọc bộ nhớ khi bắt đầu — KHÔNG chờ người dùng nhắc.
@@ -57,9 +57,9 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 6. **Skeleton trilingual**: `scripts/translate/init_trilingual_skeleton.py --chunks-dir ... --progress-dir ...` → progress JSON `{chunk_id, total_chunks, chapter, source_text, translated_text, word_count_source, word_count_translated, mode:'trilingual', original_text, pinyin_text}`
 7. **Dịch**: subagent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng BẰNG nhau), giữ heading `#`/`##`, giữ nguyên dòng `![...]` ảnh, bỏ `///` OCR dư, dùng glossary, `translated_at="2026-07-31T00:00:00"`, ghi `json.dumps(ensure_ascii=False, indent=2)` utf-8. (KHÔNG dùng Local AI — chất lượng kém, đã bỏ.)
 8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `scripts/qa/glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
-9. **Merge**: `scripts/output/merge_chunks.py --format trilingual --force` → `output/books/<slug>/final/tamngu.md`
-10. **EPUB**: `scripts/output/make_epub.py` (cần pandoc)
-11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `output/books/<slug>/final/vi.md` (bản dịch thuần Việt)
+9. **Merge**: `scripts/output/merge_chunks.py --format trilingual --force` → `output/books/<tên-sách-gốc>/final/tamngu.md` (thư mục output = tên file input, có `metadata.json`; chi tiết xem `.opencode/command/dich.md`)
+10. **EPUB**: `scripts/output/make_epub.py` (cần pandoc) → **chỉ 1 file `<tên-sách-input>.epub` ở gốc** thư mục output; **KHÔNG tạo** `final/*.epub`/`trilingual.epub`. Sách ZH **bắt buộc nhúng font** Noto Serif SC (tránh Calibre hiện `?`). Chi tiết + checklist bắt buộc xem `.opencode/command/dich.md` mục J/K.
+11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `output/books/<tên-sách-gốc>/final/vi.md` (bản dịch thuần Việt)
 12. **Cập nhật input/ (BẮT BUỘC)**: `python scripts\manage_input.py` — di chuyển file nguồn vào `input\da-dich\` (đã dịch) hoặc `input\da-audio\` (đã dịch + audio) để người dùng biết trạng thái.
 
 ## BƯỚC 11 — TẠO AUDIOBOOK (VieNeu-TTS v3 Turbo)
@@ -87,15 +87,16 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - `output/books/<slug>/audiobook/ch01.mp3` — audio chapter (MP3 128kbps, ~10MB/chapter, kèm metadata title/album)
 - `output/books/<slug>/final/vi.md` — bản dịch thuần Việt (từ bước 9 Merge)
 - `output/books/<slug>/final/tamngu.md` — bản tam ngữ
-- `output/books/<slug>/trilingual.epub` — epub tam ngữ
+- `output/books/<slug>/<tên-sách-input>.epub` — **1 file EPUB duy nhất ở gốc** (tên theo file input, sách ZH nhúng font Noto Serif SC). KHÔNG tạo `final/*.epub` / `trilingual.epub`.
 - `output/books/<slug>/images/` — ảnh từ EPUB
 - Progress: `working/progress_audio/<slug>.json`
 - Chunk cache để resume: `working/progress_audio/chunks/<slug>/` (tự xóa sau khi chapter xong)
 
 ## CẤU TRÚC THƯ MỤC QUAN TRỌNG
 - `input/` — file gốc PDF/EPUB, **KHÔNG commit**. Chia 3 thư mục con theo trạng thái (tự động bởi `scripts/manage_input.py`): `chua-lam/` (chưa làm — **bỏ sách mới vào đây**), `da-dich/` (đã dịch, chưa audio), `da-audio/` (đã dịch + audio). Có `README.md` giải thích.
-- `output/books/` — sản phẩm, **KHÔNG commit**. Thư mục đặt tên theo **tên sách gốc** (tên file input); mỗi thư mục có `metadata.json` ghi `{"slug": "<slug-nội-bộ>", "title": "...", "source_file": "..."}`. Slug nội bộ dùng cho `working/progress`, `working/chunks`, `glossary`, `progress_audio`.
+- `output/books/` — sản phẩm, **KHÔNG commit**. Thư mục đặt tên theo **tên sách gốc** (tên file input); mỗi thư mục có `metadata.json` ghi `{"slug": "<slug-nội-bộ>", "title": "...", "source_file": "..."}`. Slug nội bộ dùng cho `working/progress`, `working/chunks`, `glossary`, `progress_audio`. **Rule EPUB: mỗi cuốn CHỈ 1 file `.epub` ở gốc, tên = tên file input** (`<tên-sách-input>.epub`) — KHÔNG tạo `final/*.epub` hay `trilingual.epub` (tamngu/vi chỉ cần `.md` trong `final/`). Sách ZH phải nhúng font Noto Serif SC.
 - `working/extracted/`, `working/chunks/`, `working/qa/` — **KHÔNG commit**
+- `working/profile/<slug>.md` — hồ sơ văn chương per-book (giọng văn, xưng hô, đoạn mẫu "láng"), tạo ở bước F2 và ĐỌC khi dịch mỗi chunk — **KHÔNG commit** (sản phẩm)
 - `working/progress/<slug>/` — chunk đã dịch, **KHÔNG commit** (sản phẩm trung gian)
 - `working/progress_audio/` — progress + cache audiobook, **KHÔNG commit** (sản phẩm)
 - `working/venv-vieneu/` — venv VieNeu-TTS, **KHÔNG commit**

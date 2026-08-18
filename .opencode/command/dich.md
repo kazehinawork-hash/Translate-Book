@@ -1,9 +1,9 @@
 ---
-description: Tự động dịch trọn một cuốn sách — chỉ cần file PDF/EPUB trong input/, lệnh này chạy toàn bộ pipeline (extract → chunk → glossary → dịch → QA → merge → EPUB) và trả kết quả hoàn chỉnh.
+description: Dịch trọn một cuốn sách (extract → chunk → glossary → dịch → QA → merge → EPUB). Chỉ DỊCH, không tạo audiobook — dùng /audio để tạo audio, /dich_audio để làm cả hai.
 agent: build
 ---
 
-Tự động dịch trọn một cuốn sách từ đầu đến cuối. Người dùng KHÔNG làm bước thủ công nào — bạn chạy mọi thứ. `$ARGUMENTS` có thể là: (1) tên file trong `input/` (VD `ten-sach.pdf`), (2) slug sách đã có chunk (VD `zuo-yi-ge-gang-gang-hao-de-nu-zi`), hoặc để trống.
+Tự động dịch trọn một cuốn sách từ đầu đến cuối (KHÔNG tạo audiobook — dùng `/audio` hoặc `/dich_audio`). Người dùng KHÔNG làm bước thủ công nào — bạn chạy mọi thứ. `$ARGUMENTS` có thể là: (1) tên file trong `input/` (VD `ten-sach.pdf`), (2) slug sách đã có chunk (VD `zuo-yi-ge-gang-gang-hao-de-nu-zi`), hoặc để trống.
 
 Luồng tổng quát:
 
@@ -14,8 +14,12 @@ Luồng tổng quát:
 4. Slug mặc định = tên file bỏ đuôi, viết thường, thay khoảng trắng bằng `-`. Nếu người dùng cung cấp `--slug <x>` trong `$ARGUMENTS` thì dùng slug đó.
 
 ## B. Extract (chỉ sách mới)
-- EPUB: `python scripts\extract\epub_extract.py --input input\<file> --output working\extracted\<slug>\raw.md`
+- EPUB (có text layer): `python scripts\extract\epub_extract.py --input input\<file> --output working\extracted\<slug>\raw.md`
 - PDF/DOCX/ảnh: `python scripts\extract\mineru_extract.py --input input\<file> --output working\extracted\<slug>\raw.md --lang <en|zh> --backend pipeline --device auto` (thử `--lang en` trước; nếu raw.md ra toàn chữ Hán thì chạy lại với `--lang zh`). `--device auto` tự dùng GPU (torch CUDA trong `.venv`).
+- **EPUB scan (toàn ảnh, không text layer) — BẮT BUỘC dùng MinerU** (ưu tiên, chất lượng tốt hơn PaddleOCR rõ rệt — text liền mạch):
+  1. Extract ảnh từ EPUB: `python -c "import zipfile,os,re; z=zipfile.ZipFile(r'input\<file>'); os.makedirs(r'working\_ocr_imgs',exist_ok=True); imgs=sorted([x for x in z.namelist() if x.lower().endswith(('.jpg','.jpeg','.png'))], key=lambda n: int(re.search(r'(\d+)',n).group(1)) if re.search(r'(\d+)',n) else 99999); [open(os.path.join(r'working\_ocr_imgs',f'{i+1:03d}{os.path.splitext(n)[1]}'),'wb').write(z.read(n)) for i,n in enumerate(imgs)]; z.close()"`
+  2. OCR từng ảnh bằng MinerU (chạy nền, checkpoint theo ảnh): loop gọi `mineru_extract.py --input <ảnh> --output <tmp>.md --lang zh --backend pipeline --device auto`, ghi checkpoint, ghép thành `raw.md` với `## Trang N`.
+  3. MinerU ~10-30s/ảnh (320 ảnh ~1.5-2 giờ) — chạy nền, có checkpoint resume.
 - **Làm sạch rác extract EPUB** (nếu QC bước C fail vì dòng lặp): xóa dòng `xml version='1.0' encoding='utf-8'?` và separator `---` thừa khỏi raw.md trước khi sang bước C (ví dụ dùng Python đọc/ghi UTF-8 — KHÔNG dùng pipe PowerShell vì hỏng dấu tiếng Việt).
 - In kết quả trích xuất (số dòng/ký tự của raw.md).
 
@@ -102,6 +106,13 @@ Manifest chỉ điều phối; `progress JSON` từng chunk vẫn là dữ liệ
 - ⚠️ **BẮT BUỘC truyền `--output-dir` tường minh** (merge_chunks tự dò PROJECT_ROOT bị lệch trên máy này — ghi ra sai vị trí nếu bỏ qua). Rename file sau merge vì script đặt tên `<slug>_trilingual.md`/`<slug>_translated.md` thay vì `tamngu.md`/`vi.md`.
 - EN: `python scripts\output\merge_chunks.py --progress-dir working\progress\<slug> --book-name <slug>-tmp --output-dir working\tmp\<slug> --force`, rồi `python scripts\output\make_bilingual.py --source <RAW> --translation working\tmp\<slug>\<slug>-tmp_translated.md --output "output\books\<tên-sách-gốc>\final\songngu.md" --lang en`; copy sang `"output\books\<tên-sách-gốc>\final\vi.md"`.
 - Sau merge, **verify nguồn dịch không mojibake**: quét ký tự `?` đứng giữa chữ (pattern `[a-zA-ZÀ-ỹ]\?(?=[a-zA-ZÀ-ỹ])`) trong vi.md — nếu > 0 thì chunk tương ứng bị hỏng dấu (thường do ghi qua pipe PowerShell), cần sửa lại chunk đúng UTF-8 rồi merge lại.
+- ⚠️ **Đồng bộ mục lục với heading body** (kinh nghiệm 08-17): nếu sách dịch LẠI hoặc chunk 0 giữ nội dung cũ, mục lục (giữa `# Mục lục` và `---`) có thể mang tên bài CŨ không khớp heading thân sách MỚI (vd "Tôi là chỗ dựa của anh" vs "Anh là chỗ dựa của em"). Trước khi kết thúc merge: đọc các heading `#` sau `---` (bỏ `# Mục lục`), **thay toàn bộ khối mục lục bằng đúng danh sách heading body đó** (dùng script Python sửa `chunk_000.json` trước rồi merge lại, hoặc sửa trực tiếp vi.md/tamngu.md). Xác nhận số mục TOC = số heading body.
+- **Sách OCR (scan) — BẮT BUỘC gộp câu + bỏ số trang** (sau merge, trước EPUB):
+  ```powershell
+  python scripts\output\merge_sentences.py --input "output\books\<tên-sách-gốc>\final\vi.md"
+  python scripts\output\merge_sentences.py --input "output\books\<tên-sách-gốc>\final\tamngu.md"
+  ```
+  Script gộp các dòng OCR nửa câu thành câu hoàn chỉnh, **bỏ số trang** (002, 003...) dính vào câu (giữ ISBN/năm/số điện thoại), giữ nguyên `## Chương N` + mục lục. Bản Việt gộp mượt; bản tam ngữ mỗi câu 1 khối Hán/pinyin/Việt.
 
 ## J. EPUB
 - Nếu người dùng muốn file EPUB (hoặc mặc định tạo): gọi pandoc tại `C:\Users\Admin\AppData\Local\Pandoc\pandoc.exe` qua `python scripts\output\make_epub.py "output\books\<tên-sách-gốc>\final\vi.md" --title "<Tên sách>" --author "<tác giả nếu biết>" --resource-path "output\books\<tên-sách-gốc>\images;working\extracted\<slug>"` (nếu pandoc không nằm trong PATH, thử thêm `C:\Users\Admin\AppData\Local\Pandoc` vào PATH tạm hoặc gọi pandoc.exe trực tiếp).
@@ -112,22 +123,18 @@ Manifest chỉ điều phối; `progress JSON` từng chunk vẫn là dữ liệ
   3. **Fix path font**: pandoc ghi `url("fonts/...")` trong CSS (đặt tại `EPUB/styles/`) → dùng Python sửa trong zip thành `url("../fonts/...")`.
   4. Copy `tamngu.epub` → **`output/books/<tên-sách-gốc>/<tên-sách-input>.epub`** (file EPUB duy nhất, tên theo file input). **KHÔNG tạo `final/tamngu.epub` / `final/vi.epub`** — chỉ giữ `.md` trong final/.
 
-## K. Audiobook (tạo + QA) và tổng kết
-- **Tạo audiobook GPU** (nếu người dùng muốn / mặc định làm cho sách VI + ZH đã dịch). `--slug` vẫn dùng slug nội bộ — script `find_book_dir()` tự map slug → thư mục tên gốc qua `metadata.json`:
-  ```powershell
-  working\venv-vieneu\Scripts\python.exe -u scripts\audiobook\audiobook_long.py --slug <slug> --gpu --batch-size 8 --music auto --music-volume 0.20 --temperature 0.3 --top-k 10
-  ```
-  - `--gpu` bắt buộc cho GPU (RTX 3060); `--batch-size 8` gom chunk mỗi forward; `--music auto` nhạc nền xoay (mỗi chương 1 bài trong `core/music/`); `--music-volume 0.20` mức đã chốt; `--temperature 0.3 --top-k 10` tham số chốt (giọng chậm rãi trầm ấm).
-  - Log in **dần từng nhóm batch** (`[batch 1/60]`, `[batch 2/60]`...) — không đợi hết chapter mới in.
-  - Nếu `vi.md` đã đổi (sửa dịch): chạy lại `--chapter <số chương bị ảnh hưởng> --force` để tạo lại đúng phần, giữ các chương khác.
-  - ⚠️ Khi chạy nền: dùng `-u` (unbuffered) để log không bị nuốt; hoặc chạy trực tiếp terminal.
-- **QA audiobook** sau khi tạo:
-  ```powershell
-  python scripts\qa\audio_qa.py --slug <slug>
-  ```
-- Báo cáo được ghi tại `working/qa/<slug>/audio-report.json`; phải kiểm tra đủ chapter, file không rỗng, WAV 48 kHz và không clipping. MP3 được đo duration nếu máy có `ffprobe`.
-- In đường dẫn đầy đủ các file output: `output/books/<tên-sách-gốc>/final/vi.md` (bản tiếng Việt), `output/books/<tên-sách-gốc>/final/tamngu.md` (tam ngữ, nếu ZH), `output/books/<tên-sách-gốc>/trilingual.epub` (EPUB), `output/books/<tên-sách-gốc>/audiobook/` (ch01.mp3...) và báo cáo QA.
-- **Sắp xếp input/ theo trạng thái** (tự động): chạy `python scripts\manage_input.py` để di chuyển file input vào `input\chua-lam\` (chưa làm) / `input\da-dich\` (đã dịch) / `input\da-audio\` (đã dịch + audio) — nhìn input là biết sách xử lý đến đâu.
+## K. Tổng kết
+- In đường dẫn đầy đủ các file output: `output/books/<tên-sách-gốc>/final/vi.md` (bản tiếng Việt), `output/books/<tên-sách-gốc>/final/tamngu.md` (tam ngữ, nếu ZH), `output/books/<tên-sách-gốc>/<tên-sách-input>.epub` (EPUB).
+- **✅ CHECKLIST BẮT BUỘC trước khi báo xong** (kiểm tra từng mục, đảm bảo KHÔNG lệch rule):
+  1. Thư mục output tên = **tên file input** (`output/books/<tên-sách-gốc>/`) — KHÔNG dùng slug Latin.
+  2. Có `metadata.json` đầy đủ (slug nội bộ, title, source_file, author, language, genre, has_audio, has_epub, epub_file, created).
+  3. **Chỉ 1 file `.epub`** ở gốc, tên `<tên-sách-input>.epub` — **KHÔNG có** `final/*.epub`, **KHÔNG có** `trilingual.epub`/`vi.epub` ở gốc.
+  4. `final/` chỉ chứa `.md`: `tamngu.md` (ZH) + `vi.md` (+ `songngu.md` nếu EN).
+  5. `vi.md` **0 mojibake** (quét pattern `[a-zA-ZÀ-ỹ]\?(?=[a-zA-ZÀ-ỹ])`).
+  6. EPUB ZH **đã nhúng font** Noto Serif SC (nếu không, Calibre hiển thị `?`).
+  7. `input/` đã cập nhật trạng thái (`manage_input.py` hoặc thủ công).
+- **Cập nhật `metadata.json`** (nếu chưa đầy đủ): đảm bảo có `author`, `language`, `genre`, `has_audio=false`, `has_epub`/`epub_file` tự dò từ thư mục. Ghi bằng Python UTF-8.
+- **Cập nhật input/ theo trạng thái (BẮT BUỘC)**: chạy `python scripts\manage_input.py` — file sách dịch xong sẽ vào **`input\da-dich\`** (đã dịch, chưa audio). Lưu ý: `manage_input.py` chỉ quét file ở gốc `input/`, không quét thư mục con — nếu file đã nằm trong thư mục con (vd `chua-lam/`) thì chuyển thủ công qua Python (`shutil.move` vào `da-dich/`).
 - KHÔNG tự commit/push (theo AGENTS.md) trừ khi người dùng yêu cầu. Hỏi người dùng có muốn commit/push không.
 
 ## ⚠️ Ghi chú chung (kinh nghiệm từ các phiên)
