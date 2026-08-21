@@ -14,6 +14,7 @@
 | Slug (nội bộ) | Thư mục output (tên gốc) | Ngôn ngữ | Giai đoạn | Ghi chú / Bước tiếp theo |
 |---|---|:--------:|-----------|--------------------------|
 | `zuo-yi-ge-you-feng-gu-de-nu-zi` | `做一个有风骨的女子` | ZH | ✅ Hoàn tất | EPUB + audiobook (85 chương). Tác giả Vi Dương |
+| `zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing` | `做一个有风骨的女子  不迎合, 不媚俗 (晚晴)` | ZH | ✅ Hoàn tất | Tản văn Vãn Tình (66 chunks). **Dịch mới + audiobook 44/44 chương GPU + nhạc nền AI (08-18)**: input `.azw3` (Kindle) → calibre chuyển EPUB → extract 50 mục → 66 chunk → profile văn chương → dịch 66/66 (97K từ, khớp dòng 100%, QA Hán sót 0.0%) → đồng bộ TOC (46 mục = body) → 1 EPUB nhúng font. Audiobook: `--music-auto` đọc music_map.json (44 chương, mỗi chương 1 bài theo cảm xúc), volume 0.15, batch 16, temp 0.3, top_k 10. ~7.2 giờ audio (414MB). ⚠️ Slug khác cuốn cùng tên của Vi Dương (`zuo-yi-ge-you-feng-gu-de-nu-zi`) — đã dùng suffix `-wan-qing`. Tác giả Vãn Tình |
 | `ban-co-nam-cho-ngoi` | `Ban Co Nam Cho Ngoi - Nguyen Nhat Anh` | VI | ✅ Hoàn tất | Audiobook 12/12 chương **GPU + nhạc nền (08-13)**: toàn bộ chương chạy lại bằng GPU batch 16, nhạc nền xoay `sach_ke_chuyen_10_lofi.mp3` / `sach_ke_chuyen_11_lofi.mp3`, **volume 0.15** (giảm từ 0.20), temp 0.3, top_k 10. ~3h09 audio. Tác giả Nguyễn Nhật Ánh |
 | `dac-nhan-tam` | `Đắc Nhân Tâm - Dale Carnegie` | VI | ✅ Hoàn tất | Audiobook. Tác giả Dale Carnegie |
 | `rung-na-uy` | `Rung Na-uy - Haruki Murakami` | VI | ✅ Hoàn tất | Audiobook. Tác giả Haruki Murakami |

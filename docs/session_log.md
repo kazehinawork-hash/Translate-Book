@@ -1615,3 +1615,47 @@
 
 ### Git
 - Chưa commit. Đề xuất: commit docs (STATE.md + session_log.md) khi user duyệt.
+
+## 2026-08-18 — Dịch mới + audiobook cuốn `做一个有风骨的女子  不迎合, 不媚俗 (晚晴)` (Vãn Tình) từ file .azw3
+
+### Bối cảnh
+- User yêu cầu "dịch lại và tạo audio cho tôi cuốn sách input\da-audio\做一个有风骨的女子  不迎合, 不媚俗 (晚晴).azw3" — file định dạng **Kindle .azw3** (lần đầu xử lý định dạng này).
+- Lưu ý: đây là cuốn **khác** với `做一个有风骨的女子` (Vi Dương, 85 chương, đã hoàn tất 08-13) — cuốn mới của Vãn Tình (晚晴), tên có thêm "不迎合, 不媚俗 (晚晴)".
+
+### Đã làm
+- **Chuyển .azw3 → EPUB** bằng calibre (`C:\Program Files\Calibre2\ebook-convert.exe`) → `working/tmp_azw3/zuo-yi-ge-you-feng-gu-de-nu-zi.epub`.
+- **Extract + QC**: `epub_extract.py` → raw.md 124KB (50 mục). QC báo 50 dòng `xml version...` + 46 dòng quảng cáo ePUBw.COM → dọn sạch bằng Python (xóa 96 dòng rác). detect_language → **zh-Hans**.
+- **Chunk**: 66 chunk (smart, ZH 1500-3000).
+- **Glossary**: tạo `glossary/zuo-yi-ge-you-feng-gu-de-nu-zi.csv` (8 thuật ngữ: Đường Đường, Mỹ Mỹ, Đan Đan, Hiểu Lâm, A Phượng, Tiểu R, Starbucks, Sheraton) → merge master (tự tách master_002.csv).
+- **⚠️ Xung đột slug**: phát hiện slug `zuo-yi-ge-you-feng-gu-de-nu-zi` **trùng cuốn cũ Vi Dương** — progress/chunks cũ của cuốn Vi Dương đã bị ghi đè khi tạo data mới. Audiobook cũ (85 MP3) + epub + final của cuốn Vi Dương **nguyên vẹn** (không mất thành phẩm). **Đã đổi slug cuốn mới sang `zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing`** (rename progress + chunks + metadata + music_map key).
+- **Profile văn chương**: `working/profile/zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing.md` — giọng khích lệ mạnh, xương khí phụ nữ, xưng hô tớ/cậu bạn thân, 先生 → ông xã.
+- **Dịch 66/66 chunk** bằng sub-agent 1 chunk/lượt (8 đợt song song) — ~97K từ Việt, khớp dòng 100% (fix chunk 18 dòng trống cuối, chunk 26 thiếu dấu ngoặc đóng cuối).
+- **QA**: Hán sót 0.0% (0 ký tự), không mojibake. 6 mục glossary "lệch" là cố ý (风骨 → xương khí theo profile).
+- **Merge + đồng bộ TOC**: merge vi.md + tamngu.md → phát hiện 29/46 mục TOC lệch tên với heading body (sub-agent dịch chunk 0 độc lập) → **đồng bộ TOC = body headings** → 0 diff.
+- **EPUB**: 1 file duy nhất `做一个有风骨的女子  不迎合, 不媚俗 (晚晴).epub` (16MB, nhúng font Noto Serif SC).
+- **Audiobook**: music_map AI 44 chương (phân tích cảm xúc từng bài, 13 bài nhạc core/music) → chạy `audiobook_long.py --slug zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing --gpu --batch-size 16 --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10` → **44/44 chương, ~7.2 giờ audio (25887s), 414MB**, gen 2.2h (RTF ~0.3).
+- **QA audio**: 44 MP3 đều OK (audio_qa báo 50 do đếm cả Bìa/Lời bạt — không phải lỗi).
+- **Cập nhật**: metadata.json (has_audio=true), input azw3 đã ở `da-audio/` (đúng), STATE.md + session_log.md.
+
+### File đổi
+- `working/tmp_azw3/zuo-yi-ge-you-feng-gu-de-nu-zi.epub` — tạm chuyển đổi — KHÔNG commit
+- `working/profile/zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing.md` — mới — KHÔNG commit (sản phẩm)
+- `working/progress/zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing/` (66 chunk) — mới (rename từ slug cũ) — KHÔNG commit
+- `working/chunks/zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing/` (66 file) — mới — KHÔNG commit
+- `working/qa/zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing/` — KHÔNG commit
+- `output/books/做一个有风骨的女子  不迎合, 不媚俗 (晚晴)/final/{tamngu.md, vi.md}` — KHÔNG commit
+- `output/books/做一个有风骨的女子  不迎合, 不媚俗 (晚晴)/audiobook/ch01-44.mp3` (44 file, 414MB) — KHÔNG commit
+- `output/books/做一个有风骨的女子  不迎合, 不媚俗 (晚晴)/做一个有风骨的女子  不迎合, 不媚俗 (晚晴).epub` (16MB) — KHÔNG commit
+- `output/books/做一个有风骨的女子  不迎合, 不媚俗 (晚晴)/metadata.json` — KHÔNG commit
+- `working/progress_audio/music_map.json` — thêm slug `-wan-qing` (44 chương) — KHÔNG commit
+- `working/progress_audio/zuo-yi-ge-you-feng-gu-de-nu-zi-wan-qing.json` — mới — KHÔNG commit
+- `glossary/zuo-yi-ge-you-feng-gu-de-nu-zi.csv` + `master.csv`/`master_002.csv` — KHÔNG commit
+- `docs/STATE.md`, `docs/session_log.md` — có commit (docs)
+
+### Còn dở
+- Không. Sách đã hoàn tất (dịch + EPUB + audiobook).
+- ⚠️ **Bài học**: 2 cuốn khác nhau có thể trùng slug (tên tiếng Trung giống nhau) — khi gặp sách cùng tên, kiểm tra metadata cuốn cũ TRƯỚC khi tạo data mới, dùng suffix phân biệt (`-wan-qing` cho Vãn Tình).
+- (Ghi nhớ) File .azw3: chuyển bằng calibre ebook-convert trước khi vào pipeline extract.
+
+### Git
+- Chưa commit. Đề xuất: commit docs (STATE.md + session_log.md) khi user duyệt.
