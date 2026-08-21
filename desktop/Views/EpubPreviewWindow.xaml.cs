@@ -1113,11 +1113,21 @@ namespace TranslateBook.Views
                 _mediaPlayer.Open(new Uri(_audioFiles[index]));
                 AudioSlider.Value = 0;
 
-                // Use TOC title if available for display
-                if (index < _flatToc.Count)
-                    AudioChapterName.Text = _flatToc[index].Title;
+                // Get chapter name from audio file → find matching TOC title
+                var audioName = Path.GetFileNameWithoutExtension(_audioFiles[index]);
+                var numMatch = System.Text.RegularExpressions.Regex.Match(audioName, @"(\d+)");
+                if (numMatch.Success && int.TryParse(numMatch.Groups[1].Value, out int chNum))
+                {
+                    // Find TOC item with matching chapter number
+                    var tocItem = _flatToc.FirstOrDefault(t =>
+                        System.Text.RegularExpressions.Regex.IsMatch(t.Title, $@"Chương\s+{chNum}\b",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+                    AudioChapterName.Text = tocItem?.Title ?? $"Chương {chNum}";
+                }
                 else
-                    AudioChapterName.Text = Path.GetFileNameWithoutExtension(_audioFiles[index]);
+                {
+                    AudioChapterName.Text = audioName;
+                }
             }
             catch (Exception ex)
             {
