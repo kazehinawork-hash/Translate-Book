@@ -8,6 +8,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Dark" />
                 <ui:ControlsDictionary />
+                <ResourceDictionary Source="Themes/LiquidGlass.xaml" />
                 <ResourceDictionary Source="Themes/AppStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <converters:BoolToEmojiConverter x:Key="BoolToEmojiConverter" xmlns:converters="clr-namespace:TranslateBook.Converters"/>

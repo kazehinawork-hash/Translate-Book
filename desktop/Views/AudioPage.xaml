@@ -32,7 +32,8 @@
                 <StackPanel Margin="0,0,24,12">
                     <TextBlock Text="Chất lượng MP3" FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
-                    <ComboBox Width="100" SelectedValue="{Binding AudioBitrate, Mode=TwoWay}" SelectedValuePath="Content">
+                    <ComboBox Width="100" SelectedValue="{Binding AudioBitrate, Mode=TwoWay}" SelectedValuePath="Content"
+                              Style="{StaticResource GlassComboBox}">
                         <ComboBoxItem Content="96k"/>
                         <ComboBoxItem Content="128k"/>
                         <ComboBoxItem Content="192k"/>
@@ -53,7 +54,7 @@
                 <ColumnDefinition Width="16"/>
                 <ColumnDefinition Width="300"/>
             </Grid.ColumnDefinitions>
-            <ui:Card Grid.Column="0" Padding="12">
+            <ui:Card Grid.Column="0" Padding="12" Style="{StaticResource InteractiveCard}">
                 <StackPanel>
                     <TextBlock Text="Quản lý giọng" FontSize="14" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8"/>
@@ -61,7 +62,8 @@
                         <TextBlock Text="Giọng hiện tại:" VerticalAlignment="Center" Margin="0,0,8,0"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                         <ComboBox Width="160" ItemsSource="{Binding VoiceList}"
-                                  SelectedItem="{Binding SelectedVoice}" Margin="0,0,8,0"/>
+                                  SelectedItem="{Binding SelectedVoice}" Margin="0,0,8,0"
+                                  Style="{StaticResource GlassComboBox}"/>
                         <ui:Button Content="Đặt làm giọng chính" Icon="{ui:SymbolIcon Checkmark24}" Height="32"
                                    Command="{Binding SetActiveVoiceCommand}"/>
                         <ui:Button Content="Nghe thử" Icon="{ui:SymbolIcon Play24}" Height="32"
@@ -77,7 +79,7 @@
                     </StackPanel>
                 </StackPanel>
             </ui:Card>
-            <ui:Card Grid.Column="2" Padding="12">
+            <ui:Card Grid.Column="2" Padding="12" Style="{StaticResource InteractiveCard}">
                 <StackPanel>
                     <TextBlock Text="Trích xuất giọng mới" FontSize="14" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,8"/>
@@ -90,7 +92,8 @@
                         <ui:TextBox Grid.Column="0" Style="{StaticResource InteractiveTextBox}" PlaceholderText="Tên giọng"
                                     Text="{Binding VoiceName, UpdateSourceTrigger=PropertyChanged}"/>
                         <ComboBox Grid.Column="2" SelectedValue="{Binding VoiceGender, Mode=TwoWay}" SelectedValuePath="Tag"
-                                  ToolTip="Giới tính dùng để chọn cách xử lý giọng phù hợp">
+                                  ToolTip="Giới tính dùng để chọn cách xử lý giọng phù hợp"
+                                  Style="{StaticResource GlassComboBox}">
                             <ComboBoxItem Content="Nữ" Tag="female"/>
                             <ComboBoxItem Content="Nam" Tag="male"/>
                         </ComboBox>

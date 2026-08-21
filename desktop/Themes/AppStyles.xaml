@@ -1,7 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Log RichTextBox — monospace, read-only, auto-scroll, colored entries -->
+    <!-- Log RichTextBox — monospace, read-only, auto-scroll, colored entries (glass-style) -->
     <Style x:Key="LogRichTextBox" TargetType="RichTextBox">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
@@ -14,54 +14,33 @@
         <Setter Property="Padding" Value="8"/>
     </Style>
 
-    <Style x:Key="InteractiveCard" TargetType="ui:Card" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-        <Setter Property="RenderTransform">
-            <Setter.Value>
-                <TranslateTransform Y="0"/>
-            </Setter.Value>
-        </Setter>
-        <Setter Property="Effect">
-            <Setter.Value>
-                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.12"/>
-            </Setter.Value>
-        </Setter>
+    <!-- InteractiveCard — Glass 3.0: gradient border + blur tint (no shadow animation — perf) -->
+    <Style x:Key="InteractiveCard" TargetType="ui:Card" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+           BasedOn="{StaticResource LiquidGlassCard}">
         <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <!-- No translate/scale on hover: moving the card makes the cursor leave
-                     the hit area near edges and causes an infinite hover flicker loop. -->
-                <Setter Property="Effect">
-                    <Setter.Value>
-                        <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.2"/>
-                    </Setter.Value>
-                </Setter>
-            </Trigger>
             <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Opacity" Value="0.58"/>
             </Trigger>
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="InteractiveButton" TargetType="ui:Button" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" BasedOn="{StaticResource {x:Type ui:Button}}">
-        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-        <Setter Property="RenderTransform">
-            <Setter.Value>
-                <ScaleTransform ScaleX="1" ScaleY="1"/>
-            </Setter.Value>
-        </Setter>
+    <!-- InteractiveButton — Glass 3.0: gradient border + blur tint (no shadow — perf) -->
+    <Style x:Key="InteractiveButton" TargetType="ui:Button" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+           BasedOn="{StaticResource LiquidGlassButton}">
         <Style.Triggers>
             <Trigger Property="IsPressed" Value="True">
                 <Setter Property="RenderTransform">
                     <Setter.Value>
-                        <ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
+                        <ScaleTransform ScaleX="0.97" ScaleY="0.97"/>
                     </Setter.Value>
                 </Setter>
             </Trigger>
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="InteractiveTextBox" TargetType="ui:TextBox" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" BasedOn="{StaticResource {x:Type ui:TextBox}}">
-        <Setter Property="BorderThickness" Value="1"/>
+    <!-- InteractiveTextBox — Glass 3.0: gradient border + focus accent -->
+    <Style x:Key="InteractiveTextBox" TargetType="ui:TextBox" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+           BasedOn="{StaticResource LiquidGlassTextBox}">
         <Style.Triggers>
             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                 <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
@@ -69,20 +48,16 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Stat tile for book cards: icon + value + label -->
-    <Style x:Key="StatTile" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="8,6"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-    </Style>
+    <!-- StatTile — Glass 3.0 gradient border mini-card -->
+    <Style x:Key="StatTile" TargetType="Border" BasedOn="{StaticResource LiquidGlassStatTile}"/>
 
-    <!-- Book card header (avatar + title + status) -->
+    <!-- Book card header (Glass 3.0: gradient border + rounded) -->
     <Style x:Key="BookCardHeader" TargetType="Border">
-        <Setter Property="CornerRadius" Value="10"/>
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="CornerRadius" Value="12,12,0,0"/>
+        <Setter Property="Padding" Value="14,12"/>
         <Setter Property="Margin" Value="0,0,0,10"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
     </Style>
 
     <!-- TreeViewItem toggle chevron -->
@@ -132,7 +107,7 @@
                             <RowDefinition/>
                         </Grid.RowDefinitions>
                         <Border x:Name="Bd" Grid.Column="0" Grid.ColumnSpan="3"
-                                Background="{TemplateBinding Background}" CornerRadius="4"
+                                Background="{TemplateBinding Background}" CornerRadius="6"
                                 Padding="{TemplateBinding Padding}" SnapsToDevicePixels="true"/>
                         <ToggleButton x:Name="Expander" Style="{StaticResource ExpandCollapseToggleStyle}"
                                       IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
@@ -149,10 +124,10 @@
                             <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="true">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassButtonActiveBrush}"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="true" SourceName="Bd">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassButtonNormalBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -160,38 +135,12 @@
         </Setter>
     </Style>
 
-    <!-- Enhanced card hover animation -->
-    <Style x:Key="InteractiveCardAnim" TargetType="ui:Card" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" BasedOn="{StaticResource InteractiveCard}">
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Trigger.EnterActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).((DropShadowEffect).BlurRadius)" To="20" Duration="0:0:0.2"/>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).((DropShadowEffect).Opacity)" To="0.2" Duration="0:0:0.2"/>
-                            <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)" To="-3" Duration="0:0:0.2"/>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.EnterActions>
-                <Trigger.ExitActions>
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).((DropShadowEffect).BlurRadius)" To="14" Duration="0:0:0.2"/>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).((DropShadowEffect).Opacity)" To="0.12" Duration="0:0:0.2"/>
-                            <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.2"/>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </Trigger.ExitActions>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
     <!-- Accessibility focus indicator -->
     <Style x:Key="AccentFocusVisual" TargetType="Control">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Control">
-                    <Border BorderBrush="{DynamicResource AccentFillColorDefaultBrush}" BorderThickness="2" CornerRadius="4" Margin="-2"/>
+                    <Border BorderBrush="{DynamicResource AccentFillColorDefaultBrush}" BorderThickness="2" CornerRadius="6" Margin="-2"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

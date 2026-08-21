@@ -1,0 +1,365 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================
+         LIQUID GLASS 3.0 EFFECTS — PURE WPF
+         Merged from Glass 3.0 Taskbar + File Explorer themes
+
+         Blur tint levels (WPF approximation):
+           #10ffffff = very subtle (main frame)
+           #15ffffff = light subtle (tab normal)
+           #20ffffff = subtle (button normal)
+           #25ffffff = medium light (search box, tab selected)
+           #30ffffff = medium (active normal / pressed)
+           #35ffffff = medium bright (tab hover, accent hover)
+           #40ffffff = bright (button hover)
+           #80ffffff = gradient edges
+
+         Border gradients:
+           Vertical gray: #50808080 → #50404040 → #50808080 (main)
+           Diagonal white: #80ffffff → #50ffffff → #80ffffff (accent)
+         ============================================ -->
+
+    <!-- ===== 1. GLASS BACKDROP BRUSHES (dark tint for readable text) ===== -->
+    <SolidColorBrush x:Key="GlassBackgroundBrush" Color="#501a1a2e"/>
+    <SolidColorBrush x:Key="GlassBackgroundHoverBrush" Color="#68222240"/>
+    <SolidColorBrush x:Key="GlassBackgroundActiveBrush" Color="#581e1e38"/>
+
+    <SolidColorBrush x:Key="GlassButtonNormalBrush" Color="#45202038"/>
+    <SolidColorBrush x:Key="GlassButtonHoverBrush" Color="#65282848"/>
+    <SolidColorBrush x:Key="GlassButtonPressedBrush" Color="#55242440"/>
+    <SolidColorBrush x:Key="GlassButtonActiveBrush" Color="#55242440"/>
+    <SolidColorBrush x:Key="GlassButtonActiveHoverBrush" Color="#65282848"/>
+
+    <SolidColorBrush x:Key="GlassElementBackgroundBrush" Color="#581c1c34"/>
+    <SolidColorBrush x:Key="GlassElementBackground2Brush" Color="#40181830"/>
+    <SolidColorBrush x:Key="GlassButtonBackground2Brush" Color="#501a1a30"/>
+    <SolidColorBrush x:Key="GlassAccentBackgroundBrush" Color="#481e1e3a"/>
+    <SolidColorBrush x:Key="GlassSearchBackgroundBrush" Color="#501a1a34"/>
+
+    <SolidColorBrush x:Key="GlassTabNormalBrush" Color="#401a1a30"/>
+    <SolidColorBrush x:Key="GlassTabSelectedBrush" Color="#60222240"/>
+    <SolidColorBrush x:Key="GlassTabHoverBrush" Color="#70282848"/>
+
+    <!-- Inner shadow for depth illusion -->
+    <LinearGradientBrush x:Key="GlassInnerShadowBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#40FFFFFF" />
+        <GradientStop Offset="0.1" Color="#15FFFFFF" />
+        <GradientStop Offset="0.9" Color="#05000000" />
+        <GradientStop Offset="1" Color="#20000000" />
+    </LinearGradientBrush>
+
+    <!-- Top highlight -->
+    <LinearGradientBrush x:Key="GlassTopHighlightBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Offset="0" Color="#00FFFFFF" />
+        <GradientStop Offset="0.3" Color="#0AFFFFFF" />
+        <GradientStop Offset="0.5" Color="#18FFFFFF" />
+        <GradientStop Offset="0.7" Color="#0AFFFFFF" />
+        <GradientStop Offset="1" Color="#00FFFFFF" />
+    </LinearGradientBrush>
+
+    <!-- Diagonal light sweep -->
+    <LinearGradientBrush x:Key="GlassDiagonalHighlightBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Offset="0" Color="#00FFFFFF" />
+        <GradientStop Offset="0.35" Color="#00FFFFFF" />
+        <GradientStop Offset="0.48" Color="#0DFFFFFF" />
+        <GradientStop Offset="0.5" Color="#15FFFFFF" />
+        <GradientStop Offset="0.52" Color="#0DFFFFFF" />
+        <GradientStop Offset="0.65" Color="#00FFFFFF" />
+        <GradientStop Offset="1" Color="#00FFFFFF" />
+    </LinearGradientBrush>
+
+    <!-- ===== 2. BORDER BRUSHES ===== -->
+    <!-- Main vertical border: gray gradient (File Explorer) -->
+    <LinearGradientBrush x:Key="GlassVerticalBorderBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#50808080" Offset="0.0" />
+        <GradientStop Color="#50404040" Offset="0.25" />
+        <GradientStop Color="#50808080" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Element vertical border: subtle gray -->
+    <LinearGradientBrush x:Key="GlassElementBorderBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#50808080" Offset="1" />
+        <GradientStop Color="#50606060" Offset="0.15" />
+    </LinearGradientBrush>
+
+    <!-- Diagonal white gradient border (Glass 3.0 taskbar) -->
+    <LinearGradientBrush x:Key="GlassGradientBorderBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#80ffffff" Offset="0.0" />
+        <GradientStop Color="#50ffffff" Offset="0.55" />
+        <GradientStop Color="#80ffffff" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Hover gradient border -->
+    <LinearGradientBrush x:Key="GlassGradientBorderHoverBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#90ffffff" Offset="0.0" />
+        <GradientStop Color="#60ffffff" Offset="0.55" />
+        <GradientStop Color="#90ffffff" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Accent gradient border -->
+    <LinearGradientBrush x:Key="GlassAccentBorderBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#6078ff" Offset="0.0" />
+        <GradientStop Color="#4050cc" Offset="0.55" />
+        <GradientStop Color="#6078ff" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ===== 3. ENHANCED SHADOWS ===== -->
+    <DropShadowEffect x:Key="GlassShadowDefault" 
+                      BlurRadius="20" ShadowDepth="2" Opacity="0.12" Direction="270" Color="#000000"/>
+    
+    <DropShadowEffect x:Key="GlassShadowHover" 
+                      BlurRadius="28" ShadowDepth="4" Opacity="0.20" Direction="270" Color="#000000"/>
+    
+    <DropShadowEffect x:Key="GlassShadowPress" 
+                      BlurRadius="14" ShadowDepth="1" Opacity="0.08" Direction="270" Color="#000000"/>
+
+    <DropShadowEffect x:Key="GlassInnerShadow" 
+                      BlurRadius="8" ShadowDepth="-1" Opacity="0.1" Direction="90" Color="#000000"/>
+
+    <!-- ===== 4. ANIMATIONS ===== -->
+    <Storyboard x:Key="GlassCardHoverStoryboard">
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)"
+                         To="28" Duration="0:0:0.25" DecelerationRatio="0.8"/>
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.ShadowDepth)"
+                         To="6" Duration="0:0:0.25" DecelerationRatio="0.8"/>
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                         To="0.22" Duration="0:0:0.25" DecelerationRatio="0.8"/>
+        <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)"
+                         To="-3" Duration="0:0:0.25" DecelerationRatio="0.8"/>
+    </Storyboard>
+
+    <Storyboard x:Key="GlassCardLeaveStoryboard">
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)"
+                         To="20" Duration="0:0:0.25" AccelerationRatio="0.5"/>
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.ShadowDepth)"
+                         To="2" Duration="0:0:0.25" AccelerationRatio="0.5"/>
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                         To="0.12" Duration="0:0:0.25" AccelerationRatio="0.5"/>
+        <DoubleAnimation Storyboard.TargetProperty="(RenderTransform).(TranslateTransform.Y)"
+                         To="0" Duration="0:0:0.25" AccelerationRatio="0.5"/>
+    </Storyboard>
+
+    <Storyboard x:Key="GlassButtonPressStoryboard">
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                         To="0.97" Duration="0:0:0.08"/>
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                         To="0.97" Duration="0:0:0.08"/>
+    </Storyboard>
+
+    <Storyboard x:Key="GlassButtonReleaseStoryboard">
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                         To="1.0" Duration="0:0:0.12" EasingFunction="CubicEase"/>
+        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                         To="1.0" Duration="0:0:0.12" EasingFunction="CubicEase"/>
+    </Storyboard>
+
+    <!-- ===== 5. GLASS 3.0 CARD STYLE (custom template with CornerRadius) ===== -->
+    <Style x:Key="LiquidGlassCard" TargetType="ui:Card"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Margin" Value="6"/>
+        <Setter Property="Effect" Value="{DynamicResource GlassShadowDefault}"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <TranslateTransform Y="0"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:Card">
+                    <Border x:Name="CardBorder"
+                            Background="{DynamicResource GlassElementBackgroundBrush}"
+                            BorderBrush="{DynamicResource GlassGradientBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          ContentStringFormat="{TemplateBinding ContentStringFormat}"
+                                          Margin="{TemplateBinding Margin}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CardBorder" Property="Background" Value="{DynamicResource GlassBackgroundHoverBrush}"/>
+                            <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== 6. GLASS 3.0 BUTTON STYLE (no DropShadow — perf) ===== -->
+    <Style x:Key="LiquidGlassButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Background" Value="{DynamicResource GlassButtonNormalBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource GlassButtonHoverBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource GlassButtonPressedBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.4"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===== 7. GLASS 3.0 PRIMARY BUTTON (Accent, no shadow — perf) ===== -->
+    <Style x:Key="LiquidGlassButtonPrimary" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassAccentBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Style.Triggers>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource GlassBackgroundActiveBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===== 8. GLASS 3.0 TEXTBOX STYLE (no shadow — perf) ===== -->
+    <Style x:Key="LiquidGlassTextBox" TargetType="ui:TextBox" BasedOn="{StaticResource {x:Type ui:TextBox}}"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Background" Value="{DynamicResource GlassSearchBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Style.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                <Setter Property="Background" Value="{DynamicResource GlassBackgroundHoverBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===== 9. INNER BORDER STYLE ===== -->
+    <Style x:Key="GlassInnerBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource GlassInnerShadowBrush}"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="Margin" Value="1"/>
+    </Style>
+
+    <!-- ===== 10. NAVIGATION PANEL GLASS (no shadow — perf) ===== -->
+    <Style x:Key="LiquidGlassNavPanel" TargetType="ui:NavigationView"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Background" Value="{DynamicResource GlassBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,1,0"/>
+    </Style>
+
+    <!-- ===== 11. STAT TILE (no shadow — perf) ===== -->
+    <Style x:Key="LiquidGlassStatTile" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource GlassElementBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassVerticalBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0.3,1,0.3,0.3"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource GlassBackgroundHoverBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===== 12. SEARCH BOX GLASS ===== -->
+    <Style x:Key="LiquidGlassSearchBox" TargetType="ui:TextBox" BasedOn="{StaticResource LiquidGlassTextBox}"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="Background" Value="{DynamicResource GlassSearchBackgroundBrush}"/>
+    </Style>
+
+    <!-- ===== 13. LOG PANEL GLASS (no shadow — perf) ===== -->
+    <Style x:Key="GlassLogPanel" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource GlassElementBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0,8,8,0"/>
+    </Style>
+
+    <!-- ===== 14. GLASS COMBOBOX STYLE ===== -->
+    <Style x:Key="GlassComboBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+        <Setter Property="Background" Value="{DynamicResource GlassElementBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+    </Style>
+
+    <!-- ===== 15. GLASS PLAIN BUTTON (for non-ui:Button elements) ===== -->
+    <Style x:Key="GlassPlainButton" TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource GlassButtonNormalBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource GlassButtonHoverBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource GlassButtonPressedBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ===== 15. GLASS TAB HEADER (File Explorer tab style) ===== -->
+    <Style x:Key="GlassTabHeader" TargetType="RadioButton">
+        <Setter Property="Background" Value="{DynamicResource GlassTabNormalBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="14,6"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" 
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="12" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassTabHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassTabSelectedBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== 15. TOOLTIP GLASS ===== -->
+    <Style x:Key="GlassToolTip" TargetType="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource GlassElementBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassElementBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0.3,0.3,0.3,1"/>
+        <Setter Property="Padding" Value="8,4"/>
+    </Style>
+
+</ResourceDictionary>

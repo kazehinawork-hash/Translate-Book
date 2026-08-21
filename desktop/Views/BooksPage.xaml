@@ -27,7 +27,8 @@
                     </Grid.ColumnDefinitions>
                     <ui:TextBox x:Name="SearchBox" Grid.Column="0" PlaceholderText="Tìm kiếm..."
                                 Icon="{ui:SymbolIcon Search24}" IconPlacement="Left"
-                                TextChanged="SearchBox_TextChanged" Margin="20,0,0,0" Height="36"/>
+                                TextChanged="SearchBox_TextChanged" Margin="20,0,0,0" Height="36"
+                                Style="{StaticResource InteractiveTextBox}"/>
                     <ui:Button Grid.Column="1" Width="36" Height="36"
                                Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Làm mới" Cursor="Hand"
                                Background="Transparent" BorderThickness="0" Margin="8,0,0,0"
@@ -42,13 +43,14 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
+            <!-- Glass 3.0 tab headers -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                 <RadioButton x:Name="TabInput" Content="Input (Chưa dịch)" IsChecked="True"
-                             Click="TabInput_Click" GroupName="BookTabs" Margin="0,0,16,0"
-                             FontSize="14" FontWeight="SemiBold" Padding="12,6" Cursor="Hand"/>
+                             Click="TabInput_Click" GroupName="BookTabs" Margin="0,0,8,0"
+                             Style="{StaticResource GlassTabHeader}"/>
                 <RadioButton x:Name="TabOutput" Content="Output (Đã dịch)"
                              Click="TabOutput_Click" GroupName="BookTabs"
-                             FontSize="14" FontWeight="SemiBold" Padding="12,6" Cursor="Hand"/>
+                             Style="{StaticResource GlassTabHeader}"/>
             </StackPanel>
 
             <Grid Grid.Row="1" x:Name="InputPanel" Visibility="Visible">

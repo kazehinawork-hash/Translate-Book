@@ -20,7 +20,8 @@
                 <ComboBox x:Name="ProviderCombo" Width="250" HorizontalAlignment="Left"
                           SelectedValuePath="Content"
                           SelectedValue="{Binding SelectedProvider, Mode=TwoWay}" Margin="0,0,0,24"
-                          ToolTip="Chọn nhà cung cấp API đang sử dụng">
+                          ToolTip="Chọn nhà cung cấp API đang sử dụng"
+                          Style="{StaticResource GlassComboBox}">
                     <ComboBoxItem Content="gemini"/>
                     <ComboBoxItem Content="deepseek"/>
                     <ComboBoxItem Content="custom"/>

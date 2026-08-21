@@ -6,7 +6,8 @@
         xmlns:views="clr-namespace:TranslateBook.Views"
         Title="Translate Book" Width="1100" Height="750" MinWidth="800" MinHeight="520"
         WindowStartupLocation="CenterScreen"
-        WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round">
+        WindowBackdropType="Acrylic" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round"
+        Background="Transparent">
 
     <ui:FluentWindow.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
@@ -45,10 +46,13 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <ui:NavigationView Grid.Column="0" x:Name="NavView"
-                               IsPaneOpen="True" OpenPaneLength="220" PaneDisplayMode="Left"
-                               Margin="0,0,0,4">
-                <ui:NavigationView.MenuItems>
+            <Border Grid.Column="0" CornerRadius="0,0,0,8" ClipToBounds="True"
+                    Background="{DynamicResource GlassBackgroundBrush}">
+                <ui:NavigationView x:Name="NavView"
+                                   IsPaneOpen="True" OpenPaneLength="220" PaneDisplayMode="Left"
+                                   Margin="0,0,0,4"
+                                   Background="Transparent">
+                    <ui:NavigationView.MenuItems>
                     <ui:NavigationViewItem Content="Sách" IsActive="True"
                                            TargetPageType="{x:Type views:BooksPage}"
                                            Icon="{ui:SymbolIcon BookOpen24}"/>
@@ -67,11 +71,13 @@
                                            Icon="{ui:SymbolIcon Settings24}"/>
                 </ui:NavigationView.FooterMenuItems>
             </ui:NavigationView>
+            </Border>
 
-            <!-- Realtime Log — right docked panel (fully collapses when hidden) -->
+            <!-- Realtime Log — right docked panel (Glass 3.0: match window corners) -->
             <Border Grid.Column="1" x:Name="LogPanel" Width="300" Margin="0,0,0,4"
-                    BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}" BorderThickness="1,0,0,0"
-                    Background="{DynamicResource ControlFillColorTertiaryBrush}">
+                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
+                    Background="{DynamicResource GlassBackgroundBrush}" CornerRadius="0,8,8,0"
+                    ClipToBounds="True">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Visibility" Value="Visible"/>
@@ -95,8 +101,10 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Panel header: hamburger toggle + title + actions -->
-                        <Border Grid.Row="0" Background="{DynamicResource ControlFillColorSecondaryBrush}" Padding="6,4">
+                        <!-- Panel header: hamburger toggle + title + actions (Glass 3.0) -->
+                        <Border Grid.Row="0" Background="{DynamicResource GlassBackgroundBrush}" Padding="8,6"
+                                BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1"
+                                CornerRadius="0,8,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -131,10 +139,11 @@
                 </Grid>
             </Border>
 
-            <!-- Collapsed tab — slim vertical bar on the right edge to re-open the log -->
+            <!-- Collapsed tab — slim vertical bar (match window corners) -->
             <Border Grid.Column="1" x:Name="LogCollapsedTab" Width="28" Margin="0,0,0,4"
-                    BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}" BorderThickness="1,0,0,0"
-                    Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
+                    Background="{DynamicResource GlassBackgroundBrush}" CornerRadius="0,8,8,0"
+                    ClipToBounds="True">
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Visibility" Value="Collapsed"/>
