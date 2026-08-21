@@ -6,7 +6,7 @@
         xmlns:models="clr-namespace:TranslateBook.Models"
         Title="EPUB Preview" Height="700" Width="1000" MinWidth="800" MinHeight="600"
         WindowStartupLocation="CenterOwner"
-        WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round"
+        WindowBackdropType="Acrylic" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round"
         PreviewKeyDown="Window_PreviewKeyDown">
 
     <Grid>
@@ -19,13 +19,15 @@
 
         <ui:TitleBar Grid.Row="0" Title="Đọc thử Sách EPUB" Icon="{ui:SymbolIcon BookOpen24}"/>
 
-        <!-- Toolbar: search, zoom, theme refresh (scrolls horizontally when window is narrow) -->
-        <Border Grid.Row="1" Background="{DynamicResource ControlFillColorSecondaryBrush}" Padding="8">
+        <!-- Toolbar: search, zoom, theme refresh (Glass 3.0) -->
+        <Border Grid.Row="1" Background="{DynamicResource GlassBackgroundBrush}" Padding="10,8"
+                BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <ui:Button x:Name="BtnRefreshTheme" Content="Làm mới" Icon="{ui:SymbolIcon ArrowClockwise24}"
                                Height="32" Margin="0,0,8,0" Click="BtnRefreshTheme_Click"
-                               ToolTip="Cập nhật lại màu sắc theo theme hiện tại"/>
+                               ToolTip="Cập nhật lại màu sắc theo theme hiện tại"
+                               Style="{StaticResource InteractiveButton}"/>
 
                     <TextBlock x:Name="ZoomPercent" Text="100%" FontSize="12" VerticalAlignment="Center"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,8,0"/>
@@ -36,25 +38,31 @@
                             Margin="0,0,12,0"/>
 
                     <ui:TextBox x:Name="SearchBox" Width="160" Height="32" PlaceholderText="Tìm kiếm trong sách..."
-                                 TextChanged="SearchBox_TextChanged"/>
+                                 TextChanged="SearchBox_TextChanged"
+                                 Style="{StaticResource InteractiveTextBox}"/>
 
                     <ui:Button x:Name="BtnSearchNext" Content="Tiếp" Icon="{ui:SymbolIcon ChevronDown24}"
                                Height="32" Margin="8,0,0,0" Click="BtnSearchNext_Click"
-                               ToolTip="Tìm chuỗi kế tiếp"/>
+                               ToolTip="Tìm chuỗi kế tiếp"
+                               Style="{StaticResource InteractiveButton}"/>
                     <ui:Button x:Name="BtnSearchPrev" Content="Trước" Icon="{ui:SymbolIcon ChevronUp24}"
                                Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click"
-                               ToolTip="Tìm chuỗi trước đó"/>
+                               ToolTip="Tìm chuỗi trước đó"
+                               Style="{StaticResource InteractiveButton}"/>
 
-                    <!-- Nhạc nền -->
-                    <Border Grid.Column="0" Background="{DynamicResource ControlFillColorTertiaryBrush}"
-                            CornerRadius="6" Padding="8,2" Margin="16,0,0,0" VerticalAlignment="Center">
+                    <!-- Nhạc nền (Glass 3.0) -->
+                    <Border Grid.Column="0" Background="{DynamicResource GlassBackgroundBrush}"
+                            CornerRadius="10" Padding="10,4" Margin="16,0,0,0" VerticalAlignment="Center"
+                            BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:Button x:Name="BtnMusicToggle" Content="Nhạc nền: Tắt" Icon="{ui:SymbolIcon MusicNote24}"
+                            <ui:Button x:Name="BtnMusicToggle" Content="Nhạc nền: Tắt" Icon="{ui:SymbolIcon Headphones24}"
                                        Height="32" Margin="0,0,8,0" Click="BtnMusicToggle_Click"
-                                       ToolTip="Bật / tắt nhạc nền khi đọc"/>
+                                       ToolTip="Bật / tắt nhạc nền khi đọc"
+                                       Style="{StaticResource InteractiveButton}"/>
                             <ComboBox x:Name="MusicSelect" Width="160" Height="32" VerticalAlignment="Center"
                                       Margin="0,0,8,0" SelectionChanged="MusicSelect_SelectionChanged"
-                                      ToolTip="Chọn bản nhạc nền"/>
+                                      ToolTip="Chọn bản nhạc nền"
+                                      Style="{StaticResource GlassComboBox}"/>
                             <TextBlock x:Name="MusicVolLabel" Text="Nhạc" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        VerticalAlignment="Center" Margin="0,0,4,0"/>
                             <Slider x:Name="MusicVolumeSlider" Width="80" Minimum="0" Maximum="1" Value="0.15"
@@ -83,16 +91,16 @@
                 </TreeView.ItemTemplate>
             </TreeView>
 
-            <Border Grid.Column="1" Background="{DynamicResource ControlFillColorSecondaryBrush}"/>
+            <Border Grid.Column="1" Background="{DynamicResource GlassGradientBorderBrush}" Width="1"/>
 
             <Grid Grid.Column="2">
                 <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="#1E1E1E" NavigationCompleted="WebView_NavigationCompleted" WebMessageReceived="WebView_WebMessageReceived"/>
             </Grid>
         </Grid>
 
-        <!-- Audio Player Bar -->
-        <Border x:Name="AudioBar" Grid.Row="3" BorderThickness="0,1,0,0" Padding="16,8" Visibility="Collapsed"
-                Background="{DynamicResource ControlFillColorTertiaryBrush}" BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}">
+        <!-- Audio Player Bar (Glass 3.0) -->
+        <Border x:Name="AudioBar" Grid.Row="3" BorderThickness="0,1,0,0" Padding="16,10" Visibility="Collapsed"
+                Background="{DynamicResource GlassBackgroundBrush}" BorderBrush="{DynamicResource GlassGradientBorderBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200"/>
@@ -111,9 +119,12 @@
                 <!-- Controls and Slider -->
                 <StackPanel Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="24,0">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <Button FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="&#xE892;" Width="36" Height="36" FontSize="14" Margin="0,0,12,0" Click="BtnAudioPrev_Click" ToolTip="Chương trước"/>
-                        <Button x:Name="BtnAudioPlay" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="&#xE768;" Width="44" Height="44" FontSize="18" Click="BtnAudioPlayPause_Click" ToolTip="Phát / Tạm dừng"/>
-                        <Button FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="&#xE893;" Width="36" Height="36" FontSize="14" Margin="12,0,0,0" Click="BtnAudioNext_Click" ToolTip="Chương sau"/>
+                        <Button FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="&#xE892;" Width="36" Height="36" FontSize="14" Margin="0,0,12,0" Click="BtnAudioPrev_Click" ToolTip="Chương trước"
+                                Style="{StaticResource GlassPlainButton}"/>
+                        <Button x:Name="BtnAudioPlay" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="&#xE768;" Width="44" Height="44" FontSize="18" Click="BtnAudioPlayPause_Click" ToolTip="Phát / Tạm dừng"
+                                Style="{StaticResource GlassPlainButton}"/>
+                        <Button FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Content="&#xE893;" Width="36" Height="36" FontSize="14" Margin="12,0,0,0" Click="BtnAudioNext_Click" ToolTip="Chương sau"
+                                Style="{StaticResource GlassPlainButton}"/>
                     </StackPanel>
 
                     <Grid>

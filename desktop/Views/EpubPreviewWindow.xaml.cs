@@ -116,6 +116,17 @@ namespace TranslateBook.Views
                 TocTreeView.ItemsSource = toc;
                 FlattenToc(toc);
 
+                // Auto-expand all TOC items after layout is ready
+                TocTreeView.ItemContainerGenerator.StatusChanged += (s, e) =>
+                {
+                    if (TocTreeView.ItemContainerGenerator.Status == System.Windows.Controls.Primitives.GeneratorStatus.ContainersGenerated)
+                    {
+                        ExpandAllTocItems(TocTreeView);
+                    }
+                };
+                // Also try immediately in case containers are already generated
+                Dispatcher.BeginInvoke(new Action(() => ExpandAllTocItems(TocTreeView)), System.Windows.Threading.DispatcherPriority.Loaded);
+
                 // Build reading order
                 if (book.ReadingOrder != null)
                 {
@@ -125,6 +136,16 @@ namespace TranslateBook.Views
                             _readingOrderPaths.Add(roItem.FilePath);
                     }
                 }
+
+                // Fallback: if no reading order, try using navigation items' file paths
+                if (_readingOrderPaths.Count == 0 && book.Navigation != null)
+                {
+                    CollectNavigationPaths(book.Navigation, _readingOrderPaths);
+                }
+
+                System.Diagnostics.Debug.WriteLine($"ReadingOrder paths: {_readingOrderPaths.Count}");
+                foreach (var p in _readingOrderPaths)
+                    System.Diagnostics.Debug.WriteLine($"  {p}");
 
                 // Build CSS (embedded in HTML head — fixes FOUC)
                 string css = BuildEpubCss();
@@ -143,6 +164,12 @@ namespace TranslateBook.Views
                 for (int i = 0; i < _readingOrderPaths.Count; i++)
                 {
                     string relativePath = _readingOrderPaths[i];
+
+                    // Skip nav/TOC and title page — not content
+                    var fileName = Path.GetFileName(relativePath).ToLowerInvariant();
+                    if (fileName is "nav.xhtml" or "nav.html" or "title_page.xhtml" or "title_page.html" or "toc.xhtml" or "toc.html")
+                        continue;
+
                     string absolutePath = Path.GetFullPath(Path.Combine(_tempExtractPath, relativePath));
                     if (File.Exists(absolutePath))
                     {
@@ -166,6 +193,14 @@ namespace TranslateBook.Views
                 // Navigate to the full book
                 core.SetVirtualHostNameToFolderMapping("translatebook.local", _tempExtractPath,
                     Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+
+                // Ensure file exists before navigating
+                if (!File.Exists(_fullBookHtmlPath))
+                {
+                    // Re-create empty file if missing
+                    File.WriteAllText(_fullBookHtmlPath, "<html><body><p>No content found.</p></body></html>", Encoding.UTF8);
+                }
+
                 core.Navigate($"https://translatebook.local/fullbook.html");
 
                 InitAudioPlayer();
@@ -358,10 +393,12 @@ namespace TranslateBook.Views
                 {
                     string? attrName = null;
 
+                    // Only rewrite image src, not link hrefs (nav/TOC links)
                     if (node.Name == "img")
                         attrName = "src";
-                    else if (node.Name == "a" || node.Name == "link")
+                    else if (node.Name == "link")
                         attrName = "href";
+                    // Skip <a> hrefs — they are navigation, not resources
 
                     if (attrName != null && node.Attributes.Contains(attrName))
                     {
@@ -423,10 +460,22 @@ namespace TranslateBook.Views
 
         private TocItem MapNavigationItem(EpubNavigationItem navItem)
         {
+            var filePath = navItem.HtmlContentFile?.FilePath ?? "";
+            var anchor = "";
+
+            // Parse anchor from FilePath (e.g., "text/ch001.xhtml#chapter-6" → path + anchor)
+            if (filePath.Contains('#'))
+            {
+                var parts = filePath.Split('#');
+                filePath = parts[0];
+                anchor = parts[1];
+            }
+
             var item = new TocItem
             {
                 Title = navItem.Title,
-                FilePath = navItem.HtmlContentFile?.FilePath ?? ""
+                FilePath = filePath,
+                Anchor = anchor
             };
 
             if (navItem.NestedItems != null)
@@ -448,12 +497,40 @@ namespace TranslateBook.Views
             }
         }
 
+        private static void ExpandAllTocItems(ItemsControl itemsControl)
+        {
+            foreach (var item in itemsControl.Items)
+            {
+                var container = itemsControl.ItemContainerGenerator.ContainerFromItem(item) as System.Windows.Controls.TreeViewItem;
+                if (container != null)
+                {
+                    container.IsExpanded = true;
+                    if (container.HasItems)
+                        ExpandAllTocItems(container);
+                }
+            }
+        }
+
+        private static void CollectNavigationPaths(IEnumerable<EpubNavigationItem> items, List<string> paths)
+        {
+            foreach (var item in items)
+            {
+                if (item.HtmlContentFile != null && !string.IsNullOrEmpty(item.HtmlContentFile.FilePath))
+                    paths.Add(item.HtmlContentFile.FilePath);
+                if (item.NestedItems != null)
+                    CollectNavigationPaths(item.NestedItems, paths);
+            }
+        }
+
         private void TocTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (e.NewValue is TocItem selectedItem && !string.IsNullOrEmpty(selectedItem.FilePath))
+            if (e.NewValue is TocItem selectedItem)
             {
-                ScrollToChapter(selectedItem.FilePath);
-                SyncAudioToChapter(selectedItem.FilePath);
+                // PRIMARY: always use title-based scroll (most reliable for single-file EPUBs)
+                ScrollToChapterByTitle(selectedItem.Title);
+
+                // Sync audio: find track by anchor or title
+                SyncAudioToChapter(selectedItem);
             }
 
             // Clear search highlights on manual TOC navigation
@@ -461,7 +538,49 @@ namespace TranslateBook.Views
                 ClearSearchHighlights();
         }
 
-        private void ScrollToChapter(string tocFilePath)
+        private void ScrollToChapterByTitle(string title)
+        {
+            if (WebView?.CoreWebView2 == null || string.IsNullOrEmpty(title)) return;
+
+            string escaped = EscapeJsString(title);
+            string js = $@"
+                (function() {{
+                    var title = '{escaped}';
+                    // Method 1: find heading with exact text match
+                    var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                    for (var i = 0; i < headings.length; i++) {{
+                        var text = headings[i].textContent.trim();
+                        if (text === title || text.indexOf(title) === 0) {{
+                            headings[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                            return;
+                        }}
+                    }}
+                    // Method 2: find by partial text match
+                    for (var i = 0; i < headings.length; i++) {{
+                        if (headings[i].textContent.indexOf(title) >= 0) {{
+                            headings[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                            return;
+                        }}
+                    }}
+                    // Method 3: find by id containing title
+                    var id = title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+                    var el = document.getElementById(id);
+                    if (!el) {{
+                        var all = document.querySelectorAll('[id]');
+                        for (var i = 0; i < all.length; i++) {{
+                            if (all[i].id.indexOf(id) >= 0) {{
+                                all[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                                return;
+                            }}
+                        }}
+                    }}
+                    if (el) el.scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                }})();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void ScrollToChapter(string tocFilePath, string title = "")
         {
             if (WebView?.CoreWebView2 == null) return;
             if (string.IsNullOrEmpty(tocFilePath)) return;
@@ -475,40 +594,111 @@ namespace TranslateBook.Views
                 anchor = parts[1];
             }
 
+            System.Diagnostics.Debug.WriteLine($"ScrollToChapter: path={pathOnly}, anchor={anchor}, title={title}");
+            System.Diagnostics.Debug.WriteLine($"  _pathToChapterId count={_pathToChapterId.Count}, keys=[{string.Join(", ", _pathToChapterId.Keys)}]");
+
+            // Normalize path separators for matching
+            string normalizedPath = pathOnly.Replace("\\", "/").ToLowerInvariant();
+
+            // Try exact match first
             if (_pathToChapterId.TryGetValue(pathOnly, out int chapterId))
             {
-                string js;
-                if (!string.IsNullOrEmpty(anchor))
+                System.Diagnostics.Debug.WriteLine($"  Exact match: chapterId={chapterId}");
+                ScrollToChapterId(chapterId, anchor, title);
+                return;
+            }
+
+            // Try normalized match
+            foreach (var kvp in _pathToChapterId)
+            {
+                if (kvp.Key.Replace("\\", "/").ToLowerInvariant() == normalizedPath)
                 {
-                    js = $@"var el = document.getElementById('{EscapeJsString(anchor)}'); if(el) {{ el.scrollIntoView({{behavior: 'smooth', block: 'start'}}); }} else {{ document.getElementById('chap_{chapterId}').scrollIntoView({{behavior: 'smooth', block: 'start'}}); }}";
+                    System.Diagnostics.Debug.WriteLine($"  Normalized match: chapterId={kvp.Value}");
+                    ScrollToChapterId(kvp.Value, anchor, title);
+                    return;
                 }
-                else
-                {
-                    js = $"document.getElementById('chap_{chapterId}').scrollIntoView({{behavior: 'smooth', block: 'start'}});";
-                }
-                WebView.CoreWebView2.ExecuteScriptAsync(js);
+            }
+
+            System.Diagnostics.Debug.WriteLine($"  NO MATCH FOUND for path={pathOnly}");
+        }
+
+        private void ScrollToChapterId(int chapterId, string anchor = "", string title = "")
+        {
+            if (WebView?.CoreWebView2 == null) return;
+
+            string js;
+            if (!string.IsNullOrEmpty(anchor))
+            {
+                // Try multiple ways to find the element (URL-decoded, exact, partial)
+                var decodedAnchor = Uri.UnescapeDataString(anchor).Replace("+", " ");
+                var escapedTitle = EscapeJsString(title);
+                js = $@"
+                    (function() {{
+                        var id = '{EscapeJsString(anchor)}';
+                        var decoded = '{EscapeJsString(decodedAnchor)}';
+                        var title = '{escapedTitle}';
+                        // Try 1: exact ID
+                        var el = document.getElementById(id);
+                        // Try 2: URL-decoded ID
+                        if (!el) el = document.getElementById(decoded);
+                        // Try 3: querySelector with attribute contains
+                        if (!el) {{
+                            var all = document.querySelectorAll('[id]');
+                            for (var i = 0; i < all.length; i++) {{
+                                if (all[i].id.indexOf(decoded) >= 0 || all[i].id.indexOf(id) >= 0) {{
+                                    el = all[i];
+                                    break;
+                                }}
+                            }}
+                        }}
+                        // Try 4: find heading by text content
+                        if (!el && title) {{
+                            var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                            for (var i = 0; i < headings.length; i++) {{
+                                if (headings[i].textContent.indexOf(title) >= 0) {{
+                                    el = headings[i];
+                                    break;
+                                }}
+                            }}
+                        }}
+                        if (el) {{
+                            el.scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                        }} else {{
+                            // Final fallback: scroll to chapter div
+                            var chap = document.getElementById('chap_{chapterId}');
+                            if (chap) chap.scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                        }}
+                    }})();
+                ";
             }
             else
             {
-                // Fallback: search by reading order index
-                int idx = _readingOrderPaths.IndexOf(pathOnly);
-                if (idx >= 0)
-                {
-                    string js = $"var el = document.getElementById('chap_{idx}'); if(el) el.scrollIntoView({{behavior: 'smooth', block: 'start'}});";
-                    WebView.CoreWebView2.ExecuteScriptAsync(js);
-                }
+                js = $"document.getElementById('chap_{chapterId}').scrollIntoView({{behavior: 'smooth', block: 'start'}});";
             }
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
         }
 
-        private void SyncAudioToChapter(string filePath)
+        private void SyncAudioToChapter(TocItem tocItem)
         {
             if (_audioFiles.Count == 0) return;
 
-            int tocIndex = _flatToc.FindIndex(t => t.FilePath == filePath);
-            if (tocIndex >= 0 && tocIndex < _audioFiles.Count)
+            int audioIndex = -1;
+
+            // Extract chapter number from title (e.g., "Chương 3: Tâm tư..." → 3)
+            if (!string.IsNullOrEmpty(tocItem.Title))
             {
-                _currentTrackIndex = tocIndex;
-                LoadTrack(tocIndex);
+                var match = System.Text.RegularExpressions.Regex.Match(tocItem.Title, @"Chương\s+(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out int chapterNum))
+                {
+                    // Audio files: ch01.mp3, ch02.mp3, ... → index = chapterNum - 1
+                    audioIndex = chapterNum - 1;
+                }
+            }
+
+            if (audioIndex >= 0 && audioIndex < _audioFiles.Count)
+            {
+                _currentTrackIndex = audioIndex;
+                LoadTrack(audioIndex);
                 if (_timer?.IsEnabled == false)
                 {
                     _mediaPlayer?.Play();
