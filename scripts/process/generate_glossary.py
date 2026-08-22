@@ -31,23 +31,103 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 from _common import setup_encoding, PROJECT_ROOT
 
 
+def _read_profile(profile_dir: Path, slug: str) -> str | None:
+    """Đọc profile văn chương của cuốn, trả về các section hữu ích cho glossary."""
+    p = profile_dir / f"{slug}.md"
+    if not p.exists():
+        return None
+    raw = ''
+    for enc in ('utf-8-sig', 'utf-8'):
+        try:
+            raw = p.read_text(encoding=enc)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if not raw.strip():
+        return None
+
+    lines = raw.splitlines()
+    ctx_parts = []
+
+    # Trích section quan trọng: xưng hô, thành ngữ, đặc trưng ngôn ngữ
+    section_titles = {
+        'Hệ xưng hô': [],
+        'Thành ngữ': [],
+        'Đặc trưng ngôn ngữ': [],
+        'Cách xử lý hội thoại': [],
+        'Lưu ý riêng': [],
+    }
+    current_title = None
+    for line in lines:
+        stripped = line.strip()
+        # Detect H2 headers
+        if stripped.startswith('## '):
+            header = stripped[3:].strip().lower()
+            for key in section_titles:
+                if key.lower() in header:
+                    current_title = key
+                    break
+            else:
+                current_title = None
+        elif current_title and stripped.startswith('- ') and len(stripped) < 120:
+            section_titles[current_title].append(stripped)
+
+    # Chỉ bao gồm section có content thực sự
+    for title, items in section_titles.items():
+        if items:
+            ctx_parts.append(f"\n**{title}:**")
+            ctx_parts.extend(f"- {item}" for item in items[:8])  # max 8 items/section
+
+    if not ctx_parts:
+        return None
+
+    return '\n'.join(ctx_parts)
+
+
+PROFILE_CONTEXT_INJECTION = r"""
+--- BỐI CẢNH VĂN CHƯƠNG CỦA CUỐN SÁCH ---
+{profile_context}
+--- KẾT THÚC BỐI CẢNH ---
+
+Khi trích thuật ngữ, áp dụng các quy tắc sau:
+- KHÔNG đưa vào glossary những từ phổ thông xuất hiện trong phần bối cảnh trên
+  (ví dụ: "女人" nếu sách này dùng nó như từ bình thường, không phải tên riêng/khái niệm cốt lõi).
+- Ưu tiên các nhân vật, địa danh, tổ chức, khái niệm được nhắc đến trong bối cảnh.
+- Với tên Hán: chú ý cách sách này xử lý (theo phần hệ xưng hô / lưu ý riêng).
+- Nếu profile có gợi ý phong cách dịch cụ thể, bám theo đó khi chọn target.
+"""
+
+
 PROMPT_TEMPLATE = """Read the following text and extract ALL:
-1. Character names (nhân vật)
-2. Place names (địa điểm)
-3. Organization names (tổ chức)
-4. Domain-specific terms (thuật ngữ chuyên ngành)
-5. Skills / Magic items / Artifacts / Cultivation levels (Chiêu thức, pháp bảo, vật phẩm, cảnh giới)
+1. Character names (nhân vật) — tên người, biệt danh, xưng hô riêng
+2. Place names (địa điểm) — thành phố, vùng đất, kiến trúc nổi tiếng
+3. Organization names (tổ chức) — công ty, bang hội, tổ chức chính trị
+4. Domain-specific terms (thuật ngữ chuyên ngành) — y học, pháp lý, kỹ thuật...
+5. Skills / Magic items / Artifacts / Cultivation levels (Chiêu thức, pháp bảo, vật phẩm, cảnh giới tu luyện)
 6. Brand/product names (thương hiệu/sản phẩm)
+7. Key concepts/catchphrases (khái niệm cốt lõi, cụm từ lặp lại xuyên suốt)
 
 Output as CSV format:
 source,target,notes
 
-Rules:
+CRITICAL RULES — PHÂN BIỆT THUẬT NGỮ vs TỪ PHỔ THÔNG:
+- THUẬT NGỮ = chỉ dùng cho đối tượng ĐẶC BIỆT này, không dùng chung trong giao tiếp hàng ngày
+  Ví dụ OK: "灵气" → Linh khí (chỉ năng lượng tu tiên), "筑基" → Trúc Cơ (cảnh giới tu luyện)
+- TỪ PHỔ THÔNG = từ mọi người dùng hàng ngày, KHÔNG cần glossary
+  Ví dụ NÊN LOẠI: "女人" → phụ nữ (ai cũng biết), "幸福" → hạnh phúc (từ cơ bản)
+- TRUNG GIAN = có thể giữ nếu xuất hiện dày đặc + có nghĩa ĐẶC BIỆT trong ngữ cảnh
+  Ví dụ: "风骨" → Phong cốt (khái niệm về cốt cách con người — mang sắc thái triết lý, không giống "phụ nữ")
+
+Mức độ lọc (tùy thể loại):
+- Tiên hiệp/kiếm hiệp: LỌC RẤT KỶ — chỉ giữ thuật ngữ tu luyện, chiêu thức, pháp bảo, cảnh giới, tên riêng
+- Văn học/giải trí: LỌC VỪA — giữ tên riêng + khái niệm cốt lõi, bỏ từ phổ thông
+- Kỹ thuật/pháp lý: LỌC NHẸ — gần như giữ tất cả thuật ngữ chuyên ngành
+
+Output CSV rules:
 - "source" = original term (English/Chinese)
 - "target" = suggested Vietnamese translation (leave blank if unsure)
 - "notes" = brief context (e.g., "main character", "fictional city", "artifact", "martial art")
 - Sort by frequency (most frequent first)
-- Do NOT include common words, only proper nouns and specialized terms
 - CRITICAL: OUTPUT ONLY THE RAW CSV TEXT. NO EXPLANATIONS, NO MARKDOWN BLOCKS (```), NO GREETINGS.
 
 TEXT:
@@ -83,9 +163,19 @@ def main():
     parser.add_argument('--merge-genre', type=str,
                         help='Merge glossary m\u1edbi v\u00e0o glossary/genres/{genre}.csv hi\u1ec7n c\u00f3 (VD: "tien-hiep")')
     parser.add_argument('--output', type=Path,
-                        help='File output prompt (m\u1eb7c \u0111\u1ecbnh: working/glossary_prompt_{book_name}.txt)')
+                        help='File output prompt (mặc định: working/glossary_prompt_{book_name}.txt)')
 
     args = parser.parse_args()
+
+    PROFILE_DIR = PROJECT_ROOT / 'working' / 'profile'
+
+    # --- Bước 0: Tự đọc profile văn chương nếu có (cung cấp bối cảnh cho AI) ---
+    profile_ctx = _read_profile(PROFILE_DIR, args.book_name)
+    if profile_ctx:
+        print(f"\n\u0110\u00e3 tìm thấy profile văn chương: {PROFILE_DIR}/{args.book_name}.md")
+        print("   Injecting vào prompt...")
+    else:
+        print(f"\n\u2139\ufe0f Không có profile ({PROFILE_DIR}/{args.book_name}.md) — chạy ở chế độ cơ bản.")
 
     # Đọc source text
     text = ''
@@ -120,7 +210,7 @@ def main():
         print("[L\u1ed6I] Kh\u00f4ng \u0111\u1ecdc \u0111\u01b0\u1ee3c n\u1ed9i dung", file=sys.stderr)
         sys.exit(1)
 
-    # L\u1ea5y m\u1eabu tr\u1ea3i \u0111\u1ec1u (\u0110\u1ea7u, Gi\u1eefa, Cu\u1ed1i) n\u1ebfu v\u0103n b\u1ea3n qu\u00e1 d\u00e0i
+    # Lấy mẫu trải đều (Đầu, Giữa, Cuối) nếu văn bản quá dài
     if len(text) > args.max_chars * 1.5:
         part_size = args.max_chars // 3
         
@@ -129,7 +219,7 @@ def main():
         mid_text = text[mid_idx:mid_idx + part_size]
         end_text = text[-part_size:]
         
-        # C\u1ed1 g\u1eafng c\u1eaft g\u1ecdn g\u00e0ng t\u1ea1i c\u00e1c d\u00f2ng m\u1edbi
+        # Cố gắng cắt gọn gàng tại các dòng mới
         def clean_chunk(chunk_text, is_start=False, is_end=False):
             start_cut = 0 if is_start else chunk_text.find('\n')
             if start_cut == -1: start_cut = 0
@@ -155,27 +245,34 @@ def main():
             cut = max(last_period, last_newline)
             if cut > args.max_chars * 0.5:
                 preview = preview[:cut + 1]
-            print(f"  (c\u1eaft t\u1eeb {len(text)} k\u00fd t\u1ef1 xu\u1ed1ng {len(preview)} k\u00fd t\u1ef1)")
+            print(f"  (cắt từ {len(text)} ký tự xuống {len(preview)} ký tự)")
 
+    # --- Bước cuối: Format prompt với profile context injection ---
     prompt_content = PROMPT_TEMPLATE.format(text=preview)
+
+    # Inject profile context nếu có (cung cấp bối cảnh văn chương cho AI)
+    if profile_ctx:
+        final_prompt = PROFILE_CONTEXT_INJECTION.replace('{profile_context}', profile_ctx) + '\n\n' + prompt_content
+    else:
+        final_prompt = prompt_content
 
     output_path = args.output or (PROJECT_ROOT / 'working' / f'glossary_prompt_{args.book_name}.txt')
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(prompt_content, encoding='utf-8')
+    output_path.write_text(final_prompt, encoding='utf-8')
 
     print(f"\n\u2705 \u0110\u00e3 t\u1ea1o prompt file: {output_path}")
-    print(f"  Dung l\u01b0\u1ee3ng: {len(prompt_content)} k\u00fd t\u1ef1")
-    print(f"\n  B\u01b0\u1edbc ti\u1ebfp: \u0110\u1ecdc file prompt v\u00e0 y\u00eau c\u1ea7u Agent t\u1ea1o glossary CSV")
-    print(f"  L\u01b0u glossary v\u00e0o: glossary/{args.book_name}.csv")
+    print(f"  Dung l\u01b0\u1ee3ng: {len(final_prompt)} k\u00fd t\u1ef1")
+    print(f"\n  B\u01b0\u1edbc ti\u1ebfp: \u0110\u1ecdc file prompt và yêu cầu Agent tạo glossary CSV")
+    print(f"  Lưu glossary vào: glossary/{args.book_name}.csv")
 
     if args.merge_genre:
         genre_file = PROJECT_ROOT / 'glossary' / 'genres' / f'{args.merge_genre}.csv'
         if genre_file.exists():
-            print(f"\n  \u0110\u00e3 t\u00ecm th\u1ea5y glossary/genres/{args.merge_genre}.csv")
-            print(f"  Sau khi Agent t\u1ea1o CSV, ch\u1ea1y merge th\u1ee7 c\u00f4ng ho\u1eb7c copy c\u00e1c m\u1ee5c m\u1edbi v\u00e0o file n\u00e0y.")
+            print(f"\n  \u0110\u00e3 tìm thấy glossary/genres/{args.merge_genre}.csv")
+            print(f"  Sau khi Agent tạo CSV, chạy merge thủ công hoặc copy các mục mới vào file này.")
         else:
-            print(f"\n  \u26a0\ufe0f Ch\u01b0a c\u00f3 glossary/genres/{args.merge_genre}.csv")
-            print(f"  T\u1ea1o file m\u1edbi khi Agent tr\u1ea3 v\u1ec1 glossary.")
+            print(f"\n  \u26a0\ufe0f Chưa có glossary/genres/{args.merge_genre}.csv")
+            print(f"  Tạo file mới khi Agent trả về glossary.")
 
 
 if __name__ == '__main__':

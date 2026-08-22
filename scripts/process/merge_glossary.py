@@ -18,6 +18,7 @@ Chế độ khác:
   python scripts/process/merge_glossary.py --normalize                            # dedupe toàn master
   python scripts/process/merge_glossary.py --check                                # báo cáo master
   python scripts/process/merge_glossary.py --info                                 # chi tiết master
+  python scripts/process/merge_glossary.py --check-source-conflicts               # phát hiện source conflict cross-book
 """
 from __future__ import annotations
 
@@ -46,7 +47,7 @@ def _write_master(rows: list[dict]) -> None:
 
 
 # Từ khoá gợi ý type trong note
-_CHAR_HINT = ("nhân vật", "nhân vật", "nhân vật chính", "tên nhân", "người kể", "tác giả", "chồng", "vợ", "bạn", "hàng xóm", "đồng nghiệp", "em", "chị", "anh", "mẹ", "bố", "con", "character", "main char", "author", "protagonist")
+_CHAR_HINT = ("nhân vật", "nhân vật", "nhân vật chính", "tên nhân", "người kể", "tác giả", "chồng", "vợ", "bạn", "hàng xóm", "đồng nghiệp", "em", "chị", "anh", "mẹ", "bố", "con", "character", "main char", "author", "protagonist")
 _PLACE_HINT = ("địa danh", "thành phố", "quốc gia", "nước", "ngôi làng", "thị trấn", "khu", "phố", "tỉnh", "place", "city", "country", "location")
 # Từ Hán thông dụng (không phải tên riêng) — tránh đoán nhầm thành character
 _COMMON_HAN = {"女人", "女子", "幸福", "成熟", "独立", "善良", "优雅", "温柔", "坚强", "勇敢", "真诚", "宽容", "感恩", "乐观", "坚韧", "淡定", "从容", "智慧", "自信", "魅力", "气质", "修养", "尊严", "岁月", "婚姻", "平等", "人性", "妥协", "后记", "小三", "法国", "青岛", "风骨", "内心", "蝴蝶效应", "不攀附", "不将就", "不迷茫", "不低头", "不迎合", "不媚俗", "面带微笑", "内心强大", "从容不迫"}
@@ -60,7 +61,7 @@ def infer_type(source: str, note: str) -> str:
     if not src:
         return "term"
     # 1. Note gợi ý mạnh (nhân vật / địa điểm) — ưu tiên cao nhất
-    if any(h in note_l for h in ("nhân vật", "nhân vật", "character", "main char", "protagonist", "tác giả", "author", "người kể", "chồng", "hàng xóm", "đồng nghiệp")):
+    if any(h in note_l for h in ("nhân vật", "nhân vật", "character", "main char", "protagonist", "tác giả", "author", "người kể", "chồng", "hàng xóm", "đồng nghiệp")):
         return "character"
     if any(h in note_l for h in ("địa danh", "thành phố", "quốc gia", "ngôi làng", "thị trấn", "place", "city", "country", "location", "nước ", "tỉnh")):
         return "place"
@@ -90,6 +91,8 @@ def main() -> None:
     parser.add_argument("--check-dup", action="store_true", help="Kiểm tra source trùng target khác nhau trong master")
     parser.add_argument("--check", action="store_true", help="Báo cáo master (số dòng, sách, tác giả, thể loại)")
     parser.add_argument("--info", action="store_true", help="Chi tiết master: từng file + số dòng")
+    parser.add_argument("--check-source-conflicts", action="store_true",
+                        help="Phát hiện cùng 1 source có nhiều target khác nhau cross-book (cần xác nhận bản dịch chuẩn)")
     args = parser.parse_args()
 
     # ---- --check-dup: phát hiện source trùng target khác nhau ----
@@ -127,6 +130,47 @@ def main() -> None:
                 print(f"  - {f.name}: {len(glossary_lib._read_csv(f))} dòng")
         return
 
+    # ---- --check-source-conflicts: phát hiện source conflict cross-book ----
+    if args.check_source_conflicts:
+        rows = glossary_lib.load_all()
+        src_map = {}
+        for r in rows:
+            src = (r.get('source') or '').strip()
+            tgt = (r.get('target') or '').strip()
+            if not src or not tgt:
+                continue
+            key = src.lower()
+            src_map.setdefault(key, []).append({
+                'src': src,
+                'tgt': tgt,
+                'book': r.get('book', ''),
+                'author': r.get('author', ''),
+                'genre': r.get('genre', ''),
+            })
+        conflicts = {k: v for k, v in src_map.items() if len(set(e['tgt'] for e in v)) > 1}
+        if conflicts:
+            print(f"\n⚠️ FOUND {len(conflicts)} SOURCE CONFLICTS:")
+            print("(Cùng một source nhưng khác target ở các cuốn sách khác nhau)\n")
+            for norm_src, data in sorted(conflicts.items()):
+                s = data[0]
+                tgts = sorted(set(e['tgt'] for e in data))
+                print(f"  Source: {s['src']} -> Targets: {', '.join(tgts)}")
+                for e in data:
+                    p = []
+                    if e['book']:
+                        p.append(f"book={e['book']}")
+                    if e['author']:
+                        p.append(f"author={e['author']}")
+                    if e['genre']:
+                        p.append(f"genre={e['genre']}")
+                    meta = ', '.join(p) if p else 'shared'
+                    print(f"    - {e['tgt']} [{meta}]")
+                print()
+            sys.exit(1)
+        else:
+            print(f"\n✅ OK: No source conflicts found ({len(src_map)} sources, all consistent).")
+        return
+
     # ---- --normalize: dedupe toàn master ----
     if args.normalize:
         rows = glossary_lib.load_all()
@@ -149,7 +193,7 @@ def main() -> None:
 
     # ---- Gộp cuốn vào master ----
     if not args.book:
-        parser.error("Cần --book (hoặc --check/--info/--normalize)")
+        parser.error("Cần --book (hoặc --check/--info/--normalize/--check-source-conflicts)")
 
     book_path = args.books_dir / f"{args.book}.csv"
     if not book_path.exists():
@@ -196,7 +240,7 @@ def main() -> None:
 
     if args.dry_run:
         print(f"(dry-run) Sẽ thêm {len(new_entries)} thuật ngữ mới của cuốn '{args.book}' vào master"
-              + (f" [author={args.author}]" if args.author else "") + (f" [genre={args.genre}]" if args.genre else "") + ":")
+              + (f" [author={args.author}]" if args.author else "") + (f" [genre={args.genre}]" if args.genre else ""))
         for e in new_entries[:20]:
             print(f"  - {e['source']} → {e['target']}")
         if len(new_entries) > 20:
