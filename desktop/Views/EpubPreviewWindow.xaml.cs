@@ -688,12 +688,13 @@ namespace TranslateBook.Views
             {
                 _currentTrackIndex = audioIndex;
                 LoadTrack(audioIndex);
-                if (_timer?.IsEnabled == false)
+                // Show play button (don't auto-play when switching chapters)
+                if (_timer?.IsEnabled == true)
                 {
-                    _mediaPlayer?.Play();
-                    _timer?.Start();
-                    BtnAudioPlay.Content = "\uE769"; // Pause icon
+                    _mediaPlayer?.Pause();
+                    _timer.Stop();
                 }
+                BtnAudioPlay.Content = "\uE768"; // Play icon (triangle)
             }
         }
 
