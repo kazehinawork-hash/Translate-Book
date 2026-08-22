@@ -1662,53 +1662,32 @@
 
 ---
 
-## 2022-08-22 — Tích hợp text preprocessing từ VoiceStudio
+## 2026-08-22 — Cải tiến EPUB Preview Window (Auto-Resume Bookmark + Typography Settings)
 
 ### Đã làm
-- **Nghiên cứu repo VoiceStudio** (github.com/debpalash/VoiceStudio): phân tích toàn bộ backend/services (76 file) — TTS, audiobook, chunking, pronunciation, text normalization, translation quality. Đưa báo cáo 3 thứ worth áp dụng: pronunciation lexicon, text normalization, smart sentence-end chunking.
-
-- **Tạo `scripts/audiobook/text_normalize.py`** (mới):
-  - `_strip_unsafe_controls()` — xóa zero-width, bidi controls, BOM, C0/C1 controls
-  - `_ENTITY_RE` — decode HTML entities (`&amp;→&`, `&nbsp;→space`, `&hellip;→…`)
-  - `_REPEAT_RE` — giới hạn ký tự lặp (`!!!!!→!!!`, `......→...`)
-  - `_HSPACE_RE` / `_NEWLINE_RE` — gộp whitespace thừa
-  - `normalize_for_tts()` — entry point, pure function, idempotent
-  - Tham khảo VoiceStudio `services/text_normalization.py` nhưng simplified cho tiếng Việt (không num2words — VieNeu đọc số Việt chuẩn)
-
-- **Tạo `scripts/audiobook/pronunciation.py`** (mới):
-  - `apply_lexicon()` — word-boundary-aware replacement, longest-key-first, case-insensitive, idempotent
-  - `_compile()` — build single alternation regex từ lexicon dict
-  - `load_pronunciation_json()` — load {term: replacement} từ JSON file
-  - `apply_inline_overrides()` — resolve `[[term|replacement]]` / `[[replacement]]`
-  - `apply_pronunciation()` — main API: per-book JSON → extra lexicon → inline overrides
-  - Tham khảo VoiceStudio `services/pronunciation.py` nhưng simplified
-
-- **Nâng cấp `audiobook_long.py`**:
-  - `_split_sentences`: thêm CJK full-width punctuation (。！？；), multi-language abbreviation (ks., ts., ths., cv., bs., ds., pgs.), CJK tách không cần space
-  - `smart_chunk`: thêm lượt 3 `_merge_unspeakable` — gộp chunk chỉ chứa dấu câu vào chunk liền kề
-  - `_preprocess_chunk_text()`: hàm trung gian gọi `normalize_for_tts()` + `apply_pronunciation()` — chạy trong `generate_chapter_audio` trước TTS
-  - `_load_book_pronunciation()`: load per-book pronunciation JSON vào `_pronounce_map` TRƯỚC khi extract_chapter_text
-  - `generate_chapter_audio`: thêm tham số `slug`, preprocess chunks trước khi generate
-
-- **Tạo ví dụ pronunciation.json**: `working/profile/ban-co-nam-cho-ngoi-pronunciation.json` (3 từ: chí, thầy Dân, Lê Mưu)
-
-- **Cập nhập docs**: AGENTS.md (thêm preprocessing pipeline + 2 scripts mới), STATE.md (thêm mục "Text preprocessing audiobook")
-
-### Test
-- Sample 12s từ `ban-co-nam-cho-ngoi` chạy thành công bằng venv-vieneu
-- `📖 Đã nạp pronunciation per-book: 3 từ` — xác nhận per-book pronunciation load đúng
-- Compile check OK cho cả 3 file
-
-### File mới
-- `scripts/audiobook/text_normalize.py` — mới — KHÔNG commit (code)
-- `scripts/audiobook/pronunciation.py` — mới — KHÔNG commit (code)
-- `working/profile/ban-co-nam-cho-ngoi-pronunciation.json` — mới — KHÔNG commit (sản phẩm)
+- **Nghiên cứu kiến trúc Calibre Viewer**: Phân tích giải pháp dàn trang CSS multi-column, quản lý DOM, IPC và lưu bookmark bằng tọa độ/CFI.
+- **Tự động lưu & Khôi phục vị trí đọc (Auto-Resume Bookmark)**:
+  - Tích hợp JS scroll tracker (debounce 400ms) tự động tính toán tọa độ `scrollY` và tỷ lệ phần trăm đọc (`percent`).
+  - Gửi qua `window.chrome.webview.postMessage` về C# và lưu vào `%LocalAppData%\TranslateBook\reading_bookmarks.json`.
+  - Khi mở sách lại (`WebView_NavigationCompleted`), tự động cuộn trang mượt mà về vị trí đọc dở.
+  - Hiển thị TextBlock `TxtReadingProgress` báo % tiến độ đọc trực tiếp trên Toolbar.
+- **Tùy biến Typography & Chiều rộng trang (Typography Settings)**:
+  - Thêm ComboBox `CmbFont`: Mặc định (Segoe UI / Microsoft YaHei), Có chân (Noto Serif SC / Georgia / Times New Roman), Thư pháp / Cổ điển (KaiTi / Cambria), Đơn cách (Consolas).
+  - Thêm ComboBox `CmbWidth`: Gọn (650px), Vừa (800px), Rộng (1000px), Toàn màn hình (95%).
+  - Thêm ComboBox `CmbLineHeight`: Dày (1.5x), Vừa (1.8x), Thoáng (2.2x).
+  - Cập nhật `BuildEpubCss()` hỗ trợ biến CSS `--font-family`, `--max-width`, `--line-height`, kèm hiệu ứng chuyển đổi `transition: max-width 0.2s ease`.
+  - Hàm `ApplyTypographySettings()` tiêm CSS động realtime vào WebView2 DOM ngay khi người dùng đổi lựa chọn.
+- **Kiểm thử**: `dotnet build desktop/TranslateBook.csproj` đạt 0 lỗi / 0 cảnh báo biên dịch.
 
 ### File đổi
-- `scripts/audiobook/audiobook_long.py` — modified — KHÔNG commit (code)
-- `AGENTS.md` — modified — commit (docs)
-- `docs/STATE.md` — modified — commit (docs)
-- `docs/session_log.md` — modified — commit (docs)
+- `desktop/Views/EpubPreviewWindow.xaml`
+- `desktop/Views/EpubPreviewWindow.xaml.cs`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Chờ người dùng trải nghiệm thực tế trên giao diện WPF khi đọc thử sách.
 
 ### Git
-- Chưa commit. Đề xuất: commit scripts (text_normalize.py, pronunciation.py, audiobook_long.py) + docs (AGENTS.md, STATE.md, session_log.md) khi user duyệt.
+- Thay đổi chưa commit trên `main`. Không tự động commit/push theo quy tắc.
+

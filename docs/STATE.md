@@ -72,12 +72,17 @@
   - **Busy overlay** toàn cửa sổ: ProgressRing + BusyMessage + nút "Hủy thao tác" — hiện khi chạy pipeline/dịch/QA/audio; `IsBusyAny` gồm cả per-book busy (qua `BookStatus.AnyBusyChanged`).
   - **Ảnh bìa card sách** (Output): tìm ảnh trong `images/` (ưu tiên tên cover/front), fallback avatar chữ.
   - **Empty state** Input/Output có icon + nút "Mở thư mục input" (mở Explorer).
-  - **AudioPage**: progress bar "Chương N" khi tạo audio (AudioDone/AudioTotal).
+  - **AudioPage**: progress bar "Chương N" khi tạo audio (`AudioDone`/`AudioTotal` set trong GetBookStatus).
   - **Global search**: Enter ở ô tìm kiếm titlebar → nhảy tới tab Sách + lọc; **Ctrl+F** → focus ô tìm kiếm.
   - **Fix mất log**: replay `LogText` khi MainWindow subscribe (log khởi tạo không bị mất).
   - **Search theo tên**: filter khớp slug + DisplayTitle + tên file (tìm được tên tiếng Trung/Việt).
   - **Toolbar preview**: bọc ScrollViewer ngang + thu gọn nút (Làm mới, zoom 90, search 160) — hết bị cắt nút Tiếp/Trước.
   - **Fix**: `GenerateAudiobookAsync` set `IsVoiceBusy` (trước đây overlay không hiện khi tạo audio).
+
+- **Nâng cấp EPUB Preview Window (08-22)**:
+  - **Tự động lưu & Khôi phục vị trí đọc (Auto-Resume / Bookmark)**: JS theo dõi sự kiện cuộn trang với debounce 400ms, gửi tọa độ scrollY + phần trăm tiến độ về C#; lưu nguyên tử vào `%LocalAppData%\TranslateBook\reading_bookmarks.json`. Khi mở lại sách, tự động nhảy mượt về vị trí đọc dở. Hiển thị phần trăm đọc trên Toolbar.
+  - **Tùy biến Typography & Chiều rộng trang (Typography Settings)**: Thêm bộ điều khiển trực quan trên Toolbar (chọn Phông chữ: Segoe UI, Serif, Cổ điển, Monospace; chọn Độ rộng lề: Gọn 650px, Vừa 800px, Rộng 1000px, Toàn màn hình 95%; chọn Khoảng cách dòng: 1.5x, 1.8x, 2.2x). Tiêm biến CSS trực tiếp vào WebView2 DOM mà không cần reload trang.
+  - `dotnet build` đạt 0 lỗi.
 
 ---
 

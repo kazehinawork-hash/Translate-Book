@@ -223,16 +223,20 @@ namespace TranslateBook.Views
                     --fg-secondary-color: {fgSecondaryHex};
                     --link-color: {linkHex};
                     --font-size: 18px;
+                    --font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+                    --line-height: 1.8;
+                    --max-width: 800px;
                 }}
                 body {{
                     background-color: var(--bg-color);
                     color: var(--fg-color);
-                    font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
-                    line-height: 1.8;
+                    font-family: var(--font-family);
+                    line-height: var(--line-height);
                     margin: 0 auto;
                     padding: 24px;
-                    max-width: 800px;
+                    max-width: var(--max-width);
                     font-size: var(--font-size);
+                    transition: max-width 0.2s ease, font-size 0.15s ease;
                 }}
                 h1, h2, h3, h4, h5, h6 {{
                     color: var(--fg-color);
@@ -704,9 +708,45 @@ namespace TranslateBook.Views
             {
                 // Re-apply theme CSS variables (for manual refresh)
                 ReapplyThemeColors();
-                // Inject keyboard navigation script
+                // Apply typography settings from Toolbar
+                ApplyTypographySettings();
+                // Inject keyboard navigation script and scroll observer
                 InjectKeyboardNavScript();
+                // Restore previous reading position
+                RestoreReadingProgressAsync();
             }
+        }
+
+        private void ApplyTypographySettings()
+        {
+            if (WebView?.CoreWebView2 == null) return;
+
+            string fontTag = (CmbFont?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "'Segoe UI', 'Microsoft YaHei', Arial, sans-serif";
+            string widthTag = (CmbWidth?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "800px";
+            string lineHeightTag = (CmbLineHeight?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "1.8";
+
+            string js = $@"
+                var root = document.documentElement;
+                root.style.setProperty('--font-family', ""{fontTag}"");
+                root.style.setProperty('--max-width', ""{widthTag}"");
+                root.style.setProperty('--line-height', ""{lineHeightTag}"");
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void CmbFont_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyTypographySettings();
+        }
+
+        private void CmbWidth_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyTypographySettings();
+        }
+
+        private void CmbLineHeight_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyTypographySettings();
         }
 
         private void ReapplyThemeColors()
@@ -763,6 +803,7 @@ namespace TranslateBook.Views
                     if (window.__keyNavInjected) return;
                     window.__keyNavInjected = true;
 
+                    // Keyboard navigation
                     document.addEventListener('keydown', function(e) {
                         var active = document.activeElement;
                         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
@@ -781,6 +822,22 @@ namespace TranslateBook.Views
                             e.preventDefault();
                         }
                     });
+
+                    // Scroll tracking for Auto-Resume Bookmark
+                    var scrollDebounceTimer;
+                    window.addEventListener('scroll', function() {
+                        clearTimeout(scrollDebounceTimer);
+                        scrollDebounceTimer = setTimeout(function() {
+                            var y = window.pageYOffset || document.documentElement.scrollTop;
+                            var total = document.documentElement.scrollHeight - window.innerHeight;
+                            var pct = total > 0 ? Math.min(100, Math.max(0, Math.round((y / total) * 100))) : 0;
+                            window.chrome.webview.postMessage(JSON.stringify({
+                                action: 'updateScrollPosition',
+                                scrollY: y,
+                                percent: pct
+                            }));
+                        }, 400);
+                    });
                 })();
             ";
             WebView.CoreWebView2.ExecuteScriptAsync(js);
@@ -790,9 +847,10 @@ namespace TranslateBook.Views
         {
             try
             {
-                var msg = JsonSerializer.Deserialize<Dictionary<string, string>>(e.WebMessageAsJson);
-                if (msg != null && msg.TryGetValue("action", out string? action) && action != null)
+                var msg = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(e.WebMessageAsJson);
+                if (msg != null && msg.TryGetValue("action", out JsonElement actionElem) && actionElem.ValueKind == JsonValueKind.String)
                 {
+                    string? action = actionElem.GetString();
                     switch (action)
                     {
                         case "nextChapter":
@@ -807,12 +865,80 @@ namespace TranslateBook.Views
                         case "escape":
                             Close();
                             break;
+                        case "updateScrollPosition":
+                            if (msg.TryGetValue("scrollY", out JsonElement yElem) && yElem.TryGetDouble(out double scrollY))
+                            {
+                                int pct = 0;
+                                if (msg.TryGetValue("percent", out JsonElement pctElem))
+                                    pct = pctElem.GetInt32();
+                                SaveReadingProgress(scrollY, pct);
+                            }
+                            break;
                     }
                 }
             }
             catch
             {
                 // Ignore malformed messages
+            }
+        }
+
+        private static string GetProgressFilePath()
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TranslateBook");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, "reading_bookmarks.json");
+        }
+
+        private void SaveReadingProgress(double scrollY, int percent)
+        {
+            if (string.IsNullOrEmpty(_epubFilePath)) return;
+
+            TxtReadingProgress.Text = $"Tiến độ: {percent}%";
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var file = GetProgressFilePath();
+                    Dictionary<string, double> dict = new();
+                    if (File.Exists(file))
+                    {
+                        var json = File.ReadAllText(file);
+                        dict = JsonSerializer.Deserialize<Dictionary<string, double>>(json) ?? new();
+                    }
+                    dict[_epubFilePath] = scrollY;
+                    File.WriteAllText(file, JsonSerializer.Serialize(dict));
+                }
+                catch
+                {
+                    // Ignore background bookmark write failures
+                }
+            });
+        }
+
+        private async void RestoreReadingProgressAsync()
+        {
+            if (string.IsNullOrEmpty(_epubFilePath) || WebView?.CoreWebView2 == null) return;
+
+            try
+            {
+                var file = GetProgressFilePath();
+                if (!File.Exists(file)) return;
+
+                var json = await File.ReadAllTextAsync(file);
+                var dict = JsonSerializer.Deserialize<Dictionary<string, double>>(json);
+                if (dict != null && dict.TryGetValue(_epubFilePath, out double savedScrollY) && savedScrollY > 10)
+                {
+                    // Delay slightly to ensure DOM layout is fully stable
+                    await Task.Delay(250);
+                    string js = $"window.scrollTo({{top: {savedScrollY}, behavior: 'smooth'}});";
+                    await WebView.CoreWebView2.ExecuteScriptAsync(js);
+                }
+            }
+            catch
+            {
+                // Ignore restore errors
             }
         }
 
