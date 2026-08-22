@@ -27,6 +27,10 @@ import sys, os, re, time, argparse, json, shutil, hashlib, subprocess
 import numpy as np
 import soundfile as sf
 
+# Text preprocessing trước TTS (text_normalize + pronunciation)
+from text_normalize import normalize_for_tts
+from pronunciation import apply_pronunciation
+
 # scipy dùng cho fftconvolve (làm mượt envelope nhạc nền nhanh hơn np.convolve)
 try:
     from scipy.signal import fftconvolve
@@ -433,6 +437,9 @@ def detect_chapters(md_path: str) -> list:
                 continue
             if "CONTENTS" in title.upper() or "Mục Lục" in title or "目录" in title:
                 continue
+            # Bỏ qua EPUB item markers: ## [1] titlepage.xhtml, ## [2] text/...
+            if re.match(r"^\[\d+\]\s+", title):
+                continue
             chapters.append({
                 "num": len(chapters) + 1,
                 "title": title,
@@ -656,7 +663,14 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
             # Chuyển full-width parentheses → ASCII trước khi kiểm tra
             heading = heading.replace("（", "(").replace("）", ")")
             heading = re.sub(r"^\(\d+\)\s*", "", heading)  # bỏ (01) prefix
+            # Bỏ qua EPUB item markers: ## [1] titlepage.xhtml, ## [2] text/...
+            if re.match(r"^\[\d+\]\s+", heading):
+                continue
             if include_title and heading and len(heading) > 2:
+                # Thêm "Chương" trước số thứ tự: "1. Title" → "Chương 1: Title"
+                m_num = re.match(r"^(\d+)\s*[.:：]\s*(.+)$", heading)
+                if m_num:
+                    heading = f"Chương {m_num.group(1)}: {m_num.group(2)}"
                 paragraphs.append((heading, False))
             continue
         # Cleanup markdown
@@ -693,36 +707,58 @@ def extract_chapter_text(lines: list, start: int, end: int, include_title: bool 
     return paragraphs
 
 
+_ABBREVIATIONS = frozenset({
+    "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "ave", "blvd",
+    "inc", "ltd", "corp", "dept", "est", "approx", "vs", "etc",
+    "e.g", "i.e", "a.m", "p.m", "u.s", "u.s.a", "u.k",
+    "vd", "ks", "ts", "pgs", "pgs", "ths", "cv", "bs", "ds",
+})
+
+# CJK sentence-ending punctuation (。！？；) — treated same as Latin .!?
+_CJK_SENTENCE_ENDERS = "\u3002\uff01\uff1f\uff1b"  # 。！？；
+
+
 def _split_sentences(text: str) -> list:
     """Tách text thành danh sách câu hoàn chỉnh.
 
-    Tách tại: . ! ? … ; theo sau bởi space hoặc cuối chuỗi.
-    KHÔNG tách khi dấu chấm thuộc viết tắt tiếng Anh (Mr., Mrs., Dr., St.,
-    vs., etc., vd.) hoặc viết tắt 1 chữ hoa + dấu chấm (vd "TP.", "HCM."),
-    và không tách sau số (số thứ tự/viết tắt kiểu "3." khi đứng trước chữ).
+    Tách tại: . ! ? … ; 。！？； theo sau bởi space hoặc cuối chuỗi.
+    KHÔNG tách khi dấu chấm thuộc viết tắt (multi-language: Mr., Dr., ks., ts.,
+    vs., etc., vd., Pgs., Ths., Cv., Bs., Ds.) hoặc viết tắt 1 chữ hoa + dấu
+    chấm (TP., HCM.) trước chữ.
     Xử lý quote đóng: ". "? "! "? → giữ nguyên trong cùng câu.
+    Xử lý CJK full-width: 。！？ → treated same as .!?
     """
     text = text.strip()
     if not text:
         return []
 
-    # ── Phương án đơn giản & chính xác: tách theo dấu câu + space, loại trừ viết tắt ──
-    # Chèn sentinel cho viết tắt để không bị tách. Text đã qua sea_g2p thường
-    # là chữ thường ("Mr." → "mr.", "TP." → "thành phố.") nên dùng IGNORECASE.
     protected = text
-    # Viết tắt tiếng Anh + "vân vân" (sau normalize) — giữ nguyên dấu chấm
+    # Viết tắt multi-language — giữ nguyên dấu chấm
     protected = re.sub(
-        r"\b(mr|mrs|ms|dr|prof|st|vs|etc|vd|e\.g|i\.e|no|vân vân)\.(?=\s+\S)",
+        r"\b(mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|vd|e\.g|i\.e|no|"
+        r"ks|ts|ths|cv|bs|ds|vân vân|pgs)\.(?=\s+\S)",
         r"\1<PROTECT>", protected, flags=re.IGNORECASE)
-    # "thành phố." từ "TP." đứng trước tên địa danh chữ thường ("hồ chí minh")
-    # → không tách (tránh "thành phố. hồ chí minh" vỡ thành 2 câu)
+    # "thành phố." từ "TP." trước tên địa danh chữ thường
     protected = re.sub(r"\bthành phố\.(?=\s+[a-zà-ỹ])", "thành phố<PROTECT>", protected)
-    # Viết tắt 1 chữ hoa liền dấu chấm (TP., HCM.) trước chữ hoa — giữ
+    # Viết tắt 1 chữ hoa + dấu chấm trước chữ hoa
     protected = re.sub(r"\b([A-ZÀ-Ỹ])\.(?=\s+[A-ZÀ-Ỹ])", r"\1<PROTECT>", protected)
 
-    # Tách tại dấu câu kết thúc + space/cuối chuỗi
-    raw_parts = re.split(r'(?<=[.!?…])\s+', protected)
-    parts = [p.replace("<PROTECT>", ".") for p in raw_parts]
+    # Tách tại: Latin sentence-enders + CJK sentence-enders + … + ;
+    # Latin: require space/whitespace after (vd ". " nhưng không tách "3.14")
+    # CJK: tách ngay sau dấu câu (không cần space — CJK không dùng space giữa câu)
+    _LATIN_ENDERS = ".!?\u2026"
+    _CJK_ENDERS = _CJK_SENTENCE_ENDERS  # 。！？；
+    parts = []
+    # Split Latin enders (need space after)
+    latin_pat = r'(?<=[' + re.escape(_LATIN_ENDERS) + r'])\s+'
+    parts = re.split(latin_pat, protected)
+    # Further split each part by CJK enders (no space needed)
+    final = []
+    for part in parts:
+        cjk_pat = r'(?<=[' + re.escape(_CJK_ENDERS) + r'])'
+        cjk_parts = re.split(cjk_pat, part)
+        final.extend(cjk_parts)
+    parts = [p.replace("<PROTECT>", ".") for p in final]
     return [p.strip() for p in parts if p.strip()]
 
 
@@ -815,8 +851,8 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
                 remaining = sent
                 while len(remaining) > max_chars:
                     split_pos = -1
-                    # Ưu tiên tách tại dấu câu kết thúc câu (. ! ? …)
-                    for sep in [". ", "! ", "? ", "… ", "…"]:
+                    # Ưu tiên tách tại dấu câu kết thúc câu (. ! ? … 。！？)
+                    for sep in [". ", "! ", "? ", "… ", "\u3002 ", "\uff01 ", "\uff1f ", "…"]:
                         pos = remaining.rfind(sep, 0, max_chars)
                         if pos > split_pos:
                             split_pos = pos + len(sep)
@@ -922,7 +958,29 @@ def smart_chunk(paragraphs: list, max_chars: int = MAX_CHARS) -> list:
             i += 1
     chunks = merged2
 
-    return chunks
+    # Lượt 3: gộp chunk "unspeakable" (chỉ chứa dấu câu/ký tự không đọc được)
+    # vào chunk liền kề — tránh TTS đọc nhảm hoặc trả về rỗng (#1330 pattern).
+    _SPEAKABLE_RE = re.compile(r"[^\W_]", re.UNICODE)
+    final = []
+    for text, para_end in chunks:
+        if not _SPEAKABLE_RE.search(text) and final:
+            # Chunk toàn dấu câu — gộp vào chunk trước
+            prev_text, prev_para = final[-1]
+            merged_text = (prev_text + " " + text).strip()
+            if len(merged_text) <= TTS_MAX_CHARS:
+                final[-1] = (merged_text, para_end or prev_para)
+            else:
+                final.append((text, para_end))
+        elif not _SPEAKABLE_RE.search(text) and not final:
+            # Chunk đầu tiên toàn dấu câu — gộp vào chunk sau nếu có
+            continue
+        else:
+            final.append((text, para_end))
+    # Nếu chunk đầu là unspeakable và đã bị skip, đảm bảo có ít nhất 1 chunk
+    if not final and chunks:
+        final = [chunks[0]]
+
+    return final
 
 
 def find_nice_passage(paragraphs, min_chars=200, max_chars=800):
@@ -1056,16 +1114,52 @@ def _save_audio_cache(path: str, audio, signature: str) -> None:
     os.replace(temp_sig, path + ".sig")
 
 
+def _preprocess_chunk_text(text: str, slug: str = None) -> str:
+    """Chuẩn hoá text trước TTS: normalize + pronunciation.
+
+    Thứ tự:
+      1. normalize_for_tts — xóa ký tự xấu, decode entities, limit repeats
+      2. apply_pronunciation — per-book overrides từ pronunciation.json
+         (chạy SAU _apply_pronounce để per-book luôn thắng DEFAULT_PRONOUNCE)
+    """
+    out = normalize_for_tts(text)
+    out = apply_pronunciation(out, slug=slug)
+    return out
+
+
+def _load_book_pronunciation(slug: str) -> None:
+    """Load per-book pronunciation overrides vào _pronounce_map.
+
+    Gọi TRƯỚC khi extract_chapter_text xử lý text để _apply_pronounce
+    dùng được per-book overrides.
+    """
+    if not slug:
+        return
+    from pronunciation import load_pronunciation_json
+    pron_path = os.path.join(PROJECT_ROOT, "working", "profile",
+                             f"{slug}-pronunciation.json")
+    book_dict = load_pronunciation_json(pron_path)
+    if book_dict:
+        _pronounce_map.update({k.lower(): v for k, v in book_dict.items()})
+        global _pronounce_sorted
+        _pronounce_sorted = sorted(_pronounce_map.keys(), key=len, reverse=True)
+        print(f"   📖 Đã nạp pronunciation per-book: {len(book_dict)} từ")
+
+
 def generate_chapter_audio(tts, voice_name, chunks, chapter_num, temperature=0.7,
                            top_k=20, chunk_dir=None, force=False,
                            repetition_penalty=1.5, top_p=0.95,
-                           use_batch=False, batch_size=8):
+                           use_batch=False, batch_size=8, slug=None):
     """Generate audio cho 1 chapter với cache kiểm tra được tham số.
 
     - use_batch=True (GPU): gom các chunk chưa cache thành nhóm, gọi infer_batch
       (static batching) — nhanh hơn nhiều lần so với infer từng chunk.
     - use_batch=False (CPU): generate từng chunk như cũ.
+    - slug: tên slug sách để load pronunciation overrides.
     """
+    # Preprocess: normalize + pronunciation cho mỗi chunk trước khi TTS
+    chunks = [(_preprocess_chunk_text(t, slug=slug), ep) for t, ep in chunks]
+
     raw_audio = [None] * len(chunks)
     total_gen_time = 0
 
@@ -1476,6 +1570,9 @@ def main():
     print(f"📖 Book: {slug}")
     print(f"   File: {vi_md}")
 
+    # Load per-book pronunciation overrides (nếu có)
+    _load_book_pronunciation(slug)
+
     # 2. Detect chapters
     chapters, all_lines = detect_chapters(vi_md)
     print(f"📑 Found {len(chapters)} chapters")
@@ -1710,7 +1807,7 @@ def main():
                 temperature=args.temperature, top_k=args.top_k,
                 chunk_dir=chunk_dir, force=args.force,
                 repetition_penalty=args.repetition_penalty, top_p=args.top_p,
-                use_batch=args.gpu, batch_size=args.batch_size)
+                use_batch=args.gpu, batch_size=args.batch_size, slug=slug)
         except Exception as e:
             print(f"   ❌ Failed at chapter {num}: {e}")
             print(f"   💾 Progress saved (chunk cache giữ lại để resume). Run again to resume.")
