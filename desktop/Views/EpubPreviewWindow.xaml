@@ -49,27 +49,6 @@
                                Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click"
                                ToolTip="Tìm chuỗi trước đó"
                                Style="{StaticResource InteractiveButton}"/>
-
-                    <!-- Nhạc nền (Glass 3.0) -->
-                    <Border Grid.Column="0" Background="{DynamicResource GlassBackgroundBrush}"
-                            CornerRadius="10" Padding="10,4" Margin="16,0,0,0" VerticalAlignment="Center"
-                            BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:Button x:Name="BtnMusicToggle" Content="Nhạc nền: Tắt" Icon="{ui:SymbolIcon Headphones24}"
-                                       Height="32" Margin="0,0,8,0" Click="BtnMusicToggle_Click"
-                                       ToolTip="Bật / tắt nhạc nền khi đọc"
-                                       Style="{StaticResource InteractiveButton}"/>
-                            <ComboBox x:Name="MusicSelect" Width="160" Height="32" VerticalAlignment="Center"
-                                      Margin="0,0,8,0" SelectionChanged="MusicSelect_SelectionChanged"
-                                      ToolTip="Chọn bản nhạc nền"
-                                      Style="{StaticResource GlassComboBox}"/>
-                            <TextBlock x:Name="MusicVolLabel" Text="Nhạc" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
-                            <Slider x:Name="MusicVolumeSlider" Width="80" Minimum="0" Maximum="1" Value="0.15"
-                                    VerticalAlignment="Center" ValueChanged="MusicVolumeSlider_ValueChanged"
-                                    ToolTip="Volume nhạc nền"/>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Border>
