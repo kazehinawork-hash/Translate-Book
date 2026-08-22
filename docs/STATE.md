@@ -36,6 +36,15 @@
 - **Hồ sơ văn chương (book profile) — 08-14**: script `scripts/translate/create_book_profile.py` — in vài chunk đại diện + khung hồ sơ → agent viết `working/profile/<slug>.md` (tác giả/giọng văn, hệ xưng hô từng cặp nhân vật, hội thoại, thành ngữ, **đoạn dịch mẫu chuẩn "láng"**, lưu ý). Đã thêm bước **F2** vào `/dich` (cả `.commandcode` + `.opencode`): chạy trước khi dịch, mỗi batch dịch phải đọc profile. Nâng chất lượng dịch toàn diện.
 - **QA văn chương mức A tối đa (08-14)**: nâng cấp `glossary_qa.py` thêm `qa_van_chuong()` — 4 kiểm tra miễn phí (0 token): (1) lặp từ liền kề trong câu (≥3 lần, bỏ từ dừng), (2) cụm "dịch máy" dùng nhiều ("một cách", "những điều", "mà còn", "đã được", "đối với"... ≥3 lần), (3) câu >90 chữ (dễ cứng), (4) tỷ lệ từ Hán-Việt >30% (nghi dịch sát chữ). Chạy tự động trong QA pipeline, báo cáo mục "Chất lượng văn chương". Test trên `ban-co-nam-cho-ngoi/vi.md`: bắt được 31× "một cách", 15× "đối với", 82 chỗ lặp từ — chứng minh giá trị cho sách tương lai.
 
+- **Text preprocessing audiobook (08-22)**: tích hợp 3 tính năng từ VoiceStudio repo:
+  - `scripts/audiobook/text_normalize.py`: chuẩn hoá text trước TTS — xóa ký tự Unicode nguy hiểm (zero-width, bidi, BOM), decode HTML entities (`&amp;→&`), giới hạn ký tự lặp (`!!!!!→!!!`), gộp whitespace. Pure function, idempotent.
+  - `scripts/audiobook/pronunciation.py`: pronunciation lexicon — word-boundary-aware replacement (longest-key-first), inline overrides `[[term|replacement]]`, load per-book JSON từ `working/profile/<slug>-pronunciation.json`. Merge với DEFAULT_PRONOUNCE + --pronounce-json.
+  - Nâng cấp `_split_sentences`: multi-language abbreviation (ks., ts., ths., cv., bs., ds., pgs.), CJK full-width punctuation (。！？) tách đúng dù không có space.
+  - Nâng cấp `smart_chunk`: thêm unspeakable-merge — gộp chunk chỉ chứa dấu câu vào chunk liền kề (tránh TTS đọc nhảm).
+  - `_preprocess_chunk_text` chạy cho MỖI chunk trước khi TTS: `normalize_for_tts()` → `apply_pronunciation()`.
+  - `_load_book_pronunciation()` load per-book pronunciation JSON vào _pronounce_map TRƯỚC khi extract_chapter_text xử lý.
+  - Test OK: sample 12s từ `ban-co-nam-cho-ngoi` chạy thành công, preprocessing hoạt động đúng.
+
 - **Cải tổ thư mục `input/` theo trạng thái (08-13)**: chia thành `input/chua-lam/` (chưa làm), `input/da-dich/` (đã dịch, chưa audio), `input/da-audio/` (đã dịch + audio). Script `scripts/manage_input.py` tự dò `output/books/` → di chuyển file input vào đúng thư mục; chạy sau mỗi pipeline (đã thêm vào `dich.md` bước K). Hiện trạng: chua-lam 4 file (2 PDF + 2 EPUB), da-dich 3, da-audio 6. Có `input/README.md` giải thích. `dich.md` mục A/B đã cập nhật tìm file trong thư mục con.
 
 - **GPU toàn pipeline đã setup (08-12)**: RTX 3060 12GB được dùng cho cả 3 công đoạn nặng:

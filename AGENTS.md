@@ -67,15 +67,20 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 ### Pipeline
 1. **Trích reference audio**: `manage_voice.py extract` — lấy 5-10s giọng đọc sạch từ file audiobook mẫu, save WAV + metadata vào `core/voices/` (chỉ cần làm 1 lần). Dùng `--auto` để tự tìm đoạn giọng sạch bằng energy VAD (không cần chỉ `--start`)
 2. **Clone giọng**: `tts.add_voice(name, ref_path)` — tự extract speaker embedding (192-d x-vector) + MOSS code tokens
-3. **Đọc text Việt**: Đọc trực tiếp `<slug>-vi.md` (bản dịch thuần Việt từ bước 9 Merge). Text được làm sạch markdown (bảng/link/chú thích/ảnh), đọc cả tên chapter (tắt bằng `--no-read-titles`)
-4. **Smart chunk**: Chia text ≤240 ký tự/đoạn (VieNeu limit ~256), giữ nguyên câu, giữ biên đoạn văn (paragraph-aware) → silence dài hơn giữa các đoạn
-5. **Generate**: `tts.infer(chunk, voice=name, style="doc_truyen")` từng đoạn. Checkpoint theo chunk (resume nhanh giữa chừng), retry 3 lần
+3. **Đọc text Việt**: Đọc trực tiếp `<slug>-vi.md` (bản dịch thuần Việt từ bước 9 Merge). Text được làm sạch markdown (bảng/link/chú thích/ảnh), đọc cả tên chapter (tắt bằng `--no-read-titles`). Kèm `_apply_pronounce` (DEFAULT_PRONOUNCE cho tech words: AI, GPS...) + per-book overrides từ `<slug>-pronunciation.json`
+4. **Text preprocessing** (trước TTS): `_preprocess_chunk_text` chạy cho MỖI chunk trước khi gửi TTS:
+   - `normalize_for_tts()` — xóa ký tự Unicode nguy hiểm (zero-width, bidi, BOM), decode HTML entities (`&amp;→&`), giới hạn ký tự lặp (`!!!!!→!!!`), gộp whitespace
+   - `apply_pronunciation()` — per-book overrides từ `working/profile/<slug>-pronunciation.json`, inline overrides `[[term|replacement]]` trong text
+5. **Smart chunk**: Chia text ≤240 ký tự/đoạn (VieNeu limit ~256), ưu tiên tách tại sentence-end (`.!?…。！？`), abbreviation-aware (Mr., Dr., ks., ts., vs., etc.), CJK-aware, merge unspeakable chunks (chỉ chứa dấu câu → gộp vào chunk liền kề)
+6. **Generate**: `tts.infer(chunk, voice=name, style="doc_truyen")` từng đoạn. Checkpoint theo chunk (resume nhanh giữa chừng), retry 3 lần
 6. **Join**: `np.concatenate(all_audio)` + silence 0.4-0.8s giữa các đoạn → normalize từng chunk (0.95) + fade 10ms + master normalize (0.92) → WAV 48kHz
 7. **MP3**: Tự động convert WAV → MP3 128kbps (xóa WAV trừ `--keep-wav`), kèm metadata title/album
 
 ### Scripts
 - `scripts/audiobook/manage_voice.py` — Quản lý reference audio: extract (có `--auto` VAD), save WAV + metadata, list/info/delete/set-active/active, preview, validate chất lượng (duration/sample rate/peak)
 - `scripts/audiobook/audiobook_long.py` — Tạo audio từ -vi.md: auto-detect chapters, `--first`/`--chapter N`/`--sample`/`--force`/`--voice NAME`/`--temperature`/`--top-k`/`--bitrate`/`--no-read-titles`/`--keep-wav`/`--merge`, resume checkpoint (theo chapter + theo chunk), retry, auto MP3. **Chuẩn GPU (08-13)**: `--gpu --batch-size 16` — benchmark RTF 0.12 (nhanh ~2x so với batch-size 8 cũ), chất lượng tương đương. Áp dụng cho mọi sách sau. **Nhạc nền chuẩn (08-13)**: `--music-volume 0.15` (user chốt mức này, nhạc nhỏ hơn 0.20 cũ).
+- `scripts/audiobook/text_normalize.py` — Text normalization trước TTS (tham khảo VoiceStudio): xóa ký tự Unicode nguy hiểm, decode HTML entities, giới hạn ký tự lặp, gộp whitespace. Pure function, idempotent.
+- `scripts/audiobook/pronunciation.py` — Pronunciation lexicon (tham khảo VoiceStudio): word-boundary-aware replacement, inline overrides `[[term|replacement]]`, load per-book JSON từ `working/profile/<slug>-pronunciation.json`. Merge với DEFAULT_PRONOUNCE + --pronounce-json.
 
 ### Env
 - venv: `working/venv-vieneu/` (Python 3.11, `pip install vieneu`)
