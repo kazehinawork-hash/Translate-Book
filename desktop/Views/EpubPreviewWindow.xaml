@@ -38,7 +38,8 @@
                             Margin="0,0,12,0"/>
 
                     <!-- Typography: Font Selector -->
-                    <ComboBox x:Name="CmbFont" Width="110" Height="32" Margin="0,0,8,0"
+                    <ComboBox x:Name="CmbFont" Width="175" Height="32" Margin="0,0,8,0" FontSize="12"
+                              Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbFont_SelectionChanged" ToolTip="Chọn kiểu phông chữ">
                         <ComboBoxItem Content="Mặc định (Segoe UI)" IsSelected="True" Tag="'Segoe UI', 'Microsoft YaHei', Arial, sans-serif"/>
                         <ComboBoxItem Content="Có chân (Serif)" Tag="'Noto Serif SC', 'Georgia', 'Times New Roman', serif"/>
@@ -47,7 +48,8 @@
                     </ComboBox>
 
                     <!-- Typography: Width Selector -->
-                    <ComboBox x:Name="CmbWidth" Width="100" Height="32" Margin="0,0,8,0"
+                    <ComboBox x:Name="CmbWidth" Width="135" Height="32" Margin="0,0,8,0" FontSize="12"
+                              Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbWidth_SelectionChanged" ToolTip="Độ rộng lề trang sách">
                         <ComboBoxItem Content="Gọn (650px)" Tag="650px"/>
                         <ComboBoxItem Content="Vừa (800px)" IsSelected="True" Tag="800px"/>
@@ -56,27 +58,28 @@
                     </ComboBox>
 
                     <!-- Typography: Line Height -->
-                    <ComboBox x:Name="CmbLineHeight" Width="90" Height="32" Margin="0,0,12,0"
+                    <ComboBox x:Name="CmbLineHeight" Width="125" Height="32" Margin="0,0,12,0" FontSize="12"
+                              Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbLineHeight_SelectionChanged" ToolTip="Khoảng cách dòng">
                         <ComboBoxItem Content="Dày (1.5x)" Tag="1.5"/>
                         <ComboBoxItem Content="Vừa (1.8x)" IsSelected="True" Tag="1.8"/>
                         <ComboBoxItem Content="Thoáng (2.2x)" Tag="2.2"/>
                     </ComboBox>
 
-                    <ui:TextBox x:Name="SearchBox" Width="140" Height="32" PlaceholderText="Tìm kiếm..."
+                    <ui:TextBox x:Name="SearchBox" Width="180" Height="32" FontSize="12" PlaceholderText="Tìm kiếm trong sách..."
                                  TextChanged="SearchBox_TextChanged"
                                  Style="{StaticResource InteractiveTextBox}"/>
 
                     <ui:Button x:Name="BtnSearchNext" Content="Tiếp" Icon="{ui:SymbolIcon ChevronDown24}"
-                               Height="32" Margin="6,0,0,0" Click="BtnSearchNext_Click"
+                               Height="32" Margin="6,0,0,0" Click="BtnSearchNext_Click" FontSize="12"
                                ToolTip="Tìm chuỗi kế tiếp"
                                Style="{StaticResource InteractiveButton}"/>
                     <ui:Button x:Name="BtnSearchPrev" Content="Trước" Icon="{ui:SymbolIcon ChevronUp24}"
-                               Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click"
+                               Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click" FontSize="12"
                                ToolTip="Tìm chuỗi trước đó"
                                Style="{StaticResource InteractiveButton}"/>
 
-                    <TextBlock x:Name="TxtReadingProgress" Text="" FontSize="11" VerticalAlignment="Center"
+                    <TextBlock x:Name="TxtReadingProgress" Text="" FontSize="12" VerticalAlignment="Center"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="12,0,0,0"/>
                 </StackPanel>
             </ScrollViewer>

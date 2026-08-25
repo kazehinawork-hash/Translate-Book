@@ -115,7 +115,7 @@ namespace TranslateBook.Views
                     }
                 };
                 // Also try immediately in case containers are already generated
-                Dispatcher.BeginInvoke(new Action(() => ExpandAllTocItems(TocTreeView)), System.Windows.Threading.DispatcherPriority.Loaded);
+                _ = Dispatcher.BeginInvoke(new Action(() => ExpandAllTocItems(TocTreeView)), System.Windows.Threading.DispatcherPriority.Loaded);
 
                 // Build reading order
                 if (book.ReadingOrder != null)

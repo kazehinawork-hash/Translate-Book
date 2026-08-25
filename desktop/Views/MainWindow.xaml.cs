@@ -19,7 +19,13 @@ namespace TranslateBook.Views;
         public MainWindow()
         {
             InitializeComponent();
-            SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
+            try
+            {
+                var iconUri = new Uri("pack://application:,,,/app_icon.png", UriKind.RelativeOrAbsolute);
+                Icon = new System.Windows.Media.Imaging.BitmapImage(iconUri);
+            }
+            catch { }
+            SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true);
             _snackbarService.SetSnackbarPresenter(SnackbarPresenter);
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             Loaded += MainWindow_Loaded;

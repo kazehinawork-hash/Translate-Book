@@ -1691,3 +1691,304 @@
 ### Git
 - Thay đổi chưa commit trên `main`. Không tự động commit/push theo quy tắc.
 
+
+---
+
+## 2026-08-24 - Dịch lại toàn bộ 做一个有风骨的女子 (Vi Dương) từ PDF thật
+
+### Đã làm
+- **Phát hiện + sửa lỗi lạc đề**: lần dịch trước của cuốn này dùng nhầm raw.md extract từ EPUB 晚晴 (tản văn Vãn Tình) — nội dung không phải sách thật. PDF thật là self-help nữ giới của Vi Dương (微阳), 吉林文史出版社 2018, ISBN 978-7-5472-5522-3, 8 chương.
+- **Pipeline đầy đủ chạy lại**: MinerU GPU (raw.md mới 264KB) → QC 0 lỗi, zh-Hans → chunk 50 → glossary đã có 8 thuật ngữ + master đồng bộ → skeleton trilingual 50 progress JSON → viết lại profile văn chương v2 (风骨='xương khí', tiêu đề 'Người phụ nữ có xương khí') → batch manifest 50 batch × 1 chunk → dịch 50/50 khớp dòng (agent trực tiếp, bám profile) → QA từng batch pass hết.
+- **QA tổng thể**: phát hiện source_zh.md cũ trong qa dir là file lạc đề còn sót (false positive) — xóa, QA lại với raw.md đúng: Hán sót 6 ký tự chỉ ở chunk_000 metadata → sửa ('Biên soạn: Vi Dương', '(2018), số 230681'). Cập nhật 7 entry master.csv khớp bản dịch tự nhiên hơn, --normalize 616→178 dòng. QA cuối: ✅ 0 lỗi thuật ngữ / 0 Hán sót / 0 mojibake.
+- **Merge**: tamngu.md (12601 dòng, 4 ảnh) + vi.md (807 dòng, 4 ảnh). **BUG FIX scripts/output/merge_sentences.py**: nuốt dòng ảnh khi gom paragraph (thiếu is_image check) → vi.md mất 2 ảnh cuối; đã patch thêm \or is_image(lines[i])\ vào break condition.
+- **EPUB**: làm thủ công vì chưa có script nhúng font — CSS @font-face NotoSerifSC + pandoc --epub-embed-font NotoSerifSC-VF.ttf + fix path font trong zip (url('../fonts/...')) → \output/books/做一个有风骨的女子/做一个有风骨的女子.epub\ (~15.5MB).
+- **Xóa audiobook cũ** (user chốt): 85 chương MP3 dịch từ bản lạc đề, không khớp sách thật → xóa audiobook/ + progress_audio json + chunks cache; metadata has_audio=false.
+- **manage_input**: script không quét thư mục con input → move tay PDF từ da-audio/ sang da-dich/ (đã dịch, chưa audio mới).
+
+### File đổi
+- working/{chunks,progress,qa,tmp_translate}/zuo-yi-ge-you-feng-gu-de-nu-zi/* (sản phẩm)
+- output/books/做一个有风骨的女子/ (tamngu.md, vi.md, epub, metadata.json)
+- scripts/output/merge_sentences.py (bug fix dòng ảnh)
+- glossary/master.csv (7 entry cập nhật + normalize)
+- docs/STATE.md, docs/session_log.md
+
+### Bài học
+- Skeleton tách câu xuyên quote: dòng src chỉ chứa dấu đóng → dst giữ dòng riêng; câu cắt đôi giữa 2 dòng phải tách dst đúng ranh giới (helper đếm dòng nghiêm).
+- Luôn grep [\u4e00-\u9fff] file dst TRƯỚC apply — sót chữ Hán khi soạn nhanh là lỗi thường gặp nhất.
+- glossary_qa.py cần --report tường minh mới ghi file report.
+- merge_chunks bắt buộc --output-dir; EPUB ZH nhúng font vẫn phải làm tay.
+
+### Còn dở
+- Audiobook cho bản dịch mới (chưa làm — user chưa yêu cầu).
+
+### Git
+- Chưa commit. Đề xuất commit code fix (merge_sentences.py) + docs khi user duyệt.
+
+
+---
+
+## 2026-08-24 - Audiobook mới cho bản dịch lại 做一个有风骨的女子 (81 chuong)
+
+### Đã làm
+- **Don vi.md cho audio**: xoa khoi CIP/trang giay + muc luc CONTENTS (2 khoi), gop tieu de bia thanh H1 '# Nguoi phu nu co xuong khi' -> vi.md 791 dong, 4 anh, headings # con 4.
+- **detect_chapters**: 81 chuong (fallback heading #/##).
+- **music_map.json**: ghi entry slug nay qua working/tmp_translate/gen_music_map.py — 81 chuong, phan loai mood bang tu khoa (vui/binh/am/sau) xoay 26 bai lofi trong core/music/, tranh lap bai lien ke.
+- **Generate**: audiobook_long.py --slug ... --gpu --batch-size 16 --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10 (voice van_tinh). Chay nen qua wrapper run_audio.ps1 (Start-Process powershell -File; inline -Command voi redirect *> FAIL — process chet khong log). RTF 0.31, ~95 phut wall-clock, 5688s gen / 18185s audio.
+- **QA audio**: audio_qa.py FAIL do hardcode output/books/<slug>/ (thu muc output la ten goc CJK) -> QA thu cong bang tools/ffmpeg/ffprobe.exe: 81/81 MP3 hop le, tong 5.05 gio (277.6MB).
+- **metadata.json**: has_audio=true, audio_chapters=81, audio_duration_hours=5.05.
+- **manage_input**: move tay PDF tu input/da-dich/ sang input/da-audio/ (script khong quet thu muc con).
+
+### File đổi
+- output/books/做一个有风骨的女子/audiobook/ch01..ch81.mp3 (san pham)
+- output/books/做一个有风骨的女子/metadata.json
+- working/progress_audio/zuo-yi-ge-you-feng-gu-de-nu-zi.json + music_map.json (entry slug)
+- docs/STATE.md, docs/session_log.md
+
+### Bài học
+- ffprobe/ffmpeg nam o tools/ffmpeg/ffprobe.exe (khong co trong PATH) — dung de QA MP3.
+- pydub trong venv-vieneu KHONG decode duoc MP3 (thieu ffmpeg binary); audiobook_long.py tu tim ffmpeg o tools/ffmpeg/.
+- audio_qa.py hardcode path theo slug — can fix ho tro metadata.json slug->folder neu muon QA tu dong cho sach ten CJK.
+
+### Còn dở
+- Khong con no nao — cuon sach HOAN TAT day du (dich + EPUB + audio).
+
+### Git
+- Chua commit. De xuat commit code fix (merge_sentences.py) + docs khi user duyet.
+
+
+
+---
+
+## 2026-08-24 - Dich tron 做一个刚刚好的女子 2 (Khang Tinh Van, 37 chunk + EPUB)
+
+### Đã làm
+- **Pipeline trọn**: PDF 228 trang input/chua-lam/ → MinerU GPU → raw.md 70,420 chars (QC 0 lỗi) → detect zh-Hans → chunk 37 (min1500/max3000) → glossary 12 thuật ngữ merge master (--author khang-tinh-van --genre tan-van) → skeleton trilingual 37/37 → profile van chuong working/profile/zuo-yi-ge-gang-gang-hao-de-nu-zi-2.md.
+- **Dịch 37/37 chunk** bằng batch manifest, 8 vòng x ~4 chunk (workflow: claim → dump original_text vào working/tmp/zy2/src_N.txt → dịch literary theo profile → apply.py check khớp dòng + quét Hán sót → batch_qa ok:true → complete). Sót Hán sửa ngay tại vòng (tình仇, 也别怕, 刁难, 根本, 一步...).
+- **QA tổng thể pass**: run_pipeline.py --from-step 8 --to-step 8, 37/37 OK.
+- **Merge**: merge_chunks.py --format trilingual --force --output-dir 'output/books/做一个刚刚好的女子 2' → rename tamngu.md/vi.md; vi.md nối translated_text 37 JSON (~210K chars), 0 mojibake/0 Hán sót.
+- **Fix TOC + heading (thủ công, script working/tmp/zy2/fix_headings.py)**: 39 entry TOC sync theo đúng heading thân bài (giữ số trang; bỏ OCR rác ／on; entry thiếu trang bỏ dấu /); tách dòng TOC merged PART 4 thành 4 dòng (vi.md) / 4 tri-block (tamngu.md); strip # trong khối TOC; normalize thân bài: 5 H1 = tựa sách + 4 PART, subtitle PART + essay = ## (15 heading nhầm # → ##). Verify: TOC sync 62/62 heading, 0 mojibake cả 2 file. Backup .bak dời sang working/tmp/zy2/.
+- **EPUB TAM NGỮ nhúng font Noto Serif SC ~18MB** (build từ final/tamngu.md, tri-block ZH+Pinyin+VI — 2169 khối trong ch002.xhtml; lần đầu build nhầm từ vi.md thuần Việt, user bắt lỗi → rebuild): pandoc --toc-depth=2 --epub-embed-font NotoSerifSC-VF.ttf; CSS @font-face url phải là '../fonts/...' vì pandoc đặt font ở EPUB/fonts/ còn css ở EPUB/styles/ — patch trong zip rồi move ra gốc thư mục sách làm DUY NHẤT 1 file epub. Copy 40 ảnh từ extracted auto/images sang output/<sách>/images/.
+- **metadata.json**: {slug, title, source_file=input/da-dich/...}. manage_input.py không quét thư mục con → move tay PDF chua-lam/ → da-dich/.
+
+### File đổi
+- working/{chunks,progress,qa,tmp/zy2}/zuo-yi-ge-gang-gang-hao-de-nu-zi-2/* (sản phẩm trung gian)
+- output/books/做一个刚刚好的女子 2/ (tamngu.md, vi.md, epub, metadata.json, images/)
+- glossary/master.csv (+12 thuật ngữ)
+- docs/STATE.md, docs/session_log.md
+
+### Bài học
+- batch_manifest.py claim in key 'batch_id' (không có 'chunk_id') — parse nhầm tưởng claim fail.
+- TOC sách scan thường lệch bản dịch thân bài (dịch 2 lần khác nhau) → bắt buộc sync entry theo heading body trước khi EPUB; strip # trong khối TOC tránh pandoc đưa vào nav.
+- pandoc --epub-embed-font đặt font ở EPUB/fonts/, css ở EPUB/styles/ → @font-face url('../fonts/x.ttf'), kiểm tra bằng zipfile sau build.
+
+### Còn dở
+- Audiobook cho cuốn này (chưa làm — user chưa yêu cầu).
+
+### Git
+- Chưa commit. Không có thay đổi code — chỉ sản phẩm (không commit) + docs.
+
+
+---
+
+## 2026-08-25 - Dich tron 做一个刚刚好的女子 3 (Vi Duong 微阳, 50 chunk + EPUB)
+
+### Đã làm
+- **Pipeline trọn chuẩn mới**: backup dữ liệu cũ (07-31/08-01, pre-chuan van chuong) sang working/tmp/zy3_old_backup/{extracted,chunks,progress}__slug -> MinerU GPU extract lai tu PDF input/chua-lam/ -> raw.md 88,977 chars (QC 0 loi, zh-Hans) -> chunk 50 (min1500/max3000).
+- **Glossary**: tao curated 20 thuat ngu (book=zuo-yi-ge-gang-gang-hao-de-nu-zi-3, author=vi-duong, genre=tan-van) merge master; phat hien master co 344 dong duplicate cho slug nay gom 2 muc SAI nghia (淡泊->'Nhat nhe' SAI, sua thanh 'thanh dam'; 从容->'Tu tu' SAI, sua thanh 'thong dong'); REBUILD master dedupe 1-row-per-source uu tien curated -> master.csv 183 dong, xoa shards cu (backup working/tmp/glossary_shard_backup_0824/). Luu y: glossary_lib.filter_for_book dedupe theo cap (source,target) nen 2 target khac nhau cung source deu song sot - can rebuild tay.
+- **Skeleton + profile**: init_trilingual_skeleton.py 50/50 (original_text 1 cau/dong); profile working/profile/zuo-yi-ge-gang-gang-hao-de-nu-zi-3.md (giong 'chi lon tam tinh dan do', ten Han-Viet, mau dich Na Na).
+- **Dich 50/50 chunk** bang batch manifest, 13 vong (claim -> dump_range.py A B -> trans_rN.py T[cid] builder auto-mirror dong trong/dong anh -> apply.py check khop dong + quet Han sot -> batch_qa ok:true -> complete). Helper scripts o working/tmp/zy3/. apply.py da BO check dong rong (dong trong la cau truc hop le phai mirror). Cac fix lech dong: cau bi OCR tac 2 dong phai tac ban dich theo dung so dong; dau ” ket cau thoai dung rieng 1 dong phai giu nguyen vi tri.
+- **QA tong the pass**: run_pipeline.py --from-step 8 --to-step 8, 50/50 OK.
+- **Merge**: merge_chunks.py --format trilingual --force --output-dir 'output/books/做一个刚刚好的女子 3/final' -> rename tamngu.md (1.29MB) + tao vi.md tu translated_text (286K chars); vi.md 0 mojibake / 0 Han sot / 114 headings dung cau truc. metadata.json {slug,title,source_file,author:'Vi Duong',language:zh}.
+- **EPUB nhung font Noto Serif SC ~15.9MB**: make_epub.py (pandoc) tu final/tamngu.md -> inject_font.py patch trong zip (CSS @font-face url('../fonts/NotoSerifSC-VF.ttf') + manifest item) -> move ra goc thu muc sach lam DUY NHAT 1 file epub. Font nguon: working/tmp_epub/fonts/.
+- **manage_input**: move tay PDF chua-lam/ -> da-dich/.
+
+### File doi
+- working/tmp/zy3/* (helper + trans_r1..r13 + vi_r*.txt), working/{chunks,progress,qa}/.../zuo-yi-ge-gang-gang-hao-de-nu-zi-3/
+- output/books/做一个刚刚好的女子 3/ (tamngu.md, final/vi.md, epub, metadata.json)
+- glossary/master.csv (rebuild 183 dong), glossary/zuo-yi-ge-gang-gang-hao-de-nu-zi-3.csv (curated 20)
+- docs/STATE.md, docs/session_log.md
+
+### Bai hoc
+- original_text skeleton la 1-cau-dong (khac text chunk theo doan) - dump_range doc progress JSON chu khong doc chunks dir.
+- Builder dich nen auto-mirror dong rong/dong anh va chi zip list dich voi dong prose -> giam sai sot dem dong.
+- Dau ” ket cau thoai OCR hay dung rieng 1 dong - ban dich phai co dung 1 item '”'.
+- Glossary master trung cap (source,target): 2 target khac nhau cho 1 source deu song sot sau filter - khi co muc sai phai rebuild tay hoac them --normalize.
+
+### Con d?
+- Audiobook cho cuon nay (chua lam - user chua yeu cau).
+
+### Git
+- Chua commit. Khong co thay doi code - chi san pham (khong commit) + docs.
+
+
+---
+
+## 2026-08-25 - Audiobook 做一个刚刚好的女子 3 (60 chuong, GPU + music-auto)
+
+### Đã làm
+- **Don dep vi.md cho audio**: cat front-matter (`# Làm một người phụ nữ vừa vặn` den truoc `## Chương 8...` - bia/CIP/NSX/muc luc) + colophon cuoi sach (tu anh 0fbaf9b9 sau bai tho Thu Dinh den EOF), backup working/tmp/zy3/vi_backup.md -> 60 chuong sach (detect_chapters).
+- **Xoa progress cu**: working/progress_audio/zuo-yi-ge-gang-gang-hao-de-nu-zi-3.json (65 chuong tu ban audio cu da bi xoa MP3 truoc do) de tranh "All selected chapters already completed".
+- **Generate 60/60 chuong**: `audiobook_long.py --slug zuo-yi-ge-gang-gang-hao-de-nu-zi-3 --gpu --batch-size 16 --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10` (voice van_tinh active). RTF 0.32, ~90 phut gen, **4.76 gio audio (261.5MB)**, music-auto AI chon lofi theo noi dung tung chuong (26 bai trong core/music/).
+- **QA ffprobe** (tools/ffmpeg/ffprobe.exe): 60/60 MP3 hop le; ch01 4.3s (tua sach), ch37 3.9s (divider Chuong 5 'Bắt tay hòa giải với chính mình' chi co tieu de - dung ban chat, giong convention divider-chapter cac sach truoc).
+- **metadata.json**: has_audio=true, audio_chapters=60, audio_hours=4.76.
+- **manage_input**: PDF move tay `da-dich/` -> `da-audio/`.
+
+### File doi
+- output/books/做一个刚刚好的女子 3/audiobook/ch01..60.mp3, metadata.json
+- output/books/做一个刚刚好的女子 3/final/vi.md (da don dep cho audio; backup vi_backup.md)
+- input/da-audio/ (PDF)
+- docs/STATE.md, docs/session_log.md
+
+### Bai hoc
+- progress_audio JSON cu con sot sau khi xoa MP3 se lam script tuong tat ca chapter da xong -> phai xoa progress khi lam audio moi cho ban dich moi.
+- vi.md thuong chua front-matter (bia/CIP/muc luc) + colophon -> can cat truoc khi detect chapters, neu se ra chapter rac.
+
+### Còn dở
+- Khong (sach hoan tat dich + EPUB + audio).
+
+### Git
+- Chua commit. Chi san pham (khong commit) + docs.
+
+
+---
+
+## 2026-08-25 (phien 2) - Audiobook 做一个刚刚好的女子 2 (61 chuong, GPU + music-auto)
+
+### Đã làm
+- **Don dep vi.md cho audio**: cat front-matter (0-114, gom tac gia, QR, CIP, muc luc) + back-matter (tu "Danh sach sach Doc My Van Kho" den EOF) + bo 6 dong `# PART N` divider (khong co noi dung) -> 2168 dong sach, 201K chars.
+- **Detect chapters**: 61 chuong (40 essay + sub-headings trong sach). Khong co progress cu (audiobook chua lam truoc do).
+- **Generate 61/61 chuong**: `audiobook_long.py --slug zuo-yi-ge-gang-gang-hao-de-nu-zi-2 --gpu --batch-size 16 --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10` (voice van_tinh). RTF 0.31, ~64 phut gen, **3.42 gio audio (188MB)**, music-auto AI 61 bai lofi theo noi dung tung chuong.
+- **QA ffprobe**: 61/61 MP3 hop le. Ch40 nhat (6.5s, 86 ky tu - cau ket noi giua 2 PART). Ch39 dai nhat (8.1 min).
+- **metadata.json**: them has_audio=true.
+- **manage_input**: PDF move tay `da-dich/` -> `da-audio/`.
+- **STATE.md**: cap nhat hang book 2 (audiobook 61/61 hoan tat).
+
+### File doi
+- output/books/做一个刚刚好的女子 2/audiobook/ch01..61.mp3, metadata.json
+- output/books/做一个刚刚好的女子 2/final/vi.md (da don dep cho audio; backup working/tmp/zy3/vi2_backup.md)
+- working/tmp/zy3/chapter_list_zy2.txt (61 chuong list)
+- input/da-audio/ (PDF)
+- docs/STATE.md, docs/session_log.md
+
+### Bai hoc
+- sach co PART divider (`# PART N`) nen bo truoc khi audio, vi detect_chapters tao chapter chi co tieu de doc thanh 3-5s, nghe dut quang.
+- vi.md sach nay rat sach (khong co H1 truoc PART), chi can bo dong `# PART N` thoi.
+
+### Còn dở
+- Khong (sach hoan tat dich + EPUB + audio).
+
+### Git
+- Chua commit. Chi san pham (khong commit) + docs.
+
+---
+
+## 2026-08-25 (phiên 3) - Nâng cấp Desktop UI (WPF / .NET 8)
+
+### Đã làm
+- **Đồng bộ quét & phân loại thư mục Input**:
+  - Cập nhật [`MainViewModel.cs`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/ViewModels/MainViewModel.cs) phân loại file theo thư mục con trong `input/` (`chua-lam`, `da-dich`, `da-audio`).
+  - Gán `FolderPath` và `InputCategory` vào [`BookStatus.cs`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Models/BookStatus.cs); hiển thị vị trí `input/<category>` trên Card sách.
+- **Bổ sung cấu hình GPU & Nhạc nền AI trên AudioPage**:
+  - Thêm các thuộc tính & controls trên [`AudioPage.xaml`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/AudioPage.xaml): Bật/tắt GPU (`--gpu`), Batch Size (chuẩn 16 cho RTX 3060), Bật/tắt Nhạc nền AI (`--music-auto`), Âm lượng nhạc nền (`--music-volume`, mặc định 0.15).
+  - Cập nhật [`PythonPipelineService.RunAudiobookAsync`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Services/PythonPipelineService.cs) & `GenerateAudiobookAsync` truyền đủ các tham số mới.
+- **Tiện ích Mở Thư Mục Nhanh (Explorer)**:
+  - Thêm RelayCommand `OpenBookFolder` trong `MainViewModel`.
+  - Bổ sung nút Icon Folder mở trực tiếp thư mục sách trong Windows Explorer trên Card sách của cả tab `Output` ([`BooksPage.xaml`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/BooksPage.xaml)) và trang [`AudioPage.xaml`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/AudioPage.xaml).
+- **Hiệu ứng Kính Mờ (Windhawk Liquid Glass 3.0 Specs)**:
+  - Đồng bộ `WindowBackdropType.Acrylic` trên cả XAML và `SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true)` trong [`MainWindow.xaml.cs`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/MainWindow.xaml.cs).
+  - Áp dụng đầy đủ thông số mẫu Windhawk: Gradient borders (`#50808080 → #50404040 → #50808080`), viền phần tử (`ElementBorderThickness="0.3,0.3,0.3,1"`), bo góc chuẩn (`CornerRadius=12`, `ElementCornerRadius=8`), vệt phản xạ ánh sáng trắng viền chéo (`#80ffffff → #35ffffff → #80ffffff`).
+- **Rà soát & Hoàn thiện cửa sổ Đọc thử EPUB (`EpubPreviewWindow.xaml` & `EpubPreviewWindow.xaml.cs`)**:
+  - **Mở rộng kích thước ô Box Toolbar (100% Full Text Visibility)**: Mở rộng chiều rộng các ô ComboBox chọn phông chữ lên **`175px`**, độ rộng lề lên **`135px`**, khoảng cách dòng lên **`125px`** và ô tìm kiếm lên **`180px`**; đồng bộ font `12px` chuẩn Fluent, khắc phục hoàn toàn tình trạng cắt cụt chữ trong dropdown và ô tìm kiếm.
+  - **Toolbar kính mờ Liquid Glass**: Đồng bộ style `GlassComboBox` cho bộ 3 chọn Typography (Phông chữ Segoe UI/Serif/KaiTi/Mono, Độ rộng lề trang 650px - Toàn màn hình, Khoảng cách dòng 1.5x - 2.2x); mở rộng ô tìm kiếm `180px` với `InteractiveTextBox`.
+  - **Tích hợp Audiobook Player Bar thông minh**: Tự động quét thư mục `audiobook/*.mp3` của cuốn sách khi mở cửa sổ đọc thử; đồng bộ mục lục TOC với audio theo từng chương (`ch01.mp3`, `ch02.mp3`...), hỗ trợ tua thanh trượt, điều chỉnh âm lượng và phát/tạm dừng mượt mà.
+  - **Hiển thị & Tìm kiếm**: Render qua WebView2 với Dark Theme CSS chuẩn, hỗ trợ bôi vàng từ khóa tìm kiếm (`BtnSearchNext`, `BtnSearchPrev`), zoom từ 50% đến 200%, tự động lưu và khôi phục vị trí đọc gần nhất.
+- **Rà soát & Bổ sung tính năng còn thiếu trên UI Tab Audio (`AudioPage.xaml`, `MainViewModel.cs`, `PythonPipelineService.cs`)**:
+  - **Bổ sung nút "Nghe thử mẫu ~30s" (`GenerateSampleCommand`)**: Thêm nút Play trên từng card sách audio; tự động trích xuất ~400 ký tự từ chương đầu tiên, tạo audio nhanh với giọng active và nhạc nền AI rồi tự động phát file WAV kết quả để người dùng kiểm tra chất lượng giọng & âm lượng nhạc trước khi render cả cuốn.
+  - **Bổ sung nút "Mở thư mục Audiobook" (`OpenAudioFolderCommand`)**: Mở trực tiếp thư mục chứa các file MP3/Audiobook của sách trong Windows Explorer chỉ với 1 cú click.
+  - **Tự động nạp danh sách giọng (`LoadVoicesAsync`)**: Bổ sung tự động quét thư mục `core/voices/` ngay khi ứng dụng khởi chạy, giúp ComboBox "Giọng active" luôn có sẵn danh sách giọng clone để chọn mà không cần bấm thủ công nút tải lại.
+  - **Kiểm tra luồng Tạo Audiobook (`GenerateAudiobookCommand`)**: Kết nối trực tiếp vào script `scripts/audiobook/audiobook_long.py` qua môi trường ảo `working/venv-vieneu/Scripts/python.exe`, truyền đầy đủ tham số GPU (`--gpu --batch-size 16`), Nhạc nền AI (`--music-auto --music-volume 0.15`), chất lượng bitrate (`--bitrate 128k`), tùy chọn chương (`--chapter`), ghi nhận tiến độ thời gian thực vào thanh Progress Bar và Realtime Log.
+  - **Kiểm tra luồng Quản lý giọng (`manage_voice.py`)**: Đầy đủ tính năng Đặt giọng chính (`set-active`), Nghe thử câu đọc mẫu (`preview`) và Clone giọng sạch tự động (`extract --auto`).
+  - **Đồng bộ kích thước các đầu mục chính (Unified Section Headings)**: Cả 3 đầu mục lớn **"Cấu hình Audiobook (VieNeu-TTS Turbo)"**, **"Quản lý giọng đọc"** và **"Clone giọng mới (3-8s audio)"** được chuẩn hóa đồng nhất ở mức **`FontSize="15"`, `FontWeight="Bold"`** cùng biểu tượng Fluent Icon **`FontSize="18"`**, tạo sự cân xứng và hài hòa tuyệt đối về thị giác.
+  - **Chuẩn hóa kích thước & Font chữ đồng bộ (Box Sizing & Typography)**: Mở rộng chiều rộng (`120px - 130px`), chiều cao chuẩn `32px` và font chữ `12px` đồng nhất cho toàn bộ các ô `NumberBox`, `ComboBox`, `TextBox` và các nút bấm; khắc phục triệt để tình trạng chữ to nhỏ không đều hoặc bị cắt xén nội dung bên trong.
+  - **Khung cấu hình Audiobook cao cấp**: Bọc toàn bộ thông số kỹ thuật (Độ sáng tạo, Top-K, Bitrate, Batch Size GPU, Âm lượng nhạc nền, Tùy chọn GPU/Nhạc nền AI) vào một khối kính mờ nổi bo góc `CornerRadius=12` có viền gradient phản quang.
+  - **Quản lý & Clone giọng đọc trực quan**: Phân tách thành 2 thẻ kính (`InteractiveCard`) hài hòa với icon Fluent (`Speaker224`, `MicSparkle24`), các nút thao tác nhanh (Tải lại danh sách, Đặt làm giọng chính, Nghe thử) áp dụng style `GlassIconButton` / `GlassPlainButton` bo góc 6px tinh tế.
+  - **Đóng khung danh sách sách Audio**: Danh sách sách đã dịch được bọc trong container kính mờ bo tròn `CornerRadius=12` tương tự tab Sách.
+  - **Thẻ Card sách Audio sắc nét**: Nâng cấp Avatar tròn hiển thị chữ cái đầu, tiêu đề đậm rõ ràng, huy hiệu số chương Audiobook (`Mp3Count chapters`), thanh tiến độ tạo audio theo chương (`AudioDone / AudioTotal`), nút "Tạo / Cập nhật Audio" và nút mở thư mục sách dạng `GlassIconButton`.
+- **Trau chuốt nút bấm Realtime Log & Cột điều khiển (Glass Toolbar Buttons)**:
+  - Bổ sung style **`GlassIconButton`** và **`GlassCollapseButton`** với bo góc `CornerRadius=6`, viền phản quang gradient `0.3,0.3,0.3,1` và hiệu ứng hover/press nhẹ nhàng.
+  - Thay thế toàn bộ ký tự text thô (`<`, `>`, `📋`) bằng các **Fluent SymbolIcon chuẩn (`ChevronRight24`, `ChevronLeft24`, `Copy24`)** sắc nét.
+  - Nút **"Xóa"** được áp dụng `GlassPlainButton` cân đối, ô tìm kiếm **"Lọc..."** canh chỉnh chiều cao đồng đều 26px giúp thanh header của Realtime Log thanh thoát, hiện đại và sang trọng.
+- **Hợp nhất toàn diện 3 cột thành 1 khối khung kính liền mạch & Hiệu ứng trượt Realtime Log**:
+  - Gộp cả **(1) Navigation trái (Sách/Audio)**, **(2) Danh sách sách (Input/Output)** và **(3) Realtime Log (phải)** vào trong cùng một `Border` khung kính nổi duy nhất với `CornerRadius="12"`, viền phản xạ ánh sáng `GlassGradientBorderBrush` bao quanh và `OpacityMask` cắt gọt chuẩn xác.
+  - Thêm hiệu ứng hoạt ảnh trượt mở / đóng mượt mà (**Storyboard DoubleAnimation Width 36px ↔ 300px**) cho Realtime Log tương tự như thanh Navigation Pane bên trái (Sách/Audio), đồng thời làm mờ chuyển tiếp nội dung êm ái.
+  - Bọc khu vực danh sách sách (`InputPanel` / `OutputPanel`) bên trong một khung kính mờ độc lập bo tròn `CornerRadius="12"` với viền phản quang `0.3,0.3,0.3,1`, tạo chiều sâu phân lớp vô cùng thẩm mỹ.
+- **Bo tròn hoàn hảo các khối tử & Khắc phục góc vuông ở cột sách**:
+  - Khắc phục triệt để góc dưới cùng bên phải của khu vực danh sách sách bị vuông bằng `Border.OpacityMask` với `CornerRadius="12"`, cắt gọt toàn bộ nội dung cuộn bên trong khớp tuyệt đối 100% với đường cong viền kính của container ngoài.
+  - Khắc phục các góc "trán" (header) bên trong thẻ Card bằng cách đổi `BookCardHeader` thành capsule bo tròn đều cả 4 góc `CornerRadius=8` kèm viền ánh sáng `0.3,0.3,0.3,1`, nằm lọt lòng hài hòa bên trong khung Card `CornerRadius=12`.
+  - Đồng bộ `LiquidGlassStatTile` (các ô thống kê Chunks/EPUB/Audio) về `CornerRadius=8` chuẩn Fluent.
+- **Tạo & Nhúng Biểu Tượng Ứng Dụng (Icons8 Fluent Windows Literature Icon)**:
+  - Tải và chuyển đổi biểu tượng Fluent Literature chuẩn Windows đa kích cỡ (`16x16` đến `256x256`) tại [`desktop/app.ico`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/app.ico) và PNG tại [`desktop/app_icon.png`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/app_icon.png).
+  - Cấu hình `<ApplicationIcon>app.ico</ApplicationIcon>` cùng `<Resource Include="app.ico" />`, thực hiện `dotnet clean` và `dotnet build` để Windows Compiler nhúng trực tiếp PE Icon Header vào file `.exe`.
+  - Gửi tín hiệu `SHChangeNotify` refresh Windows Explorer Icon Cache.
+- **Fix Compiler Warning & Cải thiện độ rõ nét của chữ**:
+  - Loại bỏ `DropShadowEffect` gây rasterization nhòe chữ trên card.
+  - Chuẩn hóa nền `BookCardHeader` giúp tiêu đề sách trên cả 3 trang (`BooksPage Input`, `BooksPage Output`, `AudioPage`) hiển thị sắc nét và rõ ràng.
+  - Khắc phục triệt để warning CS4014 tại [`EpubPreviewWindow.xaml.cs`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/EpubPreviewWindow.xaml.cs).
+  - Build `dotnet build` đạt **0 Error(s), 0 Warning(s)**.
+
+### File đổi
+- `desktop/app.ico`, `desktop/app_icon.png`
+- `desktop/TranslateBook.csproj`
+- `desktop/Models/BookStatus.cs`
+- `desktop/Services/PythonPipelineService.cs`
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/AudioPage.xaml`
+- `desktop/Views/MainWindow.xaml`
+- `desktop/Views/EpubPreviewWindow.xaml.cs`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không. App desktop đã build sạch sẽ và sẵn sàng chạy.
+
+### Git
+- Chưa commit. Chờ người dùng duyệt.
+
+
+---
+
+## 2026-08-25 - Dich tron 我在豪门的日日夜夜 (晚情) - 76 chunk + EPUB tam ngu
+
+### Đã làm
+- **Pipeline tron tu dau**: EPUB scan 203 trang anh -> extract anh vao working/_ocr_imgs/ (sort numeric) -> OCR MinerU GPU TUNG ANH qua worker nen (whm_ocr_worker.py, subprocess encoding utf-8 errors replace, checkpoint file md per trang trong working/_ocr_imgs/md/, wrapper whm_ocr_run.ps1 Start-Process -File, log working/tmp/whm_ocr.log) -> raw.md 158,682 chars.
+- Detect zh-Hans. QC: phat hien header/footer lap (zhaoshu weixin p6yc30, WO ZAI HAO MEN DE RIRIYE YE) + quang cao zhaoshu bumilu + hash rac c5e5c81400edad -> xa khoi raw.md, chunks text field, progress original_text.
+- FIX skeleton pinyin lech: chunk 0 va 75 co pinyin_text sinh TRUOC khi QC xoa dong quang cao -> chay lai add_pinyin.process_text. Bai hoc: khi xoa dong khoi original_text phai regenerate pinyin_text.
+- Chunk smart ZH min1500/max3000 -> 76 chunk. Glossary 20 thuat ngu merge master (--author van-tinh --genre tieu-thuyet). Skeleton trilingual 76/76. Profile van chuong wo-zai-hao-men-de-ri-ri-ye-ye.md.
+- **Dich 76/76 chunk** bang batch manifest, 16 vong x 4-5 chunk (claim -> dump src_N.txt marker @@CHUNK N@@ -> dich literary theo profile -> apply.py check khop dong + quet Han sot -> batch_qa ok:true -> complete). Fix Han sot bang fix_rN.py replace dict tung vong.
+- Loi so dong hay gap: gop quote-close standalone cua orig; them quote-close khi orig khong co; chen dong dup. Cong cu sigdiff/detail align theo signature IMG/H/q/T giup dinh vi chinh xac nhanh.
+- QA tong the pass: run_pipeline.py --from-step 8 --to-step 8, 76/76 OK.
+- Merge: merge_chunks.py --format trilingual --force --output-dir tuong minh -> rename tamngu.md; vi.md noi translated_text 76 JSON (~438K chars), 0 mojibake/0 Han sot.
+- merge_sentences.py CHO CA HAI (gop cau + bo so trang): vi.md 6010->1469 dong, tamngu.md 34975->23496 dong.
+- Clean heading: xoa 175 heading Trang (+block Trang tri kem), trash heading (chi chua dau cham, OCR rac), dedupe heading trung, chuyen heading nham thanh text thuong. Verify headings sach.
+- metadata.json day du {slug,title,source_file=da-dich,author,language=zh,genre=tieu-thuyet,has_audio=false,has_epub=true,epub_file}.
+- **EPUB tam ngu ~21MB**: build tu tamngu.md (pandoc --toc-depth=2 --epub-embed-font NotoSerifSC-VF.ttf + CSS @font-face patch '../fonts/' trong zip). Copy 195 anh tu working/_ocr_imgs/md/*/auto/images sang output/<sach>/images/.
+- manage_input: move tay EPUB chua-lam/ -> da-dich/.
+
+### File đổi
+- working/{_ocr_imgs,chunks,progress,tmp/whm}/wo-zai-hao-men-de-ri-ri-ye-ye/* (san pham trung gian)
+- output/books/我在豪门的日日夜夜 (晚情)/ (tamngu.md, vi.md, epub 21MB, metadata.json, images/)
+- glossary/master.csv (+20 thuat ngu)
+- docs/STATE.md, docs/session_log.md
+
+### Bai hoc
+- OCR scan per-page can worker nen + checkpoint file per trang; subprocess.run PHAI dat encoding utf-8 errors replace neu khong crash cp1252 sau khi ghi file.
+- Skeleton pinyin PHAI regenerate sau moi lan sua original_text (QC xoa dong).
+- Script clean final: tuyet doi khong xoa block den blank ke tiep (merge_sentences gom paragraph dai khong blank -> xoa sach content). Chi xoa dung dong heading + block trang tri match pattern cu the.
+- Sigdiff align theo chu ky IMG/H/q/T tung dong la cong cu nhanh de tim dong thua/thieu truoc khi apply.
+
+### Con dở
+- Khong con no nao — cuon HOAN TAT (dich + EPUB; KHONG audiobook theo yeu cau user).
+
+### Git
+- Chua commit. Khong co thay doi code — chi san pham (khong commit) + docs.
+

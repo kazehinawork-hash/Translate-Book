@@ -90,6 +90,8 @@ public class PythonPipelineService
     public async Task<bool> RunAudiobookAsync(string slug, string temperature = "0.3",
         string topK = "10", string bitrate = "128k", bool readTitles = true,
         bool merge = false, bool force = false, string chapters = "",
+        bool useGpu = true, int batchSize = 16, bool musicAuto = true,
+        double musicVolume = 0.15, bool isSample = false, int sampleChars = 400,
         CancellationToken ct = default)
     {
         var vieneuPython = Path.Combine(_projectRoot, "working", "venv-vieneu", "Scripts", "python.exe");
@@ -99,11 +101,14 @@ public class PythonPipelineService
             return false;
         }
 
-        var args = $"--slug {slug} --temperature {temperature} --top-k {topK} --bitrate {bitrate}";
+        var args = $"--slug \"{slug}\" --temperature {temperature} --top-k {topK} --bitrate {bitrate}";
+        if (useGpu) args += $" --gpu --batch-size {batchSize}";
+        if (musicAuto) args += $" --music-auto --music-volume {musicVolume.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}";
         if (!readTitles) args += " --no-read-titles";
         if (merge) args += " --merge";
         if (force) args += " --force";
-        if (!string.IsNullOrWhiteSpace(chapters))
+        if (isSample) args += $" --sample --sample-chars {sampleChars}";
+        if (!string.IsNullOrWhiteSpace(chapters) && !isSample)
         {
             var parts = chapters.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length > 0)

@@ -8,6 +8,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>TranslateBook</AssemblyName>
     <RootNamespace>TranslateBook</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,11 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
     <PackageReference Include="VersOne.Epub" Version="3.3.6" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+    <Resource Include="app_icon.png" />
   </ItemGroup>
 
 </Project>

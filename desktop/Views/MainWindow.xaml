@@ -40,126 +40,166 @@
             </ui:TitleBar.Header>
         </ui:TitleBar>
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <!-- Unified Glass Container: Left Nav + Book Content + Realtime Log seamlessly connected in 1 single frame -->
+        <Border x:Name="MainGlassContainer" Grid.Row="1" Margin="8,0,8,8" CornerRadius="12" ClipToBounds="True"
+                BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
+                Background="{DynamicResource GlassBackgroundBrush}">
+            <Border.OpacityMask>
+                <VisualBrush>
+                    <VisualBrush.Visual>
+                        <Border Width="{Binding ActualWidth, ElementName=MainGlassContainer}"
+                                Height="{Binding ActualHeight, ElementName=MainGlassContainer}"
+                                CornerRadius="12" Background="Black"/>
+                    </VisualBrush.Visual>
+                </VisualBrush>
+            </Border.OpacityMask>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" CornerRadius="0,0,0,8" ClipToBounds="True"
-                    Background="{DynamicResource GlassBackgroundBrush}">
-                <ui:NavigationView x:Name="NavView"
-                                   IsPaneOpen="True" OpenPaneLength="220" PaneDisplayMode="Left"
-                                   Margin="0,0,0,4"
+                <!-- Left Nav + Main Page Content -->
+                <ui:NavigationView Grid.Column="0" x:Name="NavView"
+                                   IsPaneOpen="True" OpenPaneLength="210" PaneDisplayMode="Left"
+                                   Margin="0"
                                    Background="Transparent">
                     <ui:NavigationView.MenuItems>
-                    <ui:NavigationViewItem Content="Sách" IsActive="True"
-                                           TargetPageType="{x:Type views:BooksPage}"
-                                           Icon="{ui:SymbolIcon BookOpen24}"/>
-                    <ui:NavigationViewItem Content="Audio" TargetPageType="{x:Type views:AudioPage}"
-                                           Icon="{ui:SymbolIcon Headphones24}"/>
-                </ui:NavigationView.MenuItems>
-                <ui:NavigationView.FooterMenuItems>
-                    <ui:NavigationViewItem IsHitTestVisible="False">
-                        <StackPanel Margin="0,6">
-                            <TextBlock Text="API" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.8"/>
-                            <TextBlock Text="{Binding ActiveProvider, Mode=OneWay}" FontSize="13"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
-                        </StackPanel>
-                    </ui:NavigationViewItem>
-                    <ui:NavigationViewItem Content="Cài đặt" TargetPageType="{x:Type views:ApiPage}"
-                                           Icon="{ui:SymbolIcon Settings24}"/>
-                </ui:NavigationView.FooterMenuItems>
-            </ui:NavigationView>
-            </Border>
+                        <ui:NavigationViewItem Content="Sách" IsActive="True"
+                                               TargetPageType="{x:Type views:BooksPage}"
+                                               Icon="{ui:SymbolIcon BookOpen24}"/>
+                        <ui:NavigationViewItem Content="Audio" TargetPageType="{x:Type views:AudioPage}"
+                                               Icon="{ui:SymbolIcon Headphones24}"/>
+                    </ui:NavigationView.MenuItems>
+                    <ui:NavigationView.FooterMenuItems>
+                        <ui:NavigationViewItem IsHitTestVisible="False">
+                            <StackPanel Margin="0,6">
+                                <TextBlock Text="API" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.8"/>
+                                <TextBlock Text="{Binding ActiveProvider, Mode=OneWay}" FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </ui:NavigationViewItem>
+                        <ui:NavigationViewItem Content="Cài đặt" TargetPageType="{x:Type views:ApiPage}"
+                                               Icon="{ui:SymbolIcon Settings24}"/>
+                    </ui:NavigationView.FooterMenuItems>
+                </ui:NavigationView>
 
-            <!-- Realtime Log — right docked panel (Glass 3.0: match window corners) -->
-            <Border Grid.Column="1" x:Name="LogPanel" Width="300" Margin="0,0,0,4"
-                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
-                    Background="{DynamicResource GlassBackgroundBrush}" CornerRadius="0,8,8,0"
-                    ClipToBounds="True">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Visible"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding LogExpanded}" Value="False">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                <!-- Realtime Log — right docked panel with Smooth Expand/Collapse Animation -->
+                <Border Grid.Column="1" x:Name="LogPanel" Margin="0"
+                        BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1,0,0,0"
+                        Background="{DynamicResource GlassBackgroundBrush}"
+                        ClipToBounds="True">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Width" Value="300"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding LogExpanded}" Value="False">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="36" Duration="0:0:0.25" DecelerationRatio="0.8"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="300" Duration="0:0:0.25" DecelerationRatio="0.8"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <!-- Expanded View -->
+                        <Grid x:Name="LogExpandedArea">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Setter Property="Opacity" Value="1"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LogExpanded}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Opacity" Value="0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                    <!-- Expanded area: header + log body -->
-                    <Grid Grid.Row="0" Grid.RowSpan="2" x:Name="LogExpandedArea">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                            <!-- Panel header: toggle + title + filter + clear + copy -->
+                            <Border Grid.Row="0" Background="{DynamicResource GlassElementBackground2Brush}" Padding="8,6"
+                                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Width="26" Height="26" Cursor="Hand"
+                                            Style="{StaticResource GlassIconButton}"
+                                            ToolTip="Thu Realtime Log (Ctrl+/)"
+                                            Command="{Binding ToggleLogCommand}">
+                                        <ui:SymbolIcon Symbol="ChevronRight24" FontSize="14"/>
+                                    </Button>
+                                    <TextBlock Grid.Column="1" Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="8,0,6,0" Height="26"
+                                                PlaceholderText="Lọc..." Style="{StaticResource InteractiveTextBox}" FontSize="11"
+                                                Text="{Binding LogFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                TextChanged="LogFilterBox_TextChanged"/>
+                                    <Button Grid.Column="3" Content="Xóa" FontSize="11" Padding="8,3" Height="26" Cursor="Hand"
+                                            Style="{StaticResource GlassPlainButton}" Margin="0,0,4,0"
+                                            Click="ClearLogButton_Click"/>
+                                    <Button Grid.Column="4" Width="26" Height="26" Cursor="Hand"
+                                            Style="{StaticResource GlassIconButton}"
+                                            ToolTip="Sao chép toàn bộ log" Click="CopyLogButton_Click">
+                                        <ui:SymbolIcon Symbol="Copy24" FontSize="14"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
 
-                        <!-- Panel header: hamburger toggle + title + actions (Glass 3.0) -->
-                        <Border Grid.Row="0" Background="{DynamicResource GlassBackgroundBrush}" Padding="8,6"
-                                BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1"
-                                CornerRadius="0,8,0,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="&lt;" FontSize="15" Padding="4,0" Width="28" Cursor="Hand"
-                                        ToolTip="Thu Realtime Log (Ctrl+/)"
-                                        Command="{Binding ToggleLogCommand}"/>
-                                <TextBlock Grid.Column="1" Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="8,0,8,0" Height="22"
-                                            PlaceholderText="Lọc..." Style="{StaticResource InteractiveTextBox}" FontSize="10"
-                                            Text="{Binding LogFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            TextChanged="LogFilterBox_TextChanged"/>
-                                <Button Grid.Column="3" Content="Xóa" FontSize="10" Padding="6,2" Cursor="Hand"
-                                        Click="ClearLogButton_Click"/>
-                                <Button Grid.Column="4" Content="📋" FontSize="11" Padding="5,2" Width="26" Cursor="Hand"
-                                        ToolTip="Sao chép log" Click="CopyLogButton_Click"/>
-                            </Grid>
-                        </Border>
+                            <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
+                                          VerticalScrollBarVisibility="Auto">
+                                <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
+                                             FontFamily="Consolas" FontSize="11"
+                                             TextChanged="LogTextBox_TextChanged"/>
+                            </ScrollViewer>
+                        </Grid>
 
-                        <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
-                                      VerticalScrollBarVisibility="Auto">
-                            <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
-                                         FontFamily="Consolas" FontSize="11"
-                                         TextChanged="LogTextBox_TextChanged"/>
-                        </ScrollViewer>
+                        <!-- Collapsed View Button -->
+                        <Grid x:Name="LogCollapsedArea">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Setter Property="Opacity" Value="0"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LogExpanded}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Button Width="26" Height="32" Cursor="Hand"
+                                    Style="{StaticResource GlassCollapseButton}"
+                                    ToolTip="Mở Realtime Log (Ctrl+/)"
+                                    VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,8,0,0"
+                                    Command="{Binding ToggleLogCommand}">
+                                <ui:SymbolIcon Symbol="ChevronLeft24" FontSize="14"/>
+                            </Button>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Border>
-
-            <!-- Collapsed tab — slim vertical bar (match window corners) -->
-            <Border Grid.Column="1" x:Name="LogCollapsedTab" Width="28" Margin="0,0,0,4"
-                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
-                    Background="{DynamicResource GlassBackgroundBrush}" CornerRadius="0,8,8,0"
-                    ClipToBounds="True">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding LogExpanded}" Value="False">
-                                <Setter Property="Visibility" Value="Visible"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Button Content="&gt;" FontSize="16" Width="22" Height="32" Cursor="Hand"
-                        ToolTip="Mở Realtime Log (Ctrl+/)"
-                        VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,10,0,0"
-                        Command="{Binding ToggleLogCommand}"/>
-            </Border>
-        </Grid>
+                </Border>
+            </Grid>
+        </Border>
 
         <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Grid.RowSpan="2" Margin="0,0,12,12"
                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="380"/>

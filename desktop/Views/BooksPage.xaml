@@ -43,20 +43,29 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Glass 3.0 tab headers -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                <RadioButton x:Name="TabInput" Content="Input (Chưa dịch)" IsChecked="True"
-                             Click="TabInput_Click" GroupName="BookTabs" Margin="0,0,8,0"
-                             Style="{StaticResource GlassTabHeader}"/>
-                <RadioButton x:Name="TabOutput" Content="Output (Đã dịch)"
-                             Click="TabOutput_Click" GroupName="BookTabs"
-                             Style="{StaticResource GlassTabHeader}"/>
-            </StackPanel>
+            <!-- Glass 3.0 tab headers container -->
+            <Border Grid.Row="0" Margin="0,0,0,12" Padding="4" HorizontalAlignment="Left"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                    CornerRadius="14">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="TabInput" Content="Input (Chưa dịch)" IsChecked="True"
+                                 Click="TabInput_Click" GroupName="BookTabs" Margin="0,0,4,0"
+                                 Style="{StaticResource GlassTabHeader}"/>
+                    <RadioButton x:Name="TabOutput" Content="Output (Đã dịch)"
+                                 Click="TabOutput_Click" GroupName="BookTabs"
+                                 Style="{StaticResource GlassTabHeader}"/>
+                </StackPanel>
+            </Border>
 
-            <Grid Grid.Row="1" x:Name="InputPanel" Visibility="Visible">
+            <!-- Input Book List Container with elegant rounded glass border -->
+            <Border Grid.Row="1" x:Name="InputPanel" Visibility="Visible"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                    CornerRadius="12" Padding="8" Margin="0,0,0,8">
                 <ScrollViewer x:Name="InputScrollViewer" VerticalScrollBarVisibility="Auto" Background="Transparent">
                     <StackPanel>
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -89,8 +98,7 @@
                                 <ui:Card Margin="6" Width="300" Padding="16" Style="{StaticResource InteractiveCard}">
                                     <StackPanel>
                                         <!-- Header: avatar + title + status -->
-                                        <Border Style="{StaticResource BookCardHeader}"
-                                                Background="{DynamicResource ControlFillColorTertiaryBrush}">
+                                        <Border Style="{StaticResource BookCardHeader}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -107,7 +115,7 @@
                                                     <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="Bold"
                                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="Chưa dịch - đặt vào input/" FontSize="11"
+                                                    <TextBlock Text="{Binding InputCategory, StringFormat='Vị trí: input/{0}'}" FontSize="11"
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                                Margin="0,3,0,0"/>
                                                 </StackPanel>
@@ -136,40 +144,46 @@
                                                 <ColumnDefinition Width="8"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Content="Trích xuất"
-                                                       Icon="{ui:SymbolIcon ArrowDownload24}"
-                                                       ToolTip="Trích xuất text từ file PDF/EPUB"
-                                                       Command="{Binding DataContext.ExtractBookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
-                                            <ui:Button Grid.Column="2" Content="Tạo Glossary"
-                                                       Icon="{ui:SymbolIcon TextBulletList24}"
-                                                       ToolTip="Tạo bảng glossary từ extracted text"
-                                                       Command="{Binding DataContext.GenerateGlossaryCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}">
-                                                <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="IsEnabled" Value="False"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </ui:Button.Style>
-                                            </ui:Button>
+                                            <ui:Button Grid.Column="0" Content="Chỉ Dịch" Icon="{ui:SymbolIcon DocumentText24}"
+                                                       ToolTip="Chỉ dịch sách (Extract → Translate → QA → Merge → EPUB)"
+                                                       HorizontalAlignment="Stretch"
+                                                       Command="{Binding DataContext.RunTranslateOnlyCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                       CommandParameter="{Binding}"/>
+                                            <ui:Button Grid.Column="2" Content="Tạo Audio" Icon="{ui:SymbolIcon Headphones24}"
+                                                       ToolTip="Tạo audiobook bằng VieNeu-TTS (cho sách đã dịch)"
+                                                       HorizontalAlignment="Stretch"
+                                                       Command="{Binding DataContext.RunAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                       CommandParameter="{Binding}"/>
                                         </Grid>
-                                        <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}"
-                                                   Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                   CommandParameter="{Binding}" Margin="0,8,0,0">
+                                        <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" Height="4" Margin="0,10,0,0">
+                                            <ProgressBar.Style>
+                                                <Style TargetType="ProgressBar">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ProgressBar.Style>
+                                        </ProgressBar>
+                                        <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   HorizontalAlignment="Center" Margin="0,4,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}" Margin="0,6,0,0"
+                                                   HorizontalAlignment="Center" Padding="12,2"
+                                                   Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
                                             <ui:Button.Style>
                                                 <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -188,12 +202,16 @@
                     </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
-            </Grid>
+            </Border>
 
-            <Grid Grid.Row="1" x:Name="OutputPanel" Visibility="Collapsed">
+            <!-- Output Book List Container with elegant rounded glass border -->
+            <Border Grid.Row="1" x:Name="OutputPanel" Visibility="Collapsed"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                    CornerRadius="12" Padding="8" Margin="0,0,0,8">
                 <ScrollViewer x:Name="OutputScrollViewer" VerticalScrollBarVisibility="Auto" Background="Transparent">
                     <StackPanel>
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40">
                         <StackPanel.Style>
                             <Style TargetType="StackPanel">
                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -223,8 +241,7 @@
                                 <ui:Card Margin="6" Width="340" Style="{StaticResource InteractiveCard}">
                                     <StackPanel>
                                         <!-- Header: cover/avatar + title + status badge -->
-                                        <Border Style="{StaticResource BookCardHeader}"
-                                                Background="{DynamicResource ControlFillColorTertiaryBrush}">
+                                        <Border Style="{StaticResource BookCardHeader}">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -338,11 +355,22 @@
                                             </Border>
                                         </Grid>
 
-                                        <ui:Button Appearance="Primary" Content="Đọc thử" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
-                                                   HorizontalAlignment="Stretch" Margin="0,12,0,0"
-                                                   ToolTip="Xem trước sách đã dịch (kèm nghe audiobook nếu có)"
-                                                   Command="{Binding DataContext.OpenEpubPreviewCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                   CommandParameter="{Binding}"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ui:Button Grid.Column="0" Appearance="Primary" Content="Đọc thử" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
+                                                       HorizontalAlignment="Stretch"
+                                                       ToolTip="Xem trước sách đã dịch (kèm nghe audiobook nếu có)"
+                                                       Command="{Binding DataContext.OpenEpubPreviewCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                       CommandParameter="{Binding}"/>
+                                            <ui:Button Grid.Column="2" Content="" Icon="{ui:SymbolIcon Folder24}"
+                                                       ToolTip="Mở thư mục sách trong Windows Explorer" Width="38"
+                                                       Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                       CommandParameter="{Binding}"/>
+                                        </Grid>
                                     </StackPanel>
                                 </ui:Card>
                             </DataTemplate>
@@ -350,7 +378,7 @@
                     </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
-            </Grid>
+            </Border>
         </Grid>
     </Grid>
 </Page>

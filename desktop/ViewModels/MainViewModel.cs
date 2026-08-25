@@ -79,6 +79,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _audioMergeChapters;
     [ObservableProperty] private bool _audioForceRegenerate;
     [ObservableProperty] private string _audioChapterInput = "";
+    [ObservableProperty] private bool _audioUseGpu = true;
+    [ObservableProperty] private int _audioBatchSize = 16;
+    [ObservableProperty] private bool _audioMusicAuto = true;
+    [ObservableProperty] private double _audioMusicVolume = 0.15;
 
     private const int MaxLogLines = 2000;
     private CancellationTokenSource? _currentCts;
@@ -126,6 +130,7 @@ public partial class MainViewModel : ObservableObject
 
         LoadBooks();
         LoadApiStatus();
+        _ = LoadVoicesAsync();
     }
 
     private void OnAnyBookBusyChanged() => OnPropertyChanged(nameof(IsBusyAny));
@@ -156,12 +161,18 @@ public partial class MainViewModel : ObservableObject
                 if (ext is ".pdf" or ".epub" or ".docx")
                 {
                     var name = Path.GetFileName(f);
+                    var relDir = Path.GetRelativePath(inputDir, Path.GetDirectoryName(f) ?? inputDir);
+                    var category = relDir.Replace("\\", "/").Split('/')[0];
+                    if (string.IsNullOrEmpty(category) || category == ".") category = "chua-lam";
+
                     InputBooks.Add(new BookStatus
                     {
                         Slug = name,
                         Title = Path.GetFileNameWithoutExtension(f),
                         Source = "input",
                         FilePath = f,
+                        FolderPath = Path.GetDirectoryName(f) ?? inputDir,
+                        InputCategory = category
                     });
                 }
             }
@@ -174,6 +185,30 @@ public partial class MainViewModel : ObservableObject
     private void RefreshBooks()
     {
         LoadBooks();
+    }
+
+    [RelayCommand]
+    private void OpenBookFolder(BookStatus? book)
+    {
+        if (book == null) return;
+        var path = !string.IsNullOrEmpty(book.FolderPath) && Directory.Exists(book.FolderPath)
+            ? book.FolderPath
+            : (!string.IsNullOrEmpty(book.FilePath) && File.Exists(book.FilePath)
+                ? Path.GetDirectoryName(book.FilePath)
+                : Path.Combine(_projectRoot, "output", "books", book.Title));
+
+        if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true
+            });
+        }
+        else
+        {
+            AppendLog($"[Lỗi] Thư mục không tồn tại: {path}", "warning");
+        }
     }
 
     [RelayCommand]
@@ -398,7 +433,7 @@ public partial class MainViewModel : ObservableObject
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
-        AppendLog($"Bắt đầu tạo audio: {book.Slug} (nhiệt độ={AudioTemperature}, top_k={AudioTopK}, bitrate={AudioBitrate})");
+        AppendLog($"Bắt đầu tạo audio: {book.Slug} (GPU={AudioUseGpu}, batch={AudioBatchSize}, music={AudioMusicAuto} v={AudioMusicVolume:0.00}, nhiệt độ={AudioTemperature}, top_k={AudioTopK}, bitrate={AudioBitrate})");
         try
         {
             var ok = await _pipeline.RunAudiobookAsync(
@@ -410,7 +445,13 @@ public partial class MainViewModel : ObservableObject
                 AudioMergeChapters,
                 AudioForceRegenerate,
                 AudioChapterInput,
-                ct);
+                AudioUseGpu,
+                AudioBatchSize,
+                AudioMusicAuto,
+                AudioMusicVolume,
+                isSample: false,
+                sampleChars: 400,
+                ct: ct);
             if (ok) AppendLog($"Audio hoàn thành: {book.Slug}");
             else AppendLog($"[Lỗi] Tạo audio thất bại: {book.Slug}", "error");
         }
@@ -429,6 +470,103 @@ public partial class MainViewModel : ObservableObject
             BusyMessage = "";
             _currentCts = null;
             UpdateBookStatus(book);
+        }
+    }
+
+    [RelayCommand]
+    private async Task GenerateSampleAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        IsVoiceBusy = true;
+        BusyMessage = $"Đang tạo mẫu audio: {book.Slug}...";
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        AppendLog($"Bắt đầu tạo audio mẫu (~30s test): {book.Slug} (GPU={AudioUseGpu}, music={AudioMusicAuto})");
+        try
+        {
+            var ok = await _pipeline.RunAudiobookAsync(
+                book.Slug,
+                AudioTemperature.ToString("0.0"),
+                AudioTopK.ToString(),
+                AudioBitrate,
+                AudioReadTitles,
+                false,
+                true,
+                "",
+                AudioUseGpu,
+                AudioBatchSize,
+                AudioMusicAuto,
+                AudioMusicVolume,
+                isSample: true,
+                sampleChars: 400,
+                ct: ct);
+
+            if (ok)
+            {
+                AppendLog($"Tạo audio mẫu hoàn tất: {book.Slug}");
+                var samplePath = Path.Combine(_projectRoot, "output", "samples", $"{book.Slug}-sample.wav");
+                if (File.Exists(samplePath))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = samplePath,
+                        UseShellExecute = true,
+                    });
+                }
+            }
+            else
+            {
+                AppendLog($"[Lỗi] Tạo audio mẫu thất bại: {book.Slug}", "error");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy bỏ tạo audio mẫu: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            IsVoiceBusy = false;
+            BusyMessage = "";
+            _currentCts = null;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenAudioFolder(BookStatus? book)
+    {
+        if (book == null) return;
+        var baseDir = !string.IsNullOrEmpty(book.FolderPath) && Directory.Exists(book.FolderPath)
+            ? book.FolderPath
+            : Path.Combine(_projectRoot, "output", "books", book.Title);
+
+        var audioDir = Path.Combine(baseDir, "audiobook");
+        if (!Directory.Exists(audioDir))
+            audioDir = baseDir;
+
+        if (Directory.Exists(audioDir))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = audioDir,
+                UseShellExecute = true,
+            });
+        }
+        else
+        {
+            AppendLog($"[Lỗi] Thư mục audiobook chưa tồn tại: {audioDir}", "warning");
         }
     }
 
@@ -610,6 +748,7 @@ public partial class MainViewModel : ObservableObject
             Slug = slug,
             Title = displayTitle,
             Source = source,
+            FolderPath = bookDir,
             HasViMd = File.Exists(viMd),
             HasEpub = File.Exists(epub),
             Mp3Count = mp3Count,

@@ -19,8 +19,8 @@ public partial class App : Application
         {
             var logPath = Path.Combine(LocalAppData, "crash.log");
             File.AppendAllText(logPath, $"[UI Thread] {DateTime.Now}\n{e.Exception}\n\n");
+            // Tránh lặp MessageBox vô hạn gây StackOverflow
             e.Handled = true;
-            MessageBox.Show($"Đã xảy ra lỗi:\n{e.Exception.Message}", "Lỗi hệ thống", MessageBoxButton.OK, MessageBoxImage.Error);
         };
         AppDomain.CurrentDomain.UnhandledException += (s, e) =>
         {
