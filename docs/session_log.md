@@ -1897,6 +1897,9 @@
 - **Hiệu ứng Kính Mờ (Windhawk Liquid Glass 3.0 Specs)**:
   - Đồng bộ `WindowBackdropType.Acrylic` trên cả XAML và `SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true)` trong [`MainWindow.xaml.cs`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/MainWindow.xaml.cs).
   - Áp dụng đầy đủ thông số mẫu Windhawk: Gradient borders (`#50808080 → #50404040 → #50808080`), viền phần tử (`ElementBorderThickness="0.3,0.3,0.3,1"`), bo góc chuẩn (`CornerRadius=12`, `ElementCornerRadius=8`), vệt phản xạ ánh sáng trắng viền chéo (`#80ffffff → #35ffffff → #80ffffff`).
+- **Khắc phục logic tính toán Tiến độ % (`BookStatus.cs`)**:
+  - **Nguyên nhân trước đây**: Công thức tính `ProgressPercent` chỉ dựa vào `(ProgressCount / TotalChunks) * 100`. Các cuốn sách trong tab Output đã dịch xong hoàn toàn ra file `output/books/<tên-sách>/final/vi.md` và `tamngu.md`, nhưng thư mục trung gian `working/chunks/<slug>` không lưu giữ số chunk ban đầu khiến `TotalChunks = 0` dẫn đến hiển thị `0%`.
+  - **Giải pháp**: Cập nhật công thức chuẩn xác `ProgressPercent => HasViMd ? 100 : (TotalChunks > 0 ? (double)ProgressCount / TotalChunks * 100 : 0)`. Khi cuốn sách đã có bản dịch tiếng Việt hoàn tất (`HasViMd = true`), thanh tiến độ và nhãn % sẽ hiển thị chuẩn xác **`100%`** và trạng thái **`Hoàn thành`**. Khi đang trong quá trình dịch dở, % sẽ tăng dần theo số chunk thực tế.
 - **Nâng cấp toàn diện biểu tượng StatTile Tab Output (`BooksPage.xaml`)**:
   - Thay thế toàn bộ emoji thô (`📄`, `🎧`) trên 3 thẻ thống kê **Chunks**, **EPUB**, **Audio** bằng các **`ui:SymbolIcon` Fluent chuẩn**:
     - **Chunks**: Icon **`DocumentBulletList24`** sắc nét màu Accent.
