@@ -317,7 +317,7 @@
                                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,2"/>
                                         </Grid>
 
-                                        <!-- Stat tiles: Chunks / EPUB / Audio -->
+                                        <!-- Stat tiles: Chunks / EPUB / Audio (Fluent Icons) -->
                                         <Grid Margin="0,10,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
@@ -328,27 +328,33 @@
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Style="{StaticResource StatTile}">
                                                 <StackPanel HorizontalAlignment="Center">
-                                                    <TextBlock Text="📄" FontSize="13" HorizontalAlignment="Center"/>
+                                                    <ui:SymbolIcon Symbol="DocumentBulletList24" FontSize="16"
+                                                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                                   HorizontalAlignment="Center"/>
                                                     <TextBlock Text="{Binding ProgressCount, StringFormat={}{0}}" FontSize="13" FontWeight="Bold"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
                                                     <TextBlock Text="Chunks" FontSize="10"
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
                                                 </StackPanel>
                                             </Border>
                                             <Border Grid.Column="2" Style="{StaticResource StatTile}">
                                                 <StackPanel HorizontalAlignment="Center">
-                                                    <TextBlock Text="{Binding HasEpub, Converter={StaticResource BoolToEmojiConverter}}" FontSize="13" HorizontalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding HasEpub}" FontSize="13" FontWeight="Bold"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                    <ui:SymbolIcon Symbol="Book24" FontSize="16"
+                                                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                                   HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding HasEpub, Converter={StaticResource BoolToEmojiConverter}}" FontSize="13" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
                                                     <TextBlock Text="EPUB" FontSize="10"
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
                                                 </StackPanel>
                                             </Border>
                                             <Border Grid.Column="4" Style="{StaticResource StatTile}">
                                                 <StackPanel HorizontalAlignment="Center">
-                                                    <TextBlock Text="🎧" FontSize="13" HorizontalAlignment="Center"/>
+                                                    <ui:SymbolIcon Symbol="Headphones24" FontSize="16"
+                                                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                                   HorizontalAlignment="Center"/>
                                                     <TextBlock Text="{Binding Mp3Count}" FontSize="13" FontWeight="Bold"
-                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
                                                     <TextBlock Text="Audio" FontSize="10"
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
                                                 </StackPanel>

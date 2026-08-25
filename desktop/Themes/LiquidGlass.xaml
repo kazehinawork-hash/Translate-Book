@@ -302,8 +302,10 @@
     <Style x:Key="GlassComboBox" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
         <Setter Property="Background" Value="{DynamicResource GlassElementBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderThickness" Value="0.3,0.3,0.3,1"/>
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+        <Setter Property="Padding" Value="8,3,4,3"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
     <!-- ===== 15. GLASS PLAIN BUTTON (for non-ui:Button elements) ===== -->

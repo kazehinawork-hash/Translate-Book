@@ -1897,9 +1897,15 @@
 - **Hiệu ứng Kính Mờ (Windhawk Liquid Glass 3.0 Specs)**:
   - Đồng bộ `WindowBackdropType.Acrylic` trên cả XAML và `SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true)` trong [`MainWindow.xaml.cs`](file:///E:/OneDrive/onyx/Translate%20Book/desktop/Views/MainWindow.xaml.cs).
   - Áp dụng đầy đủ thông số mẫu Windhawk: Gradient borders (`#50808080 → #50404040 → #50808080`), viền phần tử (`ElementBorderThickness="0.3,0.3,0.3,1"`), bo góc chuẩn (`CornerRadius=12`, `ElementCornerRadius=8`), vệt phản xạ ánh sáng trắng viền chéo (`#80ffffff → #35ffffff → #80ffffff`).
+- **Nâng cấp toàn diện biểu tượng StatTile Tab Output (`BooksPage.xaml`)**:
+  - Thay thế toàn bộ emoji thô (`📄`, `🎧`) trên 3 thẻ thống kê **Chunks**, **EPUB**, **Audio** bằng các **`ui:SymbolIcon` Fluent chuẩn**:
+    - **Chunks**: Icon **`DocumentBulletList24`** sắc nét màu Accent.
+    - **EPUB**: Icon **`Book24`** tinh tế màu Accent.
+    - **Audio**: Icon **`Headphones24`** đồng bộ màu Accent.
+  - Cân chỉnh khoảng cách và typography số lượng (`13px Bold`) cùng nhãn phụ (`10px Secondary`), tạo cảm giác hiện đại, thanh thoát và cao cấp đồng bộ với toàn bộ giao diện Windhawk Liquid Glass.
 - **Rà soát & Hoàn thiện cửa sổ Đọc thử EPUB (`EpubPreviewWindow.xaml` & `EpubPreviewWindow.xaml.cs`)**:
-  - **Mở rộng kích thước ô Box Toolbar (100% Full Text Visibility)**: Mở rộng chiều rộng các ô ComboBox chọn phông chữ lên **`175px`**, độ rộng lề lên **`135px`**, khoảng cách dòng lên **`125px`** và ô tìm kiếm lên **`180px`**; đồng bộ font `12px` chuẩn Fluent, khắc phục hoàn toàn tình trạng cắt cụt chữ trong dropdown và ô tìm kiếm.
-  - **Toolbar kính mờ Liquid Glass**: Đồng bộ style `GlassComboBox` cho bộ 3 chọn Typography (Phông chữ Segoe UI/Serif/KaiTi/Mono, Độ rộng lề trang 650px - Toàn màn hình, Khoảng cách dòng 1.5x - 2.2x); mở rộng ô tìm kiếm `180px` với `InteractiveTextBox`.
+  - **Tối ưu Padding & Kích thước ô Box Toolbar (100% Full Visibility)**: Tinh chỉnh `GlassComboBox` style với `Padding="8,3,4,3"` và `VerticalContentAlignment="Center"`, mở rộng chiều rộng ô Phông chữ lên **`190px`**, Độ rộng lề lên **`145px`**, Khoảng cách dòng lên **`135px`**, ô Tìm kiếm lên **`190px`** và rút gọn nhãn item (`Có chân (Serif SC)`, `Cổ điển (KaiTi)`) giúp toàn bộ chữ hiển thị vừa vặn, thoáng đãng và không bao giờ bị cắt cụt.
+  - **Toolbar kính mờ Liquid Glass**: Đồng bộ style `GlassComboBox` cho bộ 3 chọn Typography (Phông chữ Segoe UI/Serif/KaiTi/Mono, Độ rộng lề trang 650px - Toàn màn hình, Khoảng cách dòng 1.5x - 2.2x); mở rộng ô tìm kiếm `190px` với `InteractiveTextBox`.
   - **Tích hợp Audiobook Player Bar thông minh**: Tự động quét thư mục `audiobook/*.mp3` của cuốn sách khi mở cửa sổ đọc thử; đồng bộ mục lục TOC với audio theo từng chương (`ch01.mp3`, `ch02.mp3`...), hỗ trợ tua thanh trượt, điều chỉnh âm lượng và phát/tạm dừng mượt mà.
   - **Hiển thị & Tìm kiếm**: Render qua WebView2 với Dark Theme CSS chuẩn, hỗ trợ bôi vàng từ khóa tìm kiếm (`BtnSearchNext`, `BtnSearchPrev`), zoom từ 50% đến 200%, tự động lưu và khôi phục vị trí đọc gần nhất.
 - **Rà soát & Bổ sung tính năng còn thiếu trên UI Tab Audio (`AudioPage.xaml`, `MainViewModel.cs`, `PythonPipelineService.cs`)**:
@@ -1991,4 +1997,30 @@
 
 ### Git
 - Chua commit. Khong co thay doi code — chi san pham (khong commit) + docs.
+
+
+---
+
+## 2026-08-25 (phien 4) - Audiobook 做一个有境界的女子 (34 chuong, GPU + music-auto)
+
+### Đã làm
+- **Don dep vi.md cho audio**: cat front-matter 6 dong (title, author, lang, source, slug, separator) -> 2643 dong sach, 381K chars. Khong co back-matter. Khong co PART divider.
+- **Detect chapters**: 34 chuong (35 ## essays, 1 H1 title removed).
+- **Generate 34/34 chuong**: `audiobook_long.py --slug zuo-yi-ge-you-jing-jie-de-nu-zi --gpu --batch-size 16 --music-auto --music-volume 0.15 --temperature 0.3 --top-k 10` (voice van_tinh). RTF 0.37, ~172 phut gen, **6.5 gio audio (160MB)**, music-auto AI 34 bai lofi theo noi dung tung chuong. Chay 2 lan (timeout 2h lan 1 het chuong 24, resume tu chuong 25).
+- **QA ffprobe**: 34/34 MP3 hop le.
+- **metadata.json**: them has_audio=true.
+- **manage_input**: EPUB move tay `da-dich/` -> `da-audio/`.
+- **STATE.md**: cap nhat hang jingjie (audiobook 34/34 hoan tat).
+
+### File doi
+- output/books/做一个有境界的女子  不自轻,不自弃 (晚情)/audiobook/ch01..34.mp3, metadata.json
+- output/books/做一个有境界的女子  不自轻, no self,不自弃 (晚情)/final/vi.md (da don dep cho audio; backup working/tmp/zy3/vi_backup_jingjie.md)
+- input/da-audio/ (EPUB)
+- docs/STATE.md, docs/session_log.md
+
+### Con dở
+- Khong (sach hoan tat dich + EPUB + audio).
+
+### Git
+- Chua commit. Chi san pham (khong commit) + docs.
 

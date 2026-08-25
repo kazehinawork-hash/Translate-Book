@@ -38,17 +38,17 @@
                             Margin="0,0,12,0"/>
 
                     <!-- Typography: Font Selector -->
-                    <ComboBox x:Name="CmbFont" Width="175" Height="32" Margin="0,0,8,0" FontSize="12"
+                    <ComboBox x:Name="CmbFont" Width="190" Height="32" Margin="0,0,8,0" FontSize="12"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbFont_SelectionChanged" ToolTip="Chọn kiểu phông chữ">
                         <ComboBoxItem Content="Mặc định (Segoe UI)" IsSelected="True" Tag="'Segoe UI', 'Microsoft YaHei', Arial, sans-serif"/>
-                        <ComboBoxItem Content="Có chân (Serif)" Tag="'Noto Serif SC', 'Georgia', 'Times New Roman', serif"/>
-                        <ComboBoxItem Content="Thư pháp / Cổ điển" Tag="'KaiTi', 'STKaiti', 'Cambria', serif"/>
+                        <ComboBoxItem Content="Có chân (Serif SC)" Tag="'Noto Serif SC', 'Georgia', 'Times New Roman', serif"/>
+                        <ComboBoxItem Content="Cổ điển (KaiTi)" Tag="'KaiTi', 'STKaiti', 'Cambria', serif"/>
                         <ComboBoxItem Content="Đơn cách (Mono)" Tag="'Consolas', 'Courier New', monospace"/>
                     </ComboBox>
 
                     <!-- Typography: Width Selector -->
-                    <ComboBox x:Name="CmbWidth" Width="135" Height="32" Margin="0,0,8,0" FontSize="12"
+                    <ComboBox x:Name="CmbWidth" Width="145" Height="32" Margin="0,0,8,0" FontSize="12"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbWidth_SelectionChanged" ToolTip="Độ rộng lề trang sách">
                         <ComboBoxItem Content="Gọn (650px)" Tag="650px"/>
@@ -58,7 +58,7 @@
                     </ComboBox>
 
                     <!-- Typography: Line Height -->
-                    <ComboBox x:Name="CmbLineHeight" Width="125" Height="32" Margin="0,0,12,0" FontSize="12"
+                    <ComboBox x:Name="CmbLineHeight" Width="135" Height="32" Margin="0,0,12,0" FontSize="12"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbLineHeight_SelectionChanged" ToolTip="Khoảng cách dòng">
                         <ComboBoxItem Content="Dày (1.5x)" Tag="1.5"/>
@@ -66,7 +66,7 @@
                         <ComboBoxItem Content="Thoáng (2.2x)" Tag="2.2"/>
                     </ComboBox>
 
-                    <ui:TextBox x:Name="SearchBox" Width="180" Height="32" FontSize="12" PlaceholderText="Tìm kiếm trong sách..."
+                    <ui:TextBox x:Name="SearchBox" Width="190" Height="32" FontSize="12" PlaceholderText="Tìm kiếm trong sách..."
                                  TextChanged="SearchBox_TextChanged"
                                  Style="{StaticResource InteractiveTextBox}"/>
 
