@@ -14,52 +14,56 @@
         </Grid.RowDefinitions>
 
         <!-- Header & Main Audio Config Pill Panel -->
-        <Border Grid.Row="0" Margin="0,0,0,12" Padding="16,14"
+        <Border Grid.Row="0" Margin="0,0,0,12" Padding="14,12"
                 Background="{DynamicResource GlassElementBackground2Brush}"
                 BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
                 CornerRadius="12">
             <StackPanel>
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,6">
                         <ui:SymbolIcon Symbol="Headphones24" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
                         <TextBlock Text="Cấu hình Audiobook (VieNeu-TTS Turbo)" FontSize="15" FontWeight="Bold"
                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center" HorizontalAlignment="Right">
                         <Border Background="{DynamicResource GlassElementBackgroundBrush}"
                                 BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
-                                CornerRadius="8" Padding="12,5" Margin="0,0,10,0">
-                            <CheckBox Content="Sử dụng GPU RTX (--gpu)" IsChecked="{Binding AudioUseGpu}" FontSize="12" FontWeight="SemiBold"/>
+                                CornerRadius="8" Padding="10,4" Margin="0,0,6,6">
+                            <CheckBox Content="GPU RTX (--gpu)" IsChecked="{Binding AudioUseGpu}" FontSize="11.5" FontWeight="SemiBold"/>
                         </Border>
                         <Border Background="{DynamicResource GlassElementBackgroundBrush}"
                                 BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
-                                CornerRadius="8" Padding="12,5">
-                            <CheckBox Content="Nhạc nền AI (--music-auto)" IsChecked="{Binding AudioMusicAuto}" FontSize="12" FontWeight="SemiBold"/>
+                                CornerRadius="8" Padding="10,4" Margin="0,0,6,6">
+                            <CheckBox Content="Nhạc nền AI" IsChecked="{Binding AudioMusicAuto}" FontSize="11.5" FontWeight="SemiBold"/>
                         </Border>
-                    </StackPanel>
-                </Grid>
+                        <Button Height="28" Padding="8,0" FontSize="11" Style="{StaticResource GlassPlainButton}" Margin="0,0,0,6"
+                                ToolTip="Khôi phục toàn bộ thông số về chuẩn dự án (GPU RTX, Batch 16, Nhạc 15%, Temp 0.3, Top-K 10)"
+                                Command="{Binding ResetAudioConfigCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowCounterclockwise24" FontSize="12" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,4,0"/>
+                                <TextBlock Text="Chuẩn dự án" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </DockPanel>
 
                 <WrapPanel VerticalAlignment="Center">
-                    <StackPanel Margin="0,0,16,10">
-                        <TextBlock Text="Độ sáng tạo" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
-                        <ui:NumberBox Width="120" Height="32" FontSize="12" Value="{Binding AudioTemperature, Mode=TwoWay}"
+                    <StackPanel Margin="0,0,12,8">
+                        <TextBlock Text="Độ sáng tạo" FontSize="11.5"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:NumberBox Width="105" Height="30" FontSize="11.5" Value="{Binding AudioTemperature, Mode=TwoWay}"
                                       Minimum="0" Maximum="2" SmallChange="0.1" ToolTip="Giá trị thấp cho giọng đọc ổn định hơn"/>
                     </StackPanel>
-                    <StackPanel Margin="0,0,16,10">
-                        <TextBlock Text="Top-K" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
-                        <ui:NumberBox Width="120" Height="32" FontSize="12" Value="{Binding AudioTopK, Mode=TwoWay}"
+                    <StackPanel Margin="0,0,12,8">
+                        <TextBlock Text="Top-K" FontSize="11.5"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:NumberBox Width="105" Height="30" FontSize="11.5" Value="{Binding AudioTopK, Mode=TwoWay}"
                                       Minimum="1" Maximum="100" SmallChange="1" ToolTip="Giá trị thấp cho cách đọc nhất quán hơn"/>
                     </StackPanel>
-                    <StackPanel Margin="0,0,16,10">
-                        <TextBlock Text="Chất lượng MP3" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
-                        <ComboBox Width="120" Height="32" FontSize="12" SelectedValue="{Binding AudioBitrate, Mode=TwoWay}" SelectedValuePath="Content"
+                    <StackPanel Margin="0,0,12,8">
+                        <TextBlock Text="Chất lượng MP3" FontSize="11.5"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ComboBox Width="110" Height="30" FontSize="11.5" SelectedValue="{Binding AudioBitrate, Mode=TwoWay}" SelectedValuePath="Content"
                                   Style="{StaticResource GlassComboBox}">
                             <ComboBoxItem Content="96k"/>
                             <ComboBoxItem Content="128k"/>
@@ -67,108 +71,115 @@
                             <ComboBoxItem Content="256k"/>
                         </ComboBox>
                     </StackPanel>
-                    <StackPanel Margin="0,0,16,10">
-                        <TextBlock Text="Batch Size (GPU)" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
-                        <ui:NumberBox Width="125" Height="32" FontSize="12" Value="{Binding AudioBatchSize, Mode=TwoWay}"
+                    <StackPanel Margin="0,0,12,8">
+                        <TextBlock Text="Batch Size (GPU)" FontSize="11.5"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:NumberBox Width="115" Height="30" FontSize="11.5" Value="{Binding AudioBatchSize, Mode=TwoWay}"
                                       Minimum="1" Maximum="64" SmallChange="2" ToolTip="Chuẩn GPU RTX 3060: 16 (tăng tốc 2x)"/>
                     </StackPanel>
-                    <StackPanel Margin="0,0,16,10">
-                        <TextBlock Text="Âm lượng nhạc nền" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
-                        <ui:NumberBox Width="130" Height="32" FontSize="12" Value="{Binding AudioMusicVolume, Mode=TwoWay}"
+                    <StackPanel Margin="0,0,12,8">
+                        <TextBlock Text="Âm lượng nhạc nền" FontSize="11.5"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4"/>
+                        <ui:NumberBox Width="120" Height="30" FontSize="11.5" Value="{Binding AudioMusicVolume, Mode=TwoWay}"
                                       Minimum="0.0" Maximum="1.0" SmallChange="0.05" ToolTip="Chuẩn: 0.15 (nhạc lofi êm dịu dưới giọng đọc)"/>
                     </StackPanel>
-                    <StackPanel Margin="0,0,0,10" VerticalAlignment="Bottom" Orientation="Horizontal">
-                        <CheckBox Content="Đọc tiêu đề" IsChecked="{Binding AudioReadTitles}" FontSize="12" Margin="0,0,14,8"/>
-                        <CheckBox Content="Gộp 1 file MP3" IsChecked="{Binding AudioMergeChapters}" FontSize="12" Margin="0,0,14,8"/>
-                        <CheckBox Content="Tạo lại (--force)" IsChecked="{Binding AudioForceRegenerate}" FontSize="12" Margin="0,0,0,8"/>
+                    <StackPanel Margin="0,0,0,8" VerticalAlignment="Bottom" Orientation="Horizontal">
+                        <CheckBox Content="Đọc tiêu đề" IsChecked="{Binding AudioReadTitles}" FontSize="11.5" Margin="0,0,10,6"/>
+                        <CheckBox Content="Gộp 1 MP3" IsChecked="{Binding AudioMergeChapters}" FontSize="11.5" Margin="0,0,10,6"/>
+                        <CheckBox Content="Tạo lại (--force)" IsChecked="{Binding AudioForceRegenerate}" FontSize="11.5" Margin="0,0,0,6"/>
                     </StackPanel>
                 </WrapPanel>
             </StackPanel>
         </Border>
 
-        <!-- Voice Management Section -->
+        <!-- Voice Management Section — Dual Adaptive Glass Cards -->
         <Grid Grid.Row="1" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="14"/>
-                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <ui:Card Grid.Column="0" Padding="16,12" Style="{StaticResource InteractiveCard}">
+            
+            <!-- Card 1: Quản lý giọng đọc -->
+            <Border Grid.Column="0" Padding="14,12"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                    CornerRadius="12">
                 <StackPanel>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:SymbolIcon Symbol="Speaker224" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
-                            <TextBlock Text="Quản lý giọng đọc" FontSize="15" FontWeight="Bold"
+                    <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="Speaker224" FontSize="16" Margin="0,0,6,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <TextBlock Text="Quản lý giọng đọc" FontSize="14" FontWeight="Bold"
                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                         </StackPanel>
-                        <Button Grid.Column="1" Width="28" Height="28" Style="{StaticResource GlassIconButton}"
+                        <Button DockPanel.Dock="Right" Width="26" Height="26" Style="{StaticResource GlassIconButton}"
                                 ToolTip="Tải lại danh sách giọng" Command="{Binding LoadVoicesCommand}">
-                            <ui:SymbolIcon Symbol="ArrowClockwise24" FontSize="14"/>
+                            <ui:SymbolIcon Symbol="ArrowClockwise24" FontSize="13"/>
                         </Button>
-                    </Grid>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Giọng active:" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                        <ComboBox Grid.Column="1" Height="32" FontSize="12" ItemsSource="{Binding VoiceList}"
-                                  SelectedItem="{Binding SelectedVoice}" Margin="0,0,8,0"
+                    </DockPanel>
+                    
+                    <DockPanel LastChildFill="True" Margin="0,0,0,8">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="Đặt chính" FontSize="11" Height="28" Padding="8,0" Margin="4,0,4,0"
+                                    Style="{StaticResource GlassPlainButton}" Command="{Binding SetActiveVoiceCommand}"/>
+                            <Button Width="28" Height="28" Style="{StaticResource GlassIconButton}"
+                                    ToolTip="Nghe thử giọng đọc" Command="{Binding PreviewVoiceCommand}">
+                                <ui:SymbolIcon Symbol="Play24" FontSize="13" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            </Button>
+                        </StackPanel>
+                        <ComboBox Height="28" FontSize="11.5" ItemsSource="{Binding VoiceList}"
+                                  SelectedItem="{Binding SelectedVoice}" Margin="0,0,2,0"
                                   Style="{StaticResource GlassComboBox}"/>
-                        <Button Grid.Column="2" Content="Đặt làm giọng chính" FontSize="12" Height="32" Padding="12,0" Margin="0,0,6,0"
-                                Style="{StaticResource GlassPlainButton}" Command="{Binding SetActiveVoiceCommand}"/>
-                        <Button Grid.Column="3" Width="32" Height="32" Style="{StaticResource GlassIconButton}"
-                                ToolTip="Nghe thử giọng đọc" Command="{Binding PreviewVoiceCommand}">
-                            <ui:SymbolIcon Symbol="Play24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
-                        </Button>
-                    </Grid>
-                    <ui:TextBox Style="{StaticResource InteractiveTextBox}" Height="32" FontSize="12"
+                    </DockPanel>
+                    
+                    <ui:TextBox Style="{StaticResource InteractiveTextBox}" Height="28" FontSize="11"
                                 PlaceholderText="Nhập câu đọc thử giọng..."
                                 Text="{Binding VoicePreviewText, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
-            </ui:Card>
-            <ui:Card Grid.Column="2" Padding="16,12" Style="{StaticResource InteractiveCard}">
+            </Border>
+
+            <!-- Card 2: Clone giọng mới -->
+            <Border Grid.Column="2" Padding="14,12"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                    CornerRadius="12">
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="MicSparkle24" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
-                        <TextBlock Text="Clone giọng mới (3-8s audio)" FontSize="15" FontWeight="Bold"
-                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                    </StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="MicSparkle24" FontSize="16" Margin="0,0,6,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <TextBlock Text="Clone giọng mới" FontSize="14" FontWeight="Bold"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource GlassElementBackgroundBrush}"
+                                BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3"
+                                CornerRadius="4" Padding="6,1">
+                            <TextBlock Text="3-8s audio" FontSize="10.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </Border>
+                    </DockPanel>
+                    
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="70"/>
                         </Grid.ColumnDefinitions>
-                        <ui:TextBox Grid.Column="0" Style="{StaticResource InteractiveTextBox}" Height="32" FontSize="12" PlaceholderText="Tên giọng"
+                        <ui:TextBox Grid.Column="0" Style="{StaticResource InteractiveTextBox}" Height="28" FontSize="11" PlaceholderText="Tên giọng..."
                                     Text="{Binding VoiceName, UpdateSourceTrigger=PropertyChanged}"/>
-                        <ComboBox Grid.Column="2" Height="32" FontSize="12" SelectedValue="{Binding VoiceGender, Mode=TwoWay}" SelectedValuePath="Tag"
+                        <ComboBox Grid.Column="2" Height="28" FontSize="11" SelectedValue="{Binding VoiceGender, Mode=TwoWay}" SelectedValuePath="Tag"
                                   ToolTip="Giới tính giọng" Style="{StaticResource GlassComboBox}">
                             <ComboBoxItem Content="Nữ" Tag="female"/>
                             <ComboBoxItem Content="Nam" Tag="male"/>
                         </ComboBox>
                     </Grid>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <ui:TextBox Grid.Column="0" Style="{StaticResource InteractiveTextBox}" Height="32" FontSize="12" PlaceholderText="Mô tả giọng (tùy chọn)"
-                                    Text="{Binding VoiceDescription, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0"/>
-                        <Button Grid.Column="1" Content="Trích xuất" Height="32" Padding="14,0" FontSize="12"
+                    
+                    <DockPanel LastChildFill="True">
+                        <Button DockPanel.Dock="Right" Content="Trích xuất" Height="28" Padding="10,0" FontSize="11" Margin="6,0,0,0"
                                 Style="{StaticResource GlassPlainButton}" Command="{Binding ExtractVoiceCommand}"/>
-                    </Grid>
+                        <ui:TextBox Style="{StaticResource InteractiveTextBox}" Height="28" FontSize="11" PlaceholderText="Mô tả giọng (tùy chọn)..."
+                                    Text="{Binding VoiceDescription, UpdateSourceTrigger=PropertyChanged}"/>
+                    </DockPanel>
                 </StackPanel>
-            </ui:Card>
+            </Border>
         </Grid>
 
         <!-- Book List Container with elegant rounded glass border -->
@@ -227,10 +238,16 @@
                                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
                                                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                                        <TextBlock Text="Audiobook: " FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        <TextBlock Text="Audio: " FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                                         <TextBlock Text="{Binding Mp3Count, StringFormat='{}{0} chapters', Mode=OneWay}"
                                                                    FontSize="11" FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,10,0"/>
+                                                        <Border Background="{DynamicResource GlassButtonNormalBrush}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <ui:SymbolIcon Symbol="MicSparkle24" FontSize="11" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,3,0"/>
+                                                                <TextBlock Text="van_tinh" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                            </StackPanel>
+                                                        </Border>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Grid>
@@ -256,7 +273,7 @@
                                         </Grid>
 
                                         <ui:TextBox PlaceholderText="Chương (VD: 1 2 3 hoặc để trống = tất cả)"
-                                                    Text="{Binding DataContext.AudioChapterInput, RelativeSource={RelativeSource AncestorType={x:Type Window}}, UpdateSourceTrigger=PropertyChanged}"
+                                                    Text="{Binding ChapterInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                     Style="{StaticResource InteractiveTextBox}"
                                                     Margin="0,6,0,0" Height="28" FontSize="11"/>
 
@@ -270,7 +287,7 @@
                                             </Grid.ColumnDefinitions>
                                             <ui:Button Grid.Column="0" Appearance="Primary" Content="Tạo Audio"
                                                        Icon="{ui:SymbolIcon Headphones24}" FontSize="12"
-                                                       Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                       Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                        CommandParameter="{Binding}">
                                                 <ui:Button.Style>
                                                     <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
@@ -286,20 +303,20 @@
                                             <Button Grid.Column="2" Width="34" Height="34"
                                                     Style="{StaticResource GlassIconButton}"
                                                     ToolTip="Nghe thử mẫu ~30s giọng đọc &amp; nhạc nền"
-                                                    Command="{Binding DataContext.GenerateSampleCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                    Command="{Binding DataContext.GenerateSampleCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                     CommandParameter="{Binding}">
                                                 <ui:SymbolIcon Symbol="Play24" FontSize="15" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
                                             </Button>
                                             <Button Grid.Column="4" Width="34" Height="34"
                                                     Style="{StaticResource GlassIconButton}"
                                                     ToolTip="Mở thư mục Audiobook (MP3)"
-                                                    Command="{Binding DataContext.OpenAudioFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                    Command="{Binding DataContext.OpenAudioFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                     CommandParameter="{Binding}">
                                                 <ui:SymbolIcon Symbol="Folder24" FontSize="15"/>
                                             </Button>
                                         </Grid>
                                         <ui:Button Content="Hủy tạo" Icon="{ui:SymbolIcon Dismiss24}"
-                                                   Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                   Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                    CommandParameter="{Binding}" Margin="0,6,0,0" HorizontalAlignment="Center" Padding="12,2">
                                             <ui:Button.Style>
                                                 <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">

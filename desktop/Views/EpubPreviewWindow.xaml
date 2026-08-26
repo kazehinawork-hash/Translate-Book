@@ -4,7 +4,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:models="clr-namespace:TranslateBook.Models"
-        Title="EPUB Preview" Height="700" Width="1000" MinWidth="800" MinHeight="600"
+        Title="EPUB Preview" Height="720" Width="1100" MinWidth="880" MinHeight="600"
         WindowStartupLocation="CenterOwner"
         WindowBackdropType="Acrylic" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round"
         PreviewKeyDown="Window_PreviewKeyDown">
@@ -20,35 +20,44 @@
         <ui:TitleBar Grid.Row="0" Title="Đọc thử Sách EPUB" Icon="{ui:SymbolIcon BookOpen24}"/>
 
         <!-- Toolbar: search, zoom, theme refresh (Glass 3.0) -->
-        <Border Grid.Row="1" Background="{DynamicResource GlassBackgroundBrush}" Padding="10,8"
+        <Border Grid.Row="1" Background="{DynamicResource GlassBackgroundBrush}" Padding="8,6"
                 BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <ui:Button x:Name="BtnRefreshTheme" Content="Làm mới" Icon="{ui:SymbolIcon ArrowClockwise24}"
-                               Height="32" Margin="0,0,8,0" Click="BtnRefreshTheme_Click"
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left section: Controls & Typography -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button x:Name="BtnRefreshTheme" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                               Width="32" Height="30" Margin="0,0,6,0" Click="BtnRefreshTheme_Click"
                                ToolTip="Cập nhật lại màu sắc theo theme hiện tại"
-                               Style="{StaticResource InteractiveButton}"/>
+                               Style="{StaticResource GlassIconButton}"/>
 
-                    <TextBlock x:Name="ZoomPercent" Text="100%" FontSize="12" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,8,0"/>
-
-                    <Slider x:Name="ZoomSlider" Width="80" Minimum="50" Maximum="200" Value="100"
+                    <!-- Zoom Slider -->
+                    <TextBlock x:Name="ZoomPercent" Text="100%" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,4,0"/>
+                    <Slider x:Name="ZoomSlider" Width="70" Minimum="50" Maximum="200" Value="100"
                             TickFrequency="10" IsSnapToTickEnabled="True"
                             ValueChanged="ZoomSlider_ValueChanged"
-                            Margin="0,0,12,0"/>
+                            Margin="0,0,8,0" VerticalAlignment="Center"/>
 
                     <!-- Typography: Font Selector -->
-                    <ComboBox x:Name="CmbFont" Width="190" Height="32" Margin="0,0,8,0" FontSize="12"
+                    <ComboBox x:Name="CmbFont" Width="155" Height="30" Margin="0,0,6,0" FontSize="11.5"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbFont_SelectionChanged" ToolTip="Chọn kiểu phông chữ">
-                        <ComboBoxItem Content="Mặc định (Segoe UI)" IsSelected="True" Tag="'Segoe UI', 'Microsoft YaHei', Arial, sans-serif"/>
-                        <ComboBoxItem Content="Có chân (Serif SC)" Tag="'Noto Serif SC', 'Georgia', 'Times New Roman', serif"/>
+                        <ComboBoxItem Content="Mặc định (Segoe UI)" IsSelected="True" Tag="'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif"/>
+                        <ComboBoxItem Content="Có chân (Serif)" Tag="'Merriweather', 'Georgia', 'Times New Roman', serif"/>
+                        <ComboBoxItem Content="Bookerly (Kindle)" Tag="'Bookerly', 'Literata', 'Merriweather', 'Georgia', 'Times New Roman', serif"/>
+                        <ComboBoxItem Content="Trung - Việt (Noto)" Tag="'Noto Serif SC', 'Noto Serif', 'Georgia', serif"/>
                         <ComboBoxItem Content="Cổ điển (KaiTi)" Tag="'KaiTi', 'STKaiti', 'Cambria', serif"/>
                         <ComboBoxItem Content="Đơn cách (Mono)" Tag="'Consolas', 'Courier New', monospace"/>
                     </ComboBox>
 
                     <!-- Typography: Width Selector -->
-                    <ComboBox x:Name="CmbWidth" Width="145" Height="32" Margin="0,0,8,0" FontSize="12"
+                    <ComboBox x:Name="CmbWidth" Width="115" Height="30" Margin="0,0,6,0" FontSize="11.5"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbWidth_SelectionChanged" ToolTip="Độ rộng lề trang sách">
                         <ComboBoxItem Content="Gọn (650px)" Tag="650px"/>
@@ -58,31 +67,38 @@
                     </ComboBox>
 
                     <!-- Typography: Line Height -->
-                    <ComboBox x:Name="CmbLineHeight" Width="135" Height="32" Margin="0,0,12,0" FontSize="12"
+                    <ComboBox x:Name="CmbLineHeight" Width="100" Height="30" Margin="0,0,8,0" FontSize="11.5"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbLineHeight_SelectionChanged" ToolTip="Khoảng cách dòng">
                         <ComboBoxItem Content="Dày (1.5x)" Tag="1.5"/>
                         <ComboBoxItem Content="Vừa (1.8x)" IsSelected="True" Tag="1.8"/>
                         <ComboBoxItem Content="Thoáng (2.2x)" Tag="2.2"/>
                     </ComboBox>
+                </StackPanel>
 
-                    <ui:TextBox x:Name="SearchBox" Width="190" Height="32" FontSize="12" PlaceholderText="Tìm kiếm trong sách..."
+                <!-- Right section: Search & Progress -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:TextBox x:Name="SearchBox" Width="160" Height="30" FontSize="11.5" PlaceholderText="Tìm kiếm trong sách..."
                                  TextChanged="SearchBox_TextChanged"
+                                 KeyDown="SearchBox_KeyDown"
                                  Style="{StaticResource InteractiveTextBox}"/>
 
-                    <ui:Button x:Name="BtnSearchNext" Content="Tiếp" Icon="{ui:SymbolIcon ChevronDown24}"
-                               Height="32" Margin="6,0,0,0" Click="BtnSearchNext_Click" FontSize="12"
-                               ToolTip="Tìm chuỗi kế tiếp"
-                               Style="{StaticResource InteractiveButton}"/>
-                    <ui:Button x:Name="BtnSearchPrev" Content="Trước" Icon="{ui:SymbolIcon ChevronUp24}"
-                               Height="32" Margin="4,0,0,0" Click="BtnSearchPrev_Click" FontSize="12"
-                               ToolTip="Tìm chuỗi trước đó"
-                               Style="{StaticResource InteractiveButton}"/>
+                    <ui:Button x:Name="BtnSearchPrev" Icon="{ui:SymbolIcon ChevronUp24}"
+                               Width="30" Height="30" Margin="4,0,0,0" Click="BtnSearchPrev_Click"
+                               ToolTip="Tìm chuỗi trước đó (Shift+Enter)"
+                               Style="{StaticResource GlassIconButton}"/>
+                    <ui:Button x:Name="BtnSearchNext" Icon="{ui:SymbolIcon ChevronDown24}"
+                               Width="30" Height="30" Margin="2,0,0,0" Click="BtnSearchNext_Click"
+                               ToolTip="Tìm chuỗi kế tiếp (Enter)"
+                               Style="{StaticResource GlassIconButton}"/>
 
-                    <TextBlock x:Name="TxtReadingProgress" Text="" FontSize="12" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="12,0,0,0"/>
+                    <TextBlock x:Name="TxtSearchCount" Text="" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                               Margin="6,0,0,0"/>
+
+                    <TextBlock x:Name="TxtReadingProgress" Text="" FontSize="11.5" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="8,0,4,0"/>
                 </StackPanel>
-            </ScrollViewer>
+            </Grid>
         </Border>
 
         <Grid Grid.Row="2">

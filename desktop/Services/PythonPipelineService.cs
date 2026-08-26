@@ -39,7 +39,7 @@ public class PythonPipelineService
         var psi = new ProcessStartInfo
         {
             FileName = exe,
-            Arguments = $"\"{fullPath}\" {args}",
+            Arguments = $"-u \"{fullPath}\" {args}",
             WorkingDirectory = _projectRoot,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -210,11 +210,29 @@ public class PythonPipelineService
         var voicesDir = Path.Combine(_projectRoot, "core", "voices");
         if (!Directory.Exists(voicesDir)) return voices;
 
+        var activeJson = Path.Combine(voicesDir, "active.json");
+        if (File.Exists(activeJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(activeJson));
+                if (doc.RootElement.TryGetProperty("name", out var n) && !string.IsNullOrEmpty(n.GetString()))
+                {
+                    voices.Add(n.GetString()!);
+                }
+            }
+            catch { }
+        }
+
         foreach (var d in Directory.GetDirectories(voicesDir).OrderBy(x => x))
         {
             var metaFile = Path.Combine(d, "metadata.json");
             if (File.Exists(metaFile))
-                voices.Add(Path.GetFileName(d));
+            {
+                var name = Path.GetFileName(d);
+                if (!voices.Contains(name))
+                    voices.Add(name);
+            }
         }
         return voices;
     }

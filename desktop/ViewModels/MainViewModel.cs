@@ -42,6 +42,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _apiKeyInput = "";
     [ObservableProperty] private string _modelInput = "";
     [ObservableProperty] private string _baseUrlInput = "";
+    [ObservableProperty] private ObservableCollection<string> _availableModels = new();
 
     // Pipeline properties
     [ObservableProperty] private int _pipelineFromStep = 1;
@@ -117,7 +118,15 @@ public partial class MainViewModel : ObservableObject
         _pipeline.ErrorReceived += msg =>
         {
             if (App.Current != null)
-                App.Current.Dispatcher.Invoke(() => AppendLog(msg, "error"));
+            {
+                App.Current.Dispatcher.Invoke(() =>
+                {
+                    var isRealError = msg.Contains("Error") || msg.Contains("Exception") || msg.Contains("Traceback") || msg.Contains("Failed");
+                    var isWarning = msg.Contains("Warning") || msg.Contains("WARN") || msg.Contains("warning");
+                    var level = isRealError ? "error" : isWarning ? "warning" : "info";
+                    AppendLog(msg, level);
+                });
+            }
         };
 
         // Keep the global busy overlay in sync with per-book busy states.
@@ -444,7 +453,7 @@ public partial class MainViewModel : ObservableObject
                 AudioReadTitles,
                 AudioMergeChapters,
                 AudioForceRegenerate,
-                AudioChapterInput,
+                book.ChapterInput,
                 AudioUseGpu,
                 AudioBatchSize,
                 AudioMusicAuto,
@@ -570,35 +579,57 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RefreshBookProgress()
+    private async void RefreshBookProgress()
     {
-        foreach (var book in OutputBooks)
-        {
-            var progressDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
-            if (!Directory.Exists(progressDir)) continue;
+        var outputBooksList = OutputBooks.ToList();
+        var root = _projectRoot;
+        if (string.IsNullOrEmpty(root)) return;
 
-            var translated = 0;
-            foreach (var f in Directory.GetFiles(progressDir, "chunk_*.json"))
+        // Run heavy Disk I/O on background thread to prevent UI freezing/lagging
+        var updates = await Task.Run(() =>
+        {
+            var results = new List<(BookStatus book, int progress)>();
+            foreach (var book in outputBooksList)
             {
+                var progressDir = Path.Combine(root, "working", "progress", book.Slug);
+                if (!Directory.Exists(progressDir)) continue;
+
+                var translated = 0;
                 try
                 {
-                    using var doc = JsonDocument.Parse(File.ReadAllText(f));
-                    if (doc.RootElement.TryGetProperty("translated_text", out var t)
-                        && !string.IsNullOrWhiteSpace(t.GetString()))
-                        translated++;
+                    foreach (var f in Directory.GetFiles(progressDir, "chunk_*.json"))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(File.ReadAllText(f));
+                            if (doc.RootElement.TryGetProperty("translated_text", out var t)
+                                && !string.IsNullOrWhiteSpace(t.GetString()))
+                                translated++;
+                        }
+                        catch { }
+                    }
                 }
                 catch { }
+
+                if (translated != book.ProgressCount)
+                {
+                    results.Add((book, translated));
+                }
             }
-            if (translated != book.ProgressCount)
-                book.ProgressCount = translated;
+            return results;
+        });
+
+        foreach (var (book, progress) in updates)
+        {
+            book.ProgressCount = progress;
         }
 
         // Check if any output book has a QA report
         if (!HasQaReport)
         {
-            foreach (var book in OutputBooks)
+            foreach (var book in outputBooksList)
             {
-                var reportPath = Path.Combine(_projectRoot, "working", "qa", $"{book.Slug}_report.md");
+                var reportPath = Path.Combine(root, "working", "qa", $"{book.Slug}_report.md");
                 if (File.Exists(reportPath))
                 {
                     HasQaReport = true;
@@ -807,6 +838,29 @@ public partial class MainViewModel : ObservableObject
             ModelInput = config?.Model ?? "";
             BaseUrlInput = config?.BaseUrl ?? "";
             ApiKeyInput = "";
+
+            AvailableModels.Clear();
+            if (SelectedProvider == "gemini")
+            {
+                AvailableModels.Add("gemini-3.6-flash");
+                AvailableModels.Add("gemini-2.5-pro");
+                AvailableModels.Add("gemini-2.0-flash");
+            }
+            else if (SelectedProvider == "deepseek")
+            {
+                AvailableModels.Add("deepseek-chat");
+                AvailableModels.Add("deepseek-reasoner");
+            }
+            else
+            {
+                AvailableModels.Add("gpt-4o-mini");
+                AvailableModels.Add("gpt-4o");
+                AvailableModels.Add("claude-3-5-sonnet-20241022");
+                AvailableModels.Add("qwen-plus");
+            }
+
+            if (string.IsNullOrWhiteSpace(ModelInput) && AvailableModels.Count > 0)
+                ModelInput = AvailableModels[0];
         }
         catch { }
     }
@@ -1318,5 +1372,21 @@ public partial class MainViewModel : ObservableObject
             IsVoiceBusy = false;
             _currentCts = null;
         }
+    }
+
+    [RelayCommand]
+    private void ResetAudioConfig()
+    {
+        AudioUseGpu = true;
+        AudioBatchSize = 16;
+        AudioTemperature = 0.3;
+        AudioTopK = 10;
+        AudioMusicAuto = true;
+        AudioMusicVolume = 0.15;
+        AudioBitrate = "128k";
+        AudioReadTitles = true;
+        AudioMergeChapters = false;
+        AudioForceRegenerate = false;
+        AppendLog("Đã khôi phục toàn bộ Cấu hình Audiobook về chuẩn dự án (GPU RTX, Batch 16, Nhạc nền AI 15%, Temp 0.3, Top-K 10).");
     }
 }

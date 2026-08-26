@@ -38,10 +38,19 @@
 
                 <TextBlock Text="Mô hình (Model)" FontSize="13" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
-                <ui:TextBox x:Name="ModelBox" Width="400" HorizontalAlignment="Left"
-                            Style="{StaticResource InteractiveTextBox}"
-                            PlaceholderText="Ví dụ: deepseek-chat"
-                            Text="{Binding ModelInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                    <ComboBox x:Name="ModelBox" Width="360" HorizontalAlignment="Left"
+                              IsEditable="True"
+                              ItemsSource="{Binding AvailableModels}"
+                              Text="{Binding ModelInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              ToolTip="Chọn mô hình có sẵn trong danh sách hoặc gõ tên mô hình tùy ý"
+                              Style="{StaticResource GlassComboBox}"/>
+                    <Button Width="34" Height="34" Margin="6,0,0,0" Style="{StaticResource GlassIconButton}"
+                            ToolTip="Quét trực tiếp danh sách Model từ API Key"
+                            Click="FetchModels_Click">
+                        <ui:SymbolIcon Symbol="ArrowClockwise24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                    </Button>
+                </StackPanel>
 
                 <TextBlock Text="Base URL (nếu có)" FontSize="13" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,24,0,8"/>

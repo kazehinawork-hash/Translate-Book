@@ -310,8 +310,19 @@ namespace TranslateBook.Views
                 rt {{ font-size: 0.7em; color: var(--fg-secondary-color); }}
                 div[id^='chap_'] {{ margin-bottom: 2.5em; }}
                 .search-highlight {{
-                    background-color: rgba(255, 230, 0, 0.4);
-                    scroll-margin-top: 24px;
+                    background-color: rgba(255, 220, 0, 0.45);
+                    color: #000;
+                    border-radius: 3px;
+                    padding: 1px 2px;
+                    scroll-margin-top: 100px;
+                    transition: background-color 0.2s, box-shadow 0.2s;
+                }}
+                .search-highlight.search-current {{
+                    background-color: #ff9800 !important;
+                    color: #000 !important;
+                    font-weight: bold;
+                    outline: 2px solid #ffeb3b;
+                    box-shadow: 0 0 10px rgba(255, 152, 0, 0.8);
                 }}
                 ::-webkit-scrollbar {{ width: 8px; }}
                 ::-webkit-scrollbar-track {{ background: rgba(128,128,128,0.1); border-radius: 4px; }}
@@ -865,6 +876,25 @@ namespace TranslateBook.Views
                         case "escape":
                             Close();
                             break;
+                        case "searchCount":
+                            if (msg.TryGetValue("count", out JsonElement countElem))
+                            {
+                                int count = countElem.GetInt32();
+                                int current = msg.TryGetValue("current", out JsonElement curElem) ? curElem.GetInt32() : 0;
+                                if (count == 0)
+                                {
+                                    TxtSearchCount.Text = "Không tìm thấy";
+                                    TxtSearchCount.Foreground = (Application.Current.Resources["SystemFillColorCautionBrush"] as Brush) 
+                                        ?? Brushes.Orange;
+                                }
+                                else
+                                {
+                                    TxtSearchCount.Text = $"{current}/{count}";
+                                    TxtSearchCount.Foreground = (Application.Current.Resources["AccentFillColorDefaultBrush"] as Brush) 
+                                        ?? Brushes.LightGreen;
+                                }
+                            }
+                            break;
                         case "updateScrollPosition":
                             if (msg.TryGetValue("scrollY", out JsonElement yElem) && yElem.TryGetDouble(out double scrollY))
                             {
@@ -1001,13 +1031,49 @@ namespace TranslateBook.Views
 
         // --- Search ---
 
+        private DispatcherTimer? _searchDebounceTimer;
+
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _searchDebounceTimer?.Stop();
+            _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            _searchDebounceTimer.Tick += (s, ev) =>
+            {
+                _searchDebounceTimer?.Stop();
+                ExecuteSearch();
+            };
+            _searchDebounceTimer.Start();
+        }
+
+        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+                {
+                    BtnSearchPrev_Click(this, new RoutedEventArgs());
+                }
+                else
+                {
+                    BtnSearchNext_Click(this, new RoutedEventArgs());
+                }
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                SearchBox.Text = "";
+                e.Handled = true;
+            }
+        }
+
+        private void ExecuteSearch()
         {
             string searchTerm = SearchBox.Text.Trim();
             if (string.IsNullOrEmpty(searchTerm))
             {
                 ClearSearchHighlights();
                 _isSearchHighlightActive = false;
+                TxtSearchCount.Text = "";
             }
             else
             {
@@ -1021,15 +1087,15 @@ namespace TranslateBook.Views
             if (WebView?.CoreWebView2 == null) return;
             string js = @"
                 (function() {
+                    window.__searchMatches = [];
+                    window.__searchCurrentIndex = -1;
                     var highlights = document.querySelectorAll('.search-highlight');
                     highlights.forEach(function(el) {
                         var parent = el.parentNode;
                         if (parent) {
                             var text = document.createTextNode(el.textContent);
-                            while (el.firstChild) {
-                                text.appendChild(el.firstChild);
-                            }
                             parent.replaceChild(text, el);
+                            parent.normalize();
                         }
                     });
                 })();
@@ -1040,50 +1106,104 @@ namespace TranslateBook.Views
         private void HighlightSearchTerm(string term)
         {
             if (WebView?.CoreWebView2 == null) return;
-            ClearSearchHighlights();
             string escaped = EscapeJsString(term);
 
             string js = $@"
                 (function() {{
+                    window.__searchMatches = [];
+                    window.__searchCurrentIndex = -1;
+                    
+                    // Clear previous highlights
+                    var old = document.querySelectorAll('.search-highlight');
+                    old.forEach(function(el) {{
+                        var parent = el.parentNode;
+                        if (parent) {{
+                            parent.replaceChild(document.createTextNode(el.textContent), el);
+                            parent.normalize();
+                        }}
+                    }});
+
                     var term = '{escaped}';
-                    if (!term) return;
+                    if (!term || term.length === 0) {{
+                        window.chrome.webview.postMessage(JSON.stringify({{ action: 'searchCount', count: 0, current: 0 }}));
+                        return;
+                    }}
+
                     var safeTerm = term.replace(/[.*+?^${{}}()|[\]\\]/g, '\\$&');
-                    var regex = new RegExp(safeTerm, 'gi');
                     var body = document.querySelector('body');
                     if (!body) return;
-                    var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
-                    var nodes = [];
+
+                    var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {{
+                        acceptNode: function(node) {{
+                            if (!node.nodeValue || node.nodeValue.trim().length === 0) return NodeFilter.FILTER_REJECT;
+                            var p = node.parentElement;
+                            if (p && (p.tagName === 'SCRIPT' || p.tagName === 'STYLE')) return NodeFilter.FILTER_REJECT;
+                            return NodeFilter.FILTER_ACCEPT;
+                        }}
+                    }}, false);
+
+                    var textNodes = [];
                     var node;
                     while (node = walker.nextNode()) {{
-                        if (node.nodeValue && node.nodeValue.trim().length > 0 && regex.test(node.nodeValue))
-                            nodes.push(node);
+                        textNodes.push(node);
                     }}
-                    regex.lastIndex = 0;
-                    nodes.forEach(function(textNode) {{
-                        var content = textNode.nodeValue;
-                        var matches = [];
+
+                    var totalMatches = 0;
+                    textNodes.forEach(function(textNode) {{
+                        var text = textNode.nodeValue;
+                        var regex = new RegExp(safeTerm, 'gi');
                         var match;
-                        var re = new RegExp(safeTerm, 'gi');
-                        while (match = re.exec(content)) {{
-                            matches.push({{start: match.index, end: match.index + match[0].length}});
+                        var matches = [];
+                        while ((match = regex.exec(text)) !== null) {{
+                            matches.push({{ start: match.index, end: match.index + match[0].length }});
                         }}
+
                         if (matches.length === 0) return;
 
+                        var parent = textNode.parentNode;
+                        if (!parent) return;
+
                         var frag = document.createDocumentFragment();
-                        var lastIndex = 0;
+                        var lastIdx = 0;
+
                         matches.forEach(function(m) {{
-                            if (m.start > lastIndex)
-                                frag.appendChild(document.createTextNode(content.slice(lastIndex, m.start)));
+                            if (m.start > lastIdx) {{
+                                frag.appendChild(document.createTextNode(text.substring(lastIdx, m.start)));
+                            }}
                             var span = document.createElement('span');
                             span.className = 'search-highlight';
-                            span.textContent = content.slice(m.start, m.end);
+                            span.textContent = text.substring(m.start, m.end);
                             frag.appendChild(span);
-                            lastIndex = m.end;
+                            lastIdx = m.end;
+                            totalMatches++;
                         }});
-                        if (lastIndex < content.length)
-                            frag.appendChild(document.createTextNode(content.slice(lastIndex)));
-                        textNode.parentNode.replaceChild(frag, textNode);
+
+                        if (lastIdx < text.length) {{
+                            frag.appendChild(document.createTextNode(text.substring(lastIdx)));
+                        }}
+
+                        parent.replaceChild(frag, textNode);
                     }});
+
+                    var allSpans = document.querySelectorAll('.search-highlight');
+                    window.__searchMatches = Array.from(allSpans);
+                    
+                    if (window.__searchMatches.length > 0) {{
+                        window.__searchCurrentIndex = 0;
+                        window.__searchMatches[0].classList.add('search-current');
+                        window.__searchMatches[0].scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                        window.chrome.webview.postMessage(JSON.stringify({{
+                            action: 'searchCount',
+                            count: window.__searchMatches.length,
+                            current: 1
+                        }}));
+                    }} else {{
+                        window.chrome.webview.postMessage(JSON.stringify({{
+                            action: 'searchCount',
+                            count: 0,
+                            current: 0
+                        }}));
+                    }}
                 }})();
             ";
             WebView.CoreWebView2.ExecuteScriptAsync(js);
@@ -1091,27 +1211,22 @@ namespace TranslateBook.Views
 
         private void BtnSearchNext_Click(object sender, RoutedEventArgs e)
         {
-            if (!_isSearchHighlightActive) return;
             if (WebView?.CoreWebView2 == null) return;
-
             string js = @"
                 (function() {
-                    var highlights = document.querySelectorAll('.search-highlight');
-                    if (highlights.length === 0) return;
-                    var current = window.pageYOffset || document.documentElement.scrollTop;
-                    var best = null;
-                    var bestDist = Infinity;
-                    for (var i = 0; i < highlights.length; i++) {
-                        var r = highlights[i].getBoundingClientRect();
-                        var offsetTop = r.top + window.pageYOffset;
-                        var dist = offsetTop - current;
-                        if (dist >= -50 && dist < bestDist) {
-                            bestDist = dist;
-                            best = highlights[i];
-                        }
+                    if (!window.__searchMatches || window.__searchMatches.length === 0) return;
+                    if (window.__searchCurrentIndex >= 0 && window.__searchCurrentIndex < window.__searchMatches.length) {
+                        window.__searchMatches[window.__searchCurrentIndex].classList.remove('search-current');
                     }
-                    if (!best) best = highlights[0];
-                    best.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    window.__searchCurrentIndex = (window.__searchCurrentIndex + 1) % window.__searchMatches.length;
+                    var cur = window.__searchMatches[window.__searchCurrentIndex];
+                    cur.classList.add('search-current');
+                    cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'searchCount',
+                        count: window.__searchMatches.length,
+                        current: window.__searchCurrentIndex + 1
+                    }));
                 })();
             ";
             WebView.CoreWebView2.ExecuteScriptAsync(js);
@@ -1119,27 +1234,22 @@ namespace TranslateBook.Views
 
         private void BtnSearchPrev_Click(object sender, RoutedEventArgs e)
         {
-            if (!_isSearchHighlightActive) return;
             if (WebView?.CoreWebView2 == null) return;
-
             string js = @"
                 (function() {
-                    var highlights = document.querySelectorAll('.search-highlight');
-                    if (highlights.length === 0) return;
-                    var current = window.pageYOffset || document.documentElement.scrollTop;
-                    var best = null;
-                    var bestDist = Infinity;
-                    for (var i = highlights.length - 1; i >= 0; i--) {
-                        var r = highlights[i].getBoundingClientRect();
-                        var offsetTop = r.top + window.pageYOffset;
-                        var dist = current - offsetTop;
-                        if (dist >= -50 && dist < bestDist) {
-                            bestDist = dist;
-                            best = highlights[i];
-                        }
+                    if (!window.__searchMatches || window.__searchMatches.length === 0) return;
+                    if (window.__searchCurrentIndex >= 0 && window.__searchCurrentIndex < window.__searchMatches.length) {
+                        window.__searchMatches[window.__searchCurrentIndex].classList.remove('search-current');
                     }
-                    if (!best) best = highlights[highlights.length - 1];
-                    best.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    window.__searchCurrentIndex = (window.__searchCurrentIndex - 1 + window.__searchMatches.length) % window.__searchMatches.length;
+                    var cur = window.__searchMatches[window.__searchCurrentIndex];
+                    cur.classList.add('search-current');
+                    cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'searchCount',
+                        count: window.__searchMatches.length,
+                        current: window.__searchCurrentIndex + 1
+                    }));
                 })();
             ";
             WebView.CoreWebView2.ExecuteScriptAsync(js);

@@ -81,11 +81,20 @@ namespace TranslateBook.Views;
 
         private void OnLogEntryAdded(ViewModels.MainViewModel.LogEntry entry)
         {
-            _logHistory.Add(entry);
-            if (_logHistory.Count > 2000)
-                _logHistory.RemoveAt(0);
-            if (FilterApplies(entry.Text))
-                AppendLogEntry(entry);
+            Dispatcher.Invoke(() =>
+            {
+                _logHistory.Add(entry);
+                if (_logHistory.Count > 2000)
+                    _logHistory.RemoveAt(0);
+
+                if (DataContext is ViewModels.MainViewModel vm && !vm.LogExpanded && (entry.Level == "error" || entry.Text.Contains("Bắt đầu") || entry.Text.Contains("Đang tạo")))
+                {
+                    vm.LogExpanded = true;
+                }
+
+                if (FilterApplies(entry.Text))
+                    AppendLogEntry(entry);
+            });
         }
 
         private void OnLogCleared()
@@ -105,15 +114,55 @@ namespace TranslateBook.Views;
         private void AppendLogEntry(ViewModels.MainViewModel.LogEntry entry)
         {
             if (LogBox == null) return;
-            var brush = entry.Level switch
+
+            var timeStr = DateTime.Now.ToString("HH:mm:ss");
+            var para = new Paragraph { Margin = new Thickness(0, 1, 0, 1), LineHeight = 16 };
+
+            // Timestamp in subtle muted color
+            var timeRun = new Run($"[{timeStr}] ")
             {
-                "error" => (Brush)new SolidColorBrush(Color.FromRgb(0xff, 0x6b, 0x6b)),
-                "warning" => (Brush)new SolidColorBrush(Color.FromRgb(0xff, 0xc9, 0x4d)),
-                _ => (Brush)new SolidColorBrush(Color.FromRgb(0xb0, 0xb0, 0xb0))
+                Foreground = new SolidColorBrush(Color.FromRgb(0x75, 0x85, 0x95)),
+                FontWeight = FontWeights.Normal
             };
-            var para = new Paragraph(new Run(entry.Text + "\n")) { Foreground = brush };
+            para.Inlines.Add(timeRun);
+
+            // Message with dynamic professional hacker/terminal theme colors
+            Brush textBrush;
+            FontWeight weight = FontWeights.Normal;
+
+            if (entry.Level == "error" || entry.Text.Contains("[Lỗi]") || entry.Text.Contains("Failed") || entry.Text.Contains("❌"))
+            {
+                textBrush = new SolidColorBrush(Color.FromRgb(0xff, 0x52, 0x52)); // Vivid Red
+                weight = FontWeights.SemiBold;
+            }
+            else if (entry.Level == "warning" || entry.Text.Contains("[Cảnh báo]") || entry.Text.Contains("⚠️"))
+            {
+                textBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xb7, 0x4d)); // Amber Orange
+            }
+            else if (entry.Text.Contains("Hoàn thành") || entry.Text.Contains("hoàn tất") || entry.Text.Contains("✅") || entry.Text.Contains("OK"))
+            {
+                textBrush = new SolidColorBrush(Color.FromRgb(0x69, 0xf0, 0xae)); // Neon Mint Green
+                weight = FontWeights.SemiBold;
+            }
+            else if (entry.Text.Contains("Bắt đầu") || entry.Text.Contains("Đang tạo") || entry.Text.Contains("Chapter") || entry.Text.Contains("Chương") || entry.Text.Contains("RTF"))
+            {
+                textBrush = new SolidColorBrush(Color.FromRgb(0x40, 0xc4, 0xff)); // Cyber Cyan
+            }
+            else if (entry.Text.Contains("🎵") || entry.Text.Contains("Nhạc nền") || entry.Text.Contains("giọng"))
+            {
+                textBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0x82, 0xff)); // Purple Accent
+            }
+            else
+            {
+                textBrush = new SolidColorBrush(Color.FromRgb(0xd0, 0xd8, 0xe0)); // Clean Slate White
+            }
+
+            var textRun = new Run(entry.Text) { Foreground = textBrush, FontWeight = weight };
+            para.Inlines.Add(textRun);
+
             LogBox.Document.Blocks.Add(para);
             LogBox.ScrollToEnd();
+            LogScrollViewer?.ScrollToEnd();
         }
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

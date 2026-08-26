@@ -247,13 +247,17 @@ def main() -> None:
             print(f"  ... và {len(new_entries) - 20} mục nữa")
         return
 
-    if not new_entries:
-        print(f"ℹ️ Không có thuật ngữ mới — cuốn '{args.book}' đã đồng bộ với master.")
-        return
-
     _write_master(master + new_entries)
     print(f"✅ Đã thêm {len(new_entries)} thuật ngữ của cuốn '{args.book}' vào master.csv"
           + (f" [author={args.author}]" if args.author else "") + (f" [genre={args.genre}]" if args.genre else ""))
+
+    # Tự động dọn dẹp: Xóa file csv trung gian của cuốn để giữ glossary/ luôn gọn gàng chỉ có master.csv
+    try:
+        if book_path.exists():
+            book_path.unlink()
+            print(f"🗑️ Đã tự động dọn dẹp file trung gian: {book_path.name}")
+    except Exception as ex:
+        print(f"⚠️ Không thể xóa file trung gian {book_path.name}: {ex}")
 
 
 if __name__ == "__main__":

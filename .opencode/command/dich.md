@@ -38,7 +38,7 @@ Luồng tổng quát:
 1. `python scripts\process\generate_glossary.py --source-dir working\chunks\<slug> --book-name <slug>` → tạo `working\glossary_prompt_<slug>.txt`.
 2. Đọc file prompt đó, rồi đọc vài chunk JSON đầu + giữa sách, tự trích danh sách thuật ngữ (tên nhân vật, địa điểm, thuật ngữ) và tạo `glossary\<slug>.csv` với header `source,target,notes`. Ghi UTF-8.
 3. Nếu `glossary\<slug>.csv` đã tồn tại thì giữ nguyên (không tạo lại).
-4. **Gộp vào master**: chạy `python scripts\process\merge_glossary.py --book <slug> --author <author> [--genre <genre>]` — thêm thuật ngữ của cuốn vào `glossary\master.csv` (file trung tâm duy nhất, cột `source,target,type,note,book,author,genre`), **không đè mục đã có**. Nếu cuốn thuộc tác giả/thể loại đã có trong master (`van-tinh`, `vi-duong`, `khang-tinh-van`, `tien-hiep`), các thuật ngữ chung đó sẽ **tự áp dụng** khi dịch/QA (không cần copy vào file cuốn). Master tự tách `master_001.csv` khi phình (>300 dòng) — không cần làm gì.
+4. **Gộp vào master**: chạy `python scripts\process\merge_glossary.py --book <slug> --author <author> [--genre <genre>]` — thêm thuật ngữ của cuốn vào `glossary\master.csv` (file trung tâm duy nhất, cột `source,target,type,note,book,author,genre`), **không đè mục đã có**. **Sau khi gộp xong, file trung gian `glossary/<slug>.csv` được tự động xóa** để giữ thư mục `glossary/` luôn gọn gàng (chỉ có `master.csv` và `_template.*`). Nếu cuốn thuộc tác giả/thể loại đã có trong master (`van-tinh`, `vi-duong`, `khang-tinh-van`, `tien-hiep`), các thuật ngữ chung đó sẽ **tự áp dụng** khi dịch/QA (không cần copy vào file cuốn). Master tự tách `master_001.csv` khi phình (>300 dòng) — không cần làm gì.
 5. In tóm tắt số thuật ngữ cho người dùng xem.
 
 ## F. Skeleton progress

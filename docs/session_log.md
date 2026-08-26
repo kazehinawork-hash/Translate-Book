@@ -2027,3 +2027,46 @@
 ### Git
 - Chua commit. Chi san pham (khong commit) + docs.
 
+---
+
+## 2026-08-26 — Tối ưu hiệu năng UI, Auto-fetch Model API & Zero-token Connection Test
+
+### Đã làm
+- **Giải phóng UI Thread, dọn sạch giật lag**:
+  - Chuyển toàn bộ vòng lặp đọc file JSON của `RefreshBookProgress()` sang `Task.Run` chạy ngầm, giải phóng UI thread giúp giao diện phản hồi 0ms.
+  - Sửa sự kiện chuyển tab trong `BooksPage.xaml` từ `Click` sang `Checked` trên `RadioButton`, gỡ bỏ hoàn toàn hiệu ứng làm delay/khóa tương tác chuột khi bấm chuyển tab Input / Output.
+- **Tách ô nhập số chương Audiobook theo từng sách**:
+  - Tách thuộc tính `ChapterInput` riêng cho từng `BookStatus` trong model, binding TwoWay độc lập và truyền chuẩn xác vào `RunAudiobookAsync`.
+- **Bộ lọc Realtime Log thông minh**:
+  - Nâng cấp phân loại log: tiến độ `Loading weights` của HuggingFace thành Info xám, `Warning` thành Cam cảnh báo, chỉ đánh nhãn `[ERR]` Đỏ khi có lỗi Exception thực sự.
+- **Quy chuẩn thư mục Glossary**:
+  - Cập nhật `scripts/process/merge_glossary.py` tự động xóa file trung gian `glossary/<slug>.csv` sau khi gộp vào `master.csv`.
+  - Dọn sạch 6 file CSV nhỏ lẻ, giữ thư mục `glossary/` chỉ có duy nhất `master.csv` (203 từ vựng) và `_template.*`. Cập nhật tài liệu quy tắc trong `AGENTS.md` và commands.
+- **Hỗ trợ API Key Google Gemini & Cập nhật Model mới**:
+  - Nâng cấp `ApiTranslationService.cs` hỗ trợ cả 2 định dạng Key của Google (qua query param `?key=` và Header `x-goog-api-key`).
+  - Cập nhật model mặc định từ `gemini-2.0-flash` (đã đóng cho tài khoản mới) sang **`gemini-3.6-flash`**.
+- **Auto-Fetch Model List từ API Key**:
+  - Tự động gọi API `ListModels` khi dán API Key để lấy danh sách mô hình thực tế mà tài khoản được cấp phép sử dụng.
+  - Nạp danh sách vào Dropdown chọn nhanh kèm nút `[↻]` quét thủ công, luôn bảo toàn đúng Model mà người dùng đã chọn.
+- **Kiểm tra kết nối 0-Token (Zero-Token Test Connection)**:
+  - Viết lại toàn bộ hàm `TestConnectionAsync` sử dụng gói tin `HTTP GET` (`/v1beta/models/{model}` hoặc `/v1/models`) để kiểm tra quyền truy cập và tồn tại của Model.
+  - Tiêu tốn hoàn toàn **0 Token generate**, không trừ quota dịch và không làm chậm rate limit của tài khoản.
+
+### File đổi
+- `desktop/ViewModels/MainViewModel.cs` (tối ưu Task.Run background, AvailableModels, log filter, ChapterInput)
+- `desktop/Services/ApiTranslationService.cs` (hỗ trợ x-goog-api-key, FetchAvailableModelsAsync, test kết nối 0-token, trích xuất lỗi HTTP chi tiết)
+- `desktop/Views/ApiPage.xaml`, `desktop/Views/ApiPage.xaml.cs` (Dropdown Model IsEditable, nút quét model [↻], bảo toàn Model đã chọn)
+- `desktop/Views/BooksPage.xaml`, `desktop/Views/BooksPage.xaml.cs` (chuyển Checked event, tối ưu tab transition)
+- `desktop/Views/AudioPage.xaml` (binding TwoWay ChapterInput theo model sách)
+- `desktop/Models/BookStatus.cs` (thêm ChapterInput riêng theo sách)
+- `desktop/Models/ApiConfig.cs` (default model gemini-3.6-flash)
+- `scripts/process/merge_glossary.py` (tự xóa file trung gian sau khi merge)
+- `AGENTS.md`, `.commandcode/commands/dich.md`, `.opencode/command/dich.md` (cập nhật quy chuẩn glossary)
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng. Ứng dụng hoạt động mượt mà, kết nối API Gemini 3.6 Flash / DeepSeek ổn định.
+
+### Git
+- Chưa commit — tuân thủ quy tắc chờ người dùng kiểm tra và duyệt trước.
+
