@@ -2070,3 +2070,40 @@
 ### Git
 - Chưa commit — tuân thủ quy tắc chờ người dùng kiểm tra và duyệt trước.
 
+---
+
+## 2026-08-27 — Nâng cấp tính năng Rà soát & Sửa chữa, Sửa Mục lục EPUB Tam ngữ & Trình xem trước Markdown
+
+### Đã làm
+- **Nâng cấp tính năng Rà soát & Sửa chữa thông minh (Smart Multi-layer Audit)**:
+  - Tự động dọn dẹp các chunk thừa / mồ côi ngoài phạm vi total_chunks chuẩn.
+  - Quét kiểm tra chất lượng 5 tầng: Mojibake / mất dấu font, tỷ lệ Hán sót (>15%), phát hiện câu lặp vô tận do AI ảo giác (AI Loop), lệch số dòng song ngữ/tam ngữ, dọn ký tự rác OCR `///`.
+  - Tự động sửa offline các lỗi định dạng và metadata mà không tiêu tốn token API.
+- **Sửa triệt để Mục lục (TOC) cho EPUB Tam ngữ**:
+  - Phát hiện nguyên nhân Pandoc nuốt Heading cấp 1 khi bao quanh bởi thẻ HTML `<div class="tri-block">`.
+  - Cập nhật `scripts/output/make_epub.py` loại bỏ thẻ div bao ngoài và chuyển sang các thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">` độc lập.
+  - Cập nhật `scripts/common/epub_style.css` định dạng trực tiếp các thẻ `p` này, giữ nguyên màu sắc, cỡ chữ và khoảng cách câu tam ngữ đẹp mắt.
+  - Kết quả: File EPUB Tam ngữ sinh ra có đầy đủ Mục lục 50+ chương chi tiết, nhảy trang chính xác 100% trên Calibre / EpubPreview / Moon+ Reader.
+- **Trình xem trước Markdown (MdPreviewWindow)**:
+  - Thêm cửa sổ đọc thử trực tiếp các file `.md` (bản dịch Tiếng Việt và Tam ngữ) ngay trên giao diện Desktop App.
+- **Quy chuẩn 1 file EPUB duy nhất**:
+  - Đảm bảo toàn bộ luồng tạo sách xuất đúng 1 file EPUB thành phẩm duy nhất ở gốc thư mục (`<Tên Sách>.epub`).
+
+### File đổi
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Services/PythonPipelineService.cs`
+- `desktop/Views/BooksPage.xaml`, `desktop/Views/BooksPage.xaml.cs`
+- `desktop/Views/MdPreviewWindow.xaml`, `desktop/Views/MdPreviewWindow.xaml.cs`
+- `desktop/Views/EpubPreviewWindow.xaml.cs`
+- `scripts/output/make_epub.py`
+- `scripts/common/epub_style.css`
+- `README.md`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng. Toàn bộ tính năng đã được kiểm tra và nghiệm thu thực tế.
+
+### Git
+- Sẵn sàng commit và push theo yêu cầu của người dùng.
+
+

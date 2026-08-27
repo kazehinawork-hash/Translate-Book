@@ -9,24 +9,40 @@ namespace TranslateBook.Services;
 
 public class ApiTranslationService
 {
-    private readonly HttpClient _http = new();
+    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(100) };
 
     public record TranslationResult(string Text, string Model, string Provider,
         int TokensIn = 0, int TokensOut = 0);
 
     public static string LoadGlossary(string slug, string projectRoot)
     {
-        var csvPath = Path.Combine(projectRoot, "glossary", $"{slug}.csv");
-        if (!File.Exists(csvPath))
+        var masterPath = Path.Combine(projectRoot, "glossary", "master.csv");
+        if (!File.Exists(masterPath))
             return "";
         try
         {
-            var lines = File.ReadAllLines(csvPath, Encoding.UTF8);
+            var lines = File.ReadAllLines(masterPath, Encoding.UTF8);
             var sb = new StringBuilder();
+            bool isFirst = true;
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                sb.AppendLine(line);
+                if (isFirst) { sb.AppendLine(line); isFirst = false; continue; }
+
+                // Nếu là dòng glossary chung hoặc thuộc đúng sách này
+                var parts = line.Split(',');
+                if (parts.Length >= 5)
+                {
+                    var bookCol = parts[4].Trim();
+                    if (string.IsNullOrEmpty(bookCol) || bookCol.Equals(slug, StringComparison.OrdinalIgnoreCase))
+                    {
+                        sb.AppendLine(line);
+                    }
+                }
+                else
+                {
+                    sb.AppendLine(line);
+                }
             }
             return sb.ToString();
         }
@@ -39,7 +55,7 @@ public class ApiTranslationService
     public async Task<TranslationResult> TranslateAsync(
         string text, string providerName, string glossary = "", string context = "",
         string sourceLang = "English", string targetLang = "Vietnamese",
-        bool trilingual = false, CancellationToken ct = default)
+        bool trilingual = false, Action<string>? onStatusLog = null, CancellationToken ct = default)
     {
         var config = ConfigService.GetProvider(providerName)
             ?? throw new Exception($"Provider '{providerName}' chưa được cấu hình");
@@ -49,12 +65,84 @@ public class ApiTranslationService
 
         var prompt = BuildPrompt(text, glossary, context, sourceLang, targetLang, trilingual);
 
-        return providerName switch
+        TranslationResult? rawResult = null;
+        Exception? lastEx = null;
+        for (int attempt = 1; attempt <= 5; attempt++)
         {
-            "gemini" => await TranslateGeminiAsync(config, prompt, ct, trilingual),
-            "deepseek" or "custom" => await TranslateOpenAICompatAsync(config, prompt, ct, trilingual),
-            _ => throw new Exception($"Provider '{providerName}' không hỗ trợ")
-        };
+            try
+            {
+                rawResult = providerName switch
+                {
+                    "gemini" => await TranslateGeminiAsync(config, prompt, ct, trilingual),
+                    "deepseek" or "custom" => await TranslateOpenAICompatAsync(config, prompt, ct, trilingual),
+                    _ => throw new Exception($"Provider '{providerName}' không hỗ trợ")
+                };
+                break;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                lastEx = ex;
+                var errMsg = ex.InnerException?.Message ?? ex.Message;
+                bool isRateLimit = errMsg.Contains("429") || errMsg.Contains("RESOURCE_EXHAUSTED") || errMsg.Contains("Quota exceeded", StringComparison.OrdinalIgnoreCase);
+
+                if (isRateLimit && attempt < 5)
+                {
+                    onStatusLog?.Invoke($"⏳ [Chạm giới hạn API] Đang tự động chờ 35 giây để phục hồi hạn mức (Lần thử {attempt}/5)...");
+                    await Task.Delay(35000, ct);
+                }
+                else if (attempt < 3)
+                {
+                    await Task.Delay(2500, ct);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        if (rawResult == null)
+        {
+            var msg = lastEx?.InnerException?.Message ?? lastEx?.Message ?? "Lỗi kết nối API";
+            throw new Exception($"[Kết nối API thất bại] {msg}");
+        }
+
+        if (trilingual)
+        {
+            var originalLines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var alignedLines = new string[originalLines.Length];
+
+            // Parse các dòng có dạng [1] text, [2] text...
+            var lines = rawResult.Text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            foreach (var l in lines)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(l, @"^\[(\d+)\]\s*(.*)$");
+                if (match.Success)
+                {
+                    if (int.TryParse(match.Groups[1].Value, out var idx) && idx >= 1 && idx <= originalLines.Length)
+                    {
+                        alignedLines[idx - 1] = match.Groups[2].Value.Trim();
+                    }
+                }
+            }
+
+            // Fallback cho các dòng chưa match
+            for (int i = 0; i < originalLines.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(alignedLines[i]))
+                {
+                    if (i < lines.Length && !lines[i].StartsWith("["))
+                        alignedLines[i] = lines[i].Trim();
+                    else
+                        alignedLines[i] = originalLines[i]; // Giữ nguyên heading/link ảnh nếu AI bỏ sót
+                }
+            }
+
+            var cleanText = string.Join("\n", alignedLines);
+            return rawResult with { Text = cleanText };
+        }
+
+        return rawResult;
     }
 
     public async Task<List<string>> FetchAvailableModelsAsync(string providerName, string apiKey, string baseUrl = "", CancellationToken ct = default)
@@ -312,31 +400,55 @@ public class ApiTranslationService
         string sourceLang, string targetLang, bool trilingualMode)
     {
         var sb = new StringBuilder();
+        sb.AppendLine("Bạn là một dịch giả văn học chuyên nghiệp hàng đầu.");
+        sb.AppendLine($"NHIỆM VỤ TỐI CAO: Dịch toàn bộ văn bản sau từ {sourceLang} sang {targetLang} (TIẾNG VIỆT).");
+        sb.AppendLine("⚠️ YÊU CẦU SỐ 1: BẢN DỊCH PHẢI LÀ 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG ĐƯỢC GIỮ LẠI CHỮ HÁN / TIẾNG TRUNG!");
+        sb.AppendLine();
+
         if (!string.IsNullOrEmpty(glossary))
-            sb.AppendLine("GLOSSARY:").AppendLine(glossary).AppendLine();
+            sb.AppendLine("## THUẬT NGỮ CỐ ĐỊNH (BẮT BUỘC DÙNG ĐÚNG):").AppendLine(glossary).AppendLine();
         if (!string.IsNullOrEmpty(context))
-            sb.AppendLine("CONTEXT:").AppendLine(context).AppendLine();
+            sb.AppendLine("## NGỮ CẢNH TRƯỚC:").AppendLine(context).AppendLine();
+
+        sb.AppendLine("## TIÊU CHUẨN VĂN CHƯƠNG LÁNG (LITERARY QUALITY — GIỮ HỒN NGUYÊN TÁC):");
+        sb.AppendLine("1. Dịch CẢ CÂU, CẢ ĐOẠN — không dịch thô từng từ; câu từ phải tự nhiên, mượt mà như văn phong của một nhà văn Việt Nam thực thụ.");
+        sb.AppendLine("2. GIỮ TRỌN HỒN NGUYÊN TÁC: Tuyệt đối không thêm/bớt ý, không đổi logic, giữ nguyên giọng điệu (trữ tình, châm biếm, sâu lắng, triết lý) và thái độ tác giả.");
+        sb.AppendLine("3. Nhịp điệu & âm thanh: Ưu tiên câu có nhịp điệu uyển chuyển, tránh lặp từ vô cớ; tỉnh lược đại từ thừa để văn phong thanh thoát.");
+        sb.AppendLine("4. Khẩu ngữ & hội thoại: Lời thoại sống động như người Việt giao tiếp ngoài đời thực, xưng hô nhất quán theo ngữ cảnh.");
+        sb.AppendLine("5. Thuần Việt: Ưu tiên từ ngữ thuần Việt giàu hình tượng; tránh lạm dụng từ Hán-Việt tối nghĩa hay cụm từ dịch máy (như 'một cách', 'những điều', 'được bởi').");
+        sb.AppendLine();
+        sb.AppendLine("### VÍ DỤ ĐỐI CHIẾU CHUẨN (Bản Cứng vs Bản Láng Nhà Văn):");
+        sb.AppendLine("• Câu gốc: “她心里很难过，但是她强忍着没有让泪水流下来。”");
+        sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Trong lòng cô ấy rất khó chịu, nhưng cô ấy cố nén lại không để nước mắt chảy xuống.'");
+        sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Lòng cô quặn thắt, nhưng cô nén hết vào trong, không để một giọt nước mắt rơi xuống.'");
+        sb.AppendLine("• Câu gốc: “他不停地工作，一直工作到很晚。”");
+        sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Anh ấy không ngừng làm việc, một mực làm việc đến rất muộn.'");
+        sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Anh miệt mài làm đến tận khuya.'");
+        sb.AppendLine("=> BẢN DỊCH CỦA BẠN BẮT BUỘC PHẢI ĐẠT CHUẨN LÁNG (NHÀ VĂN) NHƯ CÁC VÍ DỤ TRÊN.");
+        sb.AppendLine();
 
         if (trilingualMode)
         {
-            sb.AppendLine($"Dịch từng dòng sau đây từ {sourceLang} sang {targetLang}.");
-            sb.AppendLine($"QUAN TRỌNG: Số dòng trong kết quả phải Bằng đúng số dòng đầu vào.");
-            sb.AppendLine($"Mỗi dòng đầu vào → đúng một dòng đầu ra. KHÔNG gộp, KHÔNG tách.");
-            sb.AppendLine($"Giữ nguyên heading (#/##), giữ nguyên dòng ảnh ![...]");
-            sb.AppendLine($"Bỏ các dòng /// OCR dư thừa.");
-            sb.AppendLine($"Dùng glossary trên, không được chênh lệch.");
-            sb.AppendLine($"Output ONLY bản dịch tiếng Việt, không giải thích.");
+            var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            sb.AppendLine($"## QUY TẮC ĐỐI ỨNG DÒNG (BẮT BUỘC KHỚP {lines.Length} DÒNG 1:1):");
+            sb.AppendLine($"Văn bản gốc gồm đúng {lines.Length} dòng được đánh số [1] đến [{lines.Length}].");
+            sb.AppendLine("Bạn PHẢI trả về đúng từng dòng có tiền tố số thứ tự: [1] <bản dịch dòng 1>, [2] <bản dịch dòng 2>...");
+            sb.AppendLine("Giữ nguyên ký hiệu heading (# hoặc ##) và link ảnh ![...] ở vị trí dòng tương ứng.");
+            sb.AppendLine("CHỈ TRẢ VỀ DUY NHẤT CÁC DÒNG ĐÃ DỊCH ĐÁNH SỐ THEO THỨ TỰ. Không giải thích!");
             sb.AppendLine();
-            sb.AppendLine("TEXT TO TRANSLATE:");
-            sb.Append(text);
+            sb.AppendLine("VĂN BẢN GỐC CẦN DỊCH:");
+            for (int i = 0; i < lines.Length; i++)
+            {
+                sb.AppendLine($"[{i + 1}] {lines[i]}");
+            }
         }
         else
         {
-            sb.AppendLine($"Dịch đoạn văn sau từ {sourceLang} sang {targetLang}.");
-            sb.AppendLine("Giữ nguyên heading (#/##), bảng, link, ảnh, định dạng markdown.");
-            sb.AppendLine("Output ONLY bản dịch, không giải thích.");
+            sb.AppendLine("## QUY TẮC DỊCH:");
+            sb.AppendLine("1. Dịch toàn bộ sang tiếng Việt trôi chảy theo chuẩn nhà văn, giữ nguyên định dạng Markdown (heading #, bảng, ảnh).");
+            sb.AppendLine("2. CHỈ TRẢ VỀ DUY NHẤT BẢN DỊCH TIẾNG VIỆT. Không giải thích.");
             sb.AppendLine();
-            sb.AppendLine("TEXT TO TRANSLATE:");
+            sb.AppendLine("VĂN BẢN GỐC CẦN DỊCH SANG TIẾNG VIỆT:");
             sb.Append(text);
         }
         return sb.ToString();

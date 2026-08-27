@@ -530,8 +530,14 @@ namespace TranslateBook.Views
         {
             if (e.NewValue is TocItem selectedItem)
             {
-                // PRIMARY: always use title-based scroll (most reliable for single-file EPUBs)
-                ScrollToChapterByTitle(selectedItem.Title);
+                if (!string.IsNullOrEmpty(selectedItem.FilePath))
+                {
+                    ScrollToChapter(selectedItem.FilePath, selectedItem.Title);
+                }
+                else
+                {
+                    ScrollToChapterByTitle(selectedItem.Title);
+                }
 
                 // Sync audio: find track by anchor or title
                 SyncAudioToChapter(selectedItem);
@@ -546,39 +552,42 @@ namespace TranslateBook.Views
         {
             if (WebView?.CoreWebView2 == null || string.IsNullOrEmpty(title)) return;
 
-            string escaped = EscapeJsString(title);
+            string cleanTitle = title.Trim();
+            string escaped = EscapeJsString(cleanTitle);
             string js = $@"
                 (function() {{
-                    var title = '{escaped}';
-                    // Method 1: find heading with exact text match
+                    var title = '{escaped}'.toLowerCase();
+                    // Method 1: find heading with exact or prefix match
                     var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
                     for (var i = 0; i < headings.length; i++) {{
-                        var text = headings[i].textContent.trim();
-                        if (text === title || text.indexOf(title) === 0) {{
+                        var text = headings[i].textContent.trim().toLowerCase();
+                        if (text === title || text.indexOf(title) === 0 || title.indexOf(text) === 0) {{
                             headings[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
                             return;
                         }}
                     }}
                     // Method 2: find by partial text match
                     for (var i = 0; i < headings.length; i++) {{
-                        if (headings[i].textContent.indexOf(title) >= 0) {{
+                        var text = headings[i].textContent.trim().toLowerCase();
+                        if (text.indexOf(title) >= 0 || title.indexOf(text) >= 0) {{
                             headings[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
                             return;
                         }}
                     }}
-                    // Method 3: find by id containing title
-                    var id = title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-                    var el = document.getElementById(id);
-                    if (!el) {{
-                        var all = document.querySelectorAll('[id]');
-                        for (var i = 0; i < all.length; i++) {{
-                            if (all[i].id.indexOf(id) >= 0) {{
-                                all[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
-                                return;
-                            }}
+                    // Method 3: find by ID in document
+                    var slugId = '{escaped}'.toLowerCase().replace(/[^a-z0-9\u00C0-\u1EF9]/g, '-').replace(/-+/g, '-');
+                    var el = document.getElementById(slugId);
+                    if (el) {{
+                        el.scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                        return;
+                    }}
+                    var allWithId = document.querySelectorAll('[id]');
+                    for (var i = 0; i < allWithId.length; i++) {{
+                        if (allWithId[i].id.toLowerCase().indexOf(slugId) >= 0) {{
+                            allWithId[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                            return;
                         }}
                     }}
-                    if (el) el.scrollIntoView({{behavior: 'smooth', block: 'start'}});
                 }})();
             ";
             WebView.CoreWebView2.ExecuteScriptAsync(js);

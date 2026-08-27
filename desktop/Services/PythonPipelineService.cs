@@ -48,6 +48,8 @@ public class PythonPipelineService
             StandardOutputEncoding = System.Text.Encoding.UTF8,
             StandardErrorEncoding = System.Text.Encoding.UTF8,
         };
+        psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+        psi.EnvironmentVariables["PYTHONUTF8"] = "1";
 
         using var process = new Process { StartInfo = psi };
 
@@ -85,6 +87,35 @@ public class PythonPipelineService
     {
         CurrentProcess?.Kill(true);
         CurrentProcess = null;
+    }
+
+    public async Task<List<string>> GetChapterListAsync(string slug, string langHint = "auto")
+    {
+        var chapters = new List<string>();
+        var chunksDir = Path.Combine(_projectRoot, "working", "chunks", slug);
+        if (!Directory.Exists(chunksDir)) return chapters;
+
+        try
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(x => x))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(f);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("chapter", out var ch))
+                    {
+                        var name = ch.GetString();
+                        if (!string.IsNullOrWhiteSpace(name) && seen.Add(name))
+                            chapters.Add(name);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return chapters;
     }
 
     public async Task<bool> RunAudiobookAsync(string slug, string temperature = "0.3",
@@ -143,7 +174,7 @@ public class PythonPipelineService
         var ext = Path.GetExtension(inputPath).ToLower();
         if (ext == ".pdf")
         {
-            var args = $"--input \"{inputPath}\" --output \"working/extracted/{slug}\" --lang {lang}";
+            var args = $"--input \"{inputPath}\" --output \"working/extracted/{slug}/raw.md\" --lang {lang}";
             return await RunScriptAsync("extract/mineru_extract.py", args, ct);
         }
         else if (ext == ".epub")
@@ -158,6 +189,26 @@ public class PythonPipelineService
         }
     }
 
+    public async Task<bool> RunChunkAsync(string rawMdPath, string outputDir,
+        CancellationToken ct = default)
+    {
+        var args = $"--input \"{rawMdPath}\" --output-dir \"{outputDir}\" --strategy smart";
+        return await RunScriptAsync("process/chunk_text.py", args, ct);
+    }
+
+    public async Task<bool> RunSkeletonAsync(string chunksDir, string progressDir,
+        CancellationToken ct = default)
+    {
+        var args = $"--chunks-dir \"{chunksDir}\" --progress-dir \"{progressDir}\" --force";
+        return await RunScriptAsync("translate/init_trilingual_skeleton.py", args, ct);
+    }
+
+    public async Task<bool> RunBookProfileAsync(string chunksDir, string progressDir, CancellationToken ct = default)
+    {
+        var args = $"--chunks-dir \"{chunksDir}\" --progress-dir \"{progressDir}\"";
+        return await RunScriptAsync("translate/create_book_profile.py", args, ct);
+    }
+
     public async Task<bool> RunGlossaryAsync(string sourceDir, string bookName,
         string outputPath, CancellationToken ct = default)
     {
@@ -166,19 +217,22 @@ public class PythonPipelineService
     }
 
     public async Task<bool> RunMergeAsync(string slug, string format = "trilingual",
-        bool force = false, CancellationToken ct = default)
+        string outputDir = "", bool force = true, CancellationToken ct = default)
     {
-        var args = $"--format {format}";
+        var progressDir = Path.Combine(_projectRoot, "working", "progress", slug);
+        var args = $"--progress-dir \"{progressDir}\" --book-name \"{slug}\" --format {format}";
         if (force) args += " --force";
+        if (!string.IsNullOrWhiteSpace(outputDir)) args += $" --output-dir \"{outputDir}\"";
         return await RunScriptAsync("output/merge_chunks.py", args, ct);
     }
 
-    public async Task<bool> RunMakeEpubAsync(string slug, string title = "",
-        string author = "", CancellationToken ct = default)
+    public async Task<bool> RunMakeEpubAsync(string mdPath, string title = "",
+        string author = "", string resourcePath = "", CancellationToken ct = default)
     {
-        var args = $"--slug \"{slug}\"";
+        var args = $"\"{mdPath}\"";
         if (!string.IsNullOrWhiteSpace(title)) args += $" --title \"{title}\"";
         if (!string.IsNullOrWhiteSpace(author)) args += $" --author \"{author}\"";
+        if (!string.IsNullOrWhiteSpace(resourcePath)) args += $" --resource-path \"{resourcePath}\"";
         return await RunScriptAsync("output/make_epub.py", args, ct);
     }
 
@@ -191,6 +245,23 @@ public class PythonPipelineService
         if (!string.IsNullOrWhiteSpace(glossary)) args += $" --glossary \"{glossary}\"";
         if (!string.IsNullOrWhiteSpace(reportPath)) args += $" --report \"{reportPath}\"";
         return await RunScriptAsync("qa/glossary_qa.py", args, ct);
+    }
+
+    public async Task<bool> RunBatchQaAsync(string progressDir, int chunkId, CancellationToken ct = default)
+    {
+        var args = $"--progress-dir \"{progressDir}\" --chunk-id {chunkId}";
+        return await RunScriptAsync("qa/batch_qa.py", args, ct);
+    }
+
+    public async Task<bool> RunManageInputAsync(CancellationToken ct = default)
+    {
+        return await RunScriptAsync("manage_input.py", "", ct);
+    }
+
+    public async Task<bool> RunMergeSentencesAsync(string inputMdPath, CancellationToken ct = default)
+    {
+        var args = $"--input \"{inputMdPath}\"";
+        return await RunScriptAsync("output/merge_sentences.py", args, ct);
     }
 
     public async Task<bool> RunManageVoiceAsync(string subArgs, CancellationToken ct = default)

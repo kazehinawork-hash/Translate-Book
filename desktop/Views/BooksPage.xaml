@@ -95,7 +95,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
-                                <ui:Card Margin="6" Width="300" Padding="16" Style="{StaticResource InteractiveCard}">
+                                <ui:Card Margin="6" Width="320" Padding="16" Style="{StaticResource InteractiveCard}">
                                     <StackPanel>
                                         <!-- Header: avatar + title + status -->
                                         <Border Style="{StaticResource BookCardHeader}">
@@ -122,40 +122,70 @@
                                             </Grid>
                                         </Border>
 
-                                        <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}"
-                                                   Content="Chạy Pipeline" HorizontalAlignment="Stretch"
-                                                   ToolTip="Chạy toàn bộ pipeline: Extract → QC → Chunk → Glossary → Translate → QA → Merge → EPUB"
-                                                   Command="{Binding DataContext.RunPipelineCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                   CommandParameter="{Binding}">
-                                            <ui:Button.Style>
-                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                            <Setter Property="Content" Value="Đang chạy..."/>
-                                                            <Setter Property="IsEnabled" Value="False"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </ui:Button.Style>
-                                        </ui:Button>
-                                        <Grid Margin="0,8,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="8"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Content="Chỉ Dịch" Icon="{ui:SymbolIcon DocumentText24}"
-                                                       ToolTip="Chỉ dịch sách (Extract → Translate → QA → Merge → EPUB)"
-                                                       HorizontalAlignment="Stretch"
-                                                       Command="{Binding DataContext.RunTranslateOnlyCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                       CommandParameter="{Binding}"/>
-                                            <ui:Button Grid.Column="2" Content="Tạo Audio" Icon="{ui:SymbolIcon Headphones24}"
-                                                       ToolTip="Tạo audiobook bằng VieNeu-TTS (cho sách đã dịch)"
-                                                       HorizontalAlignment="Stretch"
-                                                       Command="{Binding DataContext.RunAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                                       CommandParameter="{Binding}"/>
-                                        </Grid>
-                                        <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" Height="4" Margin="0,10,0,0">
+                                        <!-- Khung Dịch test thử theo chương (Test chất lượng trước) -->
+                                        <Border Margin="0,8,0,10" Padding="10" CornerRadius="10"
+                                                Background="{DynamicResource GlassElementBackgroundBrush}"
+                                                BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.5">
+                                            <StackPanel>
+                                                <TextBlock Text="⚡ Dịch test thử theo chương:" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="8"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <ComboBox x:Name="ChapterCombo" Grid.Column="0" Height="32" FontSize="11.5"
+                                                              ItemsSource="{Binding AvailableChapters}"
+                                                              SelectedItem="{Binding SelectedSampleChapter, Mode=TwoWay}"
+                                                              ToolTip="Chọn chương muốn dịch test thử"
+                                                              IsEditable="False"
+                                                              Loaded="ChapterCombo_Loaded"
+                                                              Style="{StaticResource GlassComboBox}"/>
+                                                    <ui:Button Grid.Column="2" Content="Dịch test" Icon="{ui:SymbolIcon PlayCircle24}"
+                                                               Height="32" Padding="12,0" FontSize="12"
+                                                               ToolTip="Dịch test thử chương đã chọn qua API và mở cửa sổ xem trước (Preview)"
+                                                               Click="SampleTranslate_Click"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                <!-- Nút chạy Dịch toàn bộ cuốn sách & Sửa chữa -->
+                                <StackPanel Margin="0,2,0,0">
+                                    <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}"
+                                               Content="Dịch lại Toàn bộ" Height="34" HorizontalAlignment="Stretch"
+                                               ToolTip="Chạy lại toàn bộ quy trình từ đầu: Trích xuất → Chia chunk → Tạo khung → Dịch mới → Merge → EPUB"
+                                               Click="RunPipeline_Click">
+                                        <ui:Button.Style>
+                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                        <Setter Property="Content" Value="Đang chạy toàn bộ..."/>
+                                                        <Setter Property="IsEnabled" Value="False"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:Button.Style>
+                                    </ui:Button>
+
+                                    <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}" Margin="0,6,0,0"
+                                               Content="Sửa chữa &amp; Rà soát" Height="34" HorizontalAlignment="Stretch"
+                                               ToolTip="Chế độ thông minh: Rà soát lỗi từng chunk, giữ lại các chunk đã tốt, chỉ dịch lại các chunk lỗi/lệch dòng và tự động gộp lại file thành phẩm"
+                                               Click="RepairBook_Click">
+                                        <ui:Button.Style>
+                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                        <Setter Property="Content" Value="Đang rà soát &amp; sửa..."/>
+                                                        <Setter Property="IsEnabled" Value="False"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:Button.Style>
+                                    </ui:Button>
+                                </StackPanel>
+
+                                        <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" Height="4" Margin="0,8,0,0">
                                             <ProgressBar.Style>
                                                 <Style TargetType="ProgressBar">
                                                     <Setter Property="Visibility" Value="Collapsed"/>

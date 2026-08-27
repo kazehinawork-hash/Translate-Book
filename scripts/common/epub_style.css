@@ -2,22 +2,22 @@
 .tri-block {
     margin-bottom: 1.2em;
 }
-.tri-block .src-zh {
+.tri-block .src-zh, p.src-zh {
     font-size: 0.95em;
     color: #555555;
     /* KHÔNG dùng italic cho tiếng Trung (Hán tự bị nghiêng rất xấu) */
     margin: 0;
 }
-.tri-block .pinyin {
+.tri-block .pinyin, p.pinyin {
     font-size: 0.8em;
     color: #888888;
     font-style: italic;
     margin: 0;
 }
-.tri-block .vi {
+.tri-block .vi, p.vi {
     font-size: 1em;
     font-weight: 500;
-    margin: 0.2em 0 0 0;
+    margin: 0.2em 0 1.2em 0;
 }
 
 /* ── Khối song ngữ (EN/VI) ── */

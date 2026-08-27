@@ -98,7 +98,7 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<BookStatus> OutputBooks { get; } = new();
 
     /// <summary>True when any long-running operation is active — drives the busy overlay.</summary>
-    public bool IsBusyAny => IsPipelineBusy || IsVoiceBusy || IsQaBusy
+    public bool IsBusyAny => IsPipelineBusy || IsVoiceBusy || IsQaBusy || IsSampleBusy
         || InputBooks.Any(b => b.IsBusy) || OutputBooks.Any(b => b.IsBusy);
 
     partial void OnSelectedProviderChanged(string value)
@@ -174,15 +174,68 @@ public partial class MainViewModel : ObservableObject
                     var category = relDir.Replace("\\", "/").Split('/')[0];
                     if (string.IsNullOrEmpty(category) || category == ".") category = "chua-lam";
 
-                    InputBooks.Add(new BookStatus
+                    var rawTitle = Path.GetFileNameWithoutExtension(f);
+                    // Tìm xem đã có thư mục output tương ứng để lấy slug chuẩn chưa
+                    var slug = SanitizeFileName(rawTitle);
+                    var candidateOutputDir = Path.Combine(_projectRoot, "output", "books", rawTitle);
+                    if (Directory.Exists(candidateOutputDir))
                     {
-                        Slug = name,
-                        Title = Path.GetFileNameWithoutExtension(f),
+                        var metaPath = Path.Combine(candidateOutputDir, "metadata.json");
+                        if (File.Exists(metaPath))
+                        {
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(File.ReadAllText(metaPath));
+                                if (doc.RootElement.TryGetProperty("slug", out var sp) && !string.IsNullOrEmpty(sp.GetString()))
+                                    slug = sp.GetString()!;
+                            }
+                            catch { }
+                        }
+                    }
+
+                    var book = new BookStatus
+                    {
+                        Slug = slug,
+                        Title = rawTitle,
                         Source = "input",
                         FilePath = f,
                         FolderPath = Path.GetDirectoryName(f) ?? inputDir,
-                        InputCategory = category
-                    });
+                        InputCategory = category,
+                        EpubTitle = rawTitle
+                    };
+
+                    // Nạp sẵn danh sách chương để Dropdown luôn có sẵn dữ liệu chọn
+                    var chunksDir = Path.Combine(_projectRoot, "working", "chunks", slug);
+                    if (Directory.Exists(chunksDir))
+                    {
+                        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var chunkFile in Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(x => x))
+                        {
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(File.ReadAllText(chunkFile));
+                                if (doc.RootElement.TryGetProperty("chapter", out var ch))
+                                {
+                                    var chName = ch.GetString();
+                                    if (!string.IsNullOrWhiteSpace(chName) && seen.Add(chName))
+                                        book.AvailableChapters.Add(chName);
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (book.AvailableChapters.Count == 0)
+                    {
+                        book.AvailableChapters.Add("Chương 1 (Mặc định)");
+                        book.AvailableChapters.Add("Chương 2");
+                        book.AvailableChapters.Add("Chương 3");
+                        book.AvailableChapters.Add("Chương 4");
+                        book.AvailableChapters.Add("Chương 5");
+                    }
+                    book.SelectedSampleChapter = book.AvailableChapters[0];
+
+                    InputBooks.Add(book);
                 }
             }
         }
@@ -424,6 +477,406 @@ public partial class MainViewModel : ObservableObject
         }
 
         AppendLog($"Hoàn thành: {book.Slug} ({doneCount}/{totalChunks} chunk)");
+    }
+
+    // ==================== SAMPLE TRANSLATION (DỊCH MẪU 1 CHƯƠNG) ====================
+
+    [ObservableProperty] private string _selectedSampleChapter = "";
+    [ObservableProperty] private bool _isSampleBusy;
+    [ObservableProperty] private string _lastSampleMdPath = "";
+
+    /// <summary>
+    /// Tải danh sách các chương của 1 cuốn sách từ thư mục working/chunks/<slug>/
+    /// để người dùng chọn chương muốn dịch thử riêng cho cuốn sách đó.
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadChaptersAsync(BookStatus book)
+    {
+        if (book == null) return;
+        book.AvailableChapters.Clear();
+        book.SelectedSampleChapter = "";
+
+        var chapters = await _pipeline.GetChapterListAsync(book.Slug);
+        foreach (var c in chapters)
+            book.AvailableChapters.Add(c);
+
+        if (book.AvailableChapters.Count > 0)
+        {
+            book.SelectedSampleChapter = book.AvailableChapters[0];
+        }
+    }
+
+    [RelayCommand]
+    private async Task SampleTranslateAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        IsSampleBusy = true;
+        BusyMessage = $"Đang chuẩn bị dịch thử: {book.Slug}...";
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        try
+        {
+            var chunksDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
+            if (!Directory.Exists(chunksDir) || Directory.GetFiles(chunksDir, "chunk-*.json").Length == 0)
+            {
+                AppendLog($"[Dịch thử] Sách '{book.Slug}' chưa có dữ liệu chunk. Đang tự động trích xuất nội dung (Extract & Chunk)...");
+                BusyMessage = $"Đang trích xuất nội dung: {book.Slug}...";
+
+                // Chạy extract
+                var okExtract = await _pipeline.RunExtractAsync(book.FilePath, book.Slug, string.IsNullOrWhiteSpace(book.PipelineLang) ? "auto" : book.PipelineLang, ct);
+                if (!okExtract)
+                {
+                    AppendLog($"[Lỗi] Không thể trích xuất file: {book.FilePath}", "error");
+                    return;
+                }
+
+                // Chạy chunk
+                var rawMdPath = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
+                if (!File.Exists(rawMdPath))
+                {
+                    AppendLog($"[Lỗi] Không tìm thấy raw.md sau khi extract: {rawMdPath}", "error");
+                    return;
+                }
+
+                var okChunk = await _pipeline.RunChunkAsync(rawMdPath, chunksDir, ct);
+                if (!okChunk)
+                {
+                    AppendLog($"[Lỗi] Không thể chia chunk: {rawMdPath}", "error");
+                    return;
+                }
+
+                await LoadChaptersAsync(book);
+            }
+
+            if (book.AvailableChapters.Count == 0)
+            {
+                await LoadChaptersAsync(book);
+            }
+
+            var chosenChapter = book.SelectedSampleChapter;
+            if (string.IsNullOrWhiteSpace(chosenChapter) && book.AvailableChapters.Count > 0)
+            {
+                chosenChapter = book.AvailableChapters[0];
+                book.SelectedSampleChapter = chosenChapter;
+            }
+
+            if (string.IsNullOrWhiteSpace(chosenChapter))
+            {
+                chosenChapter = "Chương 1";
+            }
+
+            // Kiểm tra xem đã có skeleton (original_text dòng-đối-dòng) chưa
+            var progressDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
+            if (!Directory.Exists(progressDir))
+            {
+                await _pipeline.RunSkeletonAsync(chunksDir, progressDir, ct);
+            }
+
+            // Lấy danh sách chunk thuộc chương đã chọn
+            var chunkFiles = Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(f => f).ToArray();
+            var targetChunks = new List<(int chunkId, string text, string chapter, string originalText, string pinyinText, bool isTrilingual)>();
+
+            foreach (var chunkFile in chunkFiles)
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(chunkFile, ct);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    var c = doc.RootElement;
+                    var chapter = c.TryGetProperty("chapter", out var ch) ? ch.GetString() ?? "" : "";
+                    if (chapter != chosenChapter) continue;
+
+                    int chunkId = c.TryGetProperty("chunk_id", out var cid) ? cid.GetInt32() : -1;
+                    var text = c.TryGetProperty("text", out var tp) ? tp.GetString() ?? "" : "";
+                    bool isTrilingual = c.TryGetProperty("text", out var t2) && ContainsChinese(t2.GetString() ?? "");
+
+                    // Nếu có skeleton, ưu tiên lấy original_text chuẩn dòng-đối-dòng của init_trilingual_skeleton.py
+                    var origText = text;
+                    var progChunkFile = Path.Combine(progressDir, $"chunk_{chunkId:D3}.json");
+                    if (File.Exists(progChunkFile))
+                    {
+                        try
+                        {
+                            using var pdoc = JsonDocument.Parse(File.ReadAllText(progChunkFile));
+                            if (pdoc.RootElement.TryGetProperty("original_text", out var ot) && !string.IsNullOrWhiteSpace(ot.GetString()))
+                            {
+                                origText = ot.GetString()!;
+                            }
+                        }
+                        catch { }
+                    }
+
+                    targetChunks.Add((chunkId, origText, chapter, origText, "", isTrilingual));
+                }
+                catch { }
+            }
+
+            // Nếu chương không khớp tên cụ thể (hoặc sách chỉ có 1 file), lấy 1-2 chunk đầu tiên làm mẫu
+            if (targetChunks.Count == 0 && chunkFiles.Length > 0)
+            {
+                for (int idx = 0; idx < Math.Min(2, chunkFiles.Length); idx++)
+                {
+                    try
+                    {
+                        var json = await File.ReadAllTextAsync(chunkFiles[idx], ct);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        var c = doc.RootElement;
+                        var chapter = c.TryGetProperty("chapter", out var ch) ? ch.GetString() ?? "" : $"Chunk {idx + 1}";
+                        int chunkId = c.TryGetProperty("chunk_id", out var cid) ? cid.GetInt32() : idx + 1;
+                        var text = c.TryGetProperty("text", out var tp) ? tp.GetString() ?? "" : "";
+                        bool isTrilingual = c.TryGetProperty("text", out var t2) && ContainsChinese(t2.GetString() ?? "");
+
+                        var origText = text;
+                        var progChunkFile = Path.Combine(progressDir, $"chunk_{chunkId:D3}.json");
+                        if (File.Exists(progChunkFile))
+                        {
+                            try
+                            {
+                                using var pdoc = JsonDocument.Parse(File.ReadAllText(progChunkFile));
+                                if (pdoc.RootElement.TryGetProperty("original_text", out var ot) && !string.IsNullOrWhiteSpace(ot.GetString()))
+                                {
+                                    origText = ot.GetString()!;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        targetChunks.Add((chunkId, origText, chapter, origText, "", isTrilingual));
+                    }
+                    catch { }
+                }
+            }
+
+            if (targetChunks.Count == 0)
+            {
+                AppendLog($"[Lỗi] Không tìm thấy nội dung để dịch mẫu cho: {book.Slug}", "error");
+                return;
+            }
+
+            var glossary = ApiTranslationService.LoadGlossary(book.Slug, _projectRoot);
+            AppendLog($"Bắt đầu dịch thử: {book.Slug} (Chương: '{chosenChapter}', {targetChunks.Count} chunk)");
+            var translatedResults = new List<(int chunkId, string translated, string originalText, string pinyinText, bool isTrilingual)>();
+
+            for (int i = 0; i < targetChunks.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var (chunkId, text, chapter, originalText, _, isTrilingual) = targetChunks[i];
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    AppendLog($"  [Bỏ qua] Chunk {chunkId} rỗng", "warning");
+                    continue;
+                }
+
+                var sourceLang = isTrilingual ? "Chinese" : "English";
+                AppendLog($"  → [{i + 1}/{targetChunks.Count}] Dịch chunk {chunkId}");
+
+                var result = await _apiService.TranslateAsync(
+                    text, ActiveProvider, glossary,
+                    sourceLang: sourceLang, targetLang: "Vietnamese",
+                    trilingual: isTrilingual, ct: ct);
+
+                translatedResults.Add((chunkId, result.Text, text, "", isTrilingual));
+                AppendLog($"    ✅ Chunk {chunkId} xong ({result.Text.Length} ký tự)");
+            }
+
+            if (translatedResults.Count == 0)
+            {
+                AppendLog("[Lỗi] Không dịch được chunk nào.", "error");
+                return;
+            }
+
+            // Build file preview tạm (markdown)
+            var previewDir = Path.Combine(_projectRoot, "output", "preview");
+            Directory.CreateDirectory(previewDir);
+            var safeChapter = SanitizeFileName(chosenChapter);
+            var previewPath = Path.Combine(previewDir, $"{book.Slug}-sample-{safeChapter}.md");
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"# 📖 {book.DisplayTitle}");
+            sb.AppendLine();
+            sb.AppendLine($"**Chương mẫu:** {chosenChapter}");
+            sb.AppendLine($"**Ngày dịch:** {DateTime.Now:yyyy-MM-dd HH:mm}");
+            sb.AppendLine($"**Số chunk đã dịch:** {translatedResults.Count}");
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+            sb.AppendLine($"## {chosenChapter}");
+            sb.AppendLine();
+
+            // Gom source + vi (cho trường hợp sách Trung) hoặc chỉ vi
+            bool isFirst = true;
+            foreach (var (_, translated, _, _, _) in translatedResults.OrderBy(x => x.chunkId))
+            {
+                if (!isFirst) sb.AppendLine();
+                sb.AppendLine(translated.Trim());
+                isFirst = false;
+            }
+
+            File.WriteAllText(previewPath, sb.ToString(), new System.Text.UTF8Encoding(false));
+            LastSampleMdPath = previewPath;
+            AppendLog($"✅ Đã lưu preview mẫu: {previewPath}");
+
+            // Nếu có bản gốc → lưu kèm file song ngữ / tam ngữ
+            if (translatedResults.Any(r => r.isTrilingual))
+            {
+                // Tìm raw.md để lấy pinyin
+                var pinyinMap = TryLoadPinyinForSample(book.Slug, translatedResults);
+                var trilingualPath = Path.Combine(previewDir, $"{book.Slug}-sample-{safeChapter}-trilingual.md");
+                var tsb = new System.Text.StringBuilder();
+                tsb.AppendLine($"# 📖 {book.DisplayTitle} (Tam ngữ: Gốc + Pinyin + Việt)");
+                tsb.AppendLine();
+                tsb.AppendLine($"**Chương mẫu:** {chosenChapter}");
+                tsb.AppendLine();
+                tsb.AppendLine("---");
+                tsb.AppendLine();
+                foreach (var (cid, trans, orig, pin, _) in translatedResults.OrderBy(x => x.chunkId))
+                {
+                    var pinyin = pinyinMap.GetValueOrDefault(cid, pin);
+                    var origLines = (orig ?? "").Split('\n').Select(l => l.TrimEnd()).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                    var pinyinLines = (pinyin ?? "").Split('\n').Select(l => l.TrimEnd()).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                    var viLines = (trans ?? "").Split('\n').Select(l => l.TrimEnd()).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                    int maxLines = Math.Max(origLines.Count, Math.Max(pinyinLines.Count, viLines.Count));
+                    for (int j = 0; j < maxLines; j++)
+                    {
+                        var o = j < origLines.Count ? origLines[j] : "";
+                        var p = j < pinyinLines.Count ? pinyinLines[j] : "";
+                        var v = j < viLines.Count ? viLines[j] : "";
+                        if (!string.IsNullOrWhiteSpace(o)) tsb.AppendLine(o);
+                        if (!string.IsNullOrWhiteSpace(p)) tsb.AppendLine($"*{p}*");
+                        if (!string.IsNullOrWhiteSpace(v)) tsb.AppendLine(v);
+                        tsb.AppendLine();
+                    }
+                }
+                File.WriteAllText(trilingualPath, tsb.ToString(), new System.Text.UTF8Encoding(false));
+                AppendLog($"✅ Đã lưu preview tam ngữ: {trilingualPath}");
+
+                // Mở preview với dữ liệu tam ngữ
+                await OpenMdPreviewAsync(previewPath, book, trilingualPath, translatedResults, pinyinMap);
+            }
+            else
+            {
+                // Sách EN: chỉ bản Việt
+                await OpenMdPreviewAsync(previewPath, book, null, translatedResults, new Dictionary<int, string>());
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy dịch mẫu: {book.Slug}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            IsSampleBusy = false;
+            BusyMessage = "";
+            _currentCts = null;
+        }
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "sample";
+        foreach (var c in Path.GetInvalidFileNameChars())
+            name = name.Replace(c, '_');
+        // Giới hạn độ dài
+        if (name.Length > 50) name = name.Substring(0, 50);
+        return name;
+    }
+
+    /// <summary>Đọc working/progress/<slug>/chunk_NNN.json để lấy pinyin_text (nếu có).</summary>
+    private Dictionary<int, string> TryLoadPinyinForSample(string slug,
+        List<(int chunkId, string translated, string originalText, string pinyinText, bool isTrilingual)> results)
+    {
+        var map = new Dictionary<int, string>();
+        var progressDir = Path.Combine(_projectRoot, "working", "progress", slug);
+        if (!Directory.Exists(progressDir)) return map;
+
+        foreach (var (cid, _, _, _, _) in results)
+        {
+            var pf = Path.Combine(progressDir, $"chunk_{cid:000}.json");
+            if (!File.Exists(pf)) continue;
+            try
+            {
+                var json = File.ReadAllText(pf);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("pinyin_text", out var pin))
+                    map[cid] = pin.GetString() ?? "";
+            }
+            catch { }
+        }
+        return map;
+    }
+
+    private async Task OpenMdPreviewAsync(string viPreviewPath, BookStatus book, string? trilingualPath,
+        List<(int chunkId, string translated, string originalText, string pinyinText, bool isTrilingual)> results,
+        Dictionary<int, string> pinyinMap)
+    {
+        var app = Application.Current;
+        if (app == null)
+        {
+            AppendLog("[Lỗi] Application.Current == null, không thể mở preview.", "error");
+            return;
+        }
+        await app.Dispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                // Ưu tiên file tam ngữ nếu có (đẹp hơn, có cả gốc + pinyin + vi)
+                var mainPath = trilingualPath ?? viPreviewPath;
+                var window = new MdPreviewWindow(mainPath, book.DisplayTitle, book.Slug);
+                if (app.MainWindow != null) window.Owner = app.MainWindow;
+
+                // Truyền dữ liệu gốc/pinyin để toggle được các mode
+                var srcCombined = string.Join("\n\n",
+                    results.OrderBy(x => x.chunkId)
+                           .Select(x => x.originalText ?? ""));
+                var pinCombined = string.Join("\n\n",
+                    pinyinMap.OrderBy(x => x.Key)
+                             .Select(x => x.Value));
+                window.SetSourceContent(srcCombined, pinCombined);
+
+                window.Show();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Lỗi] Không thể mở cửa sổ preview: {ex.Message}", "error");
+            }
+        });
+    }
+
+    [RelayCommand]
+    private void OpenLastSamplePreview()
+    {
+        if (string.IsNullOrEmpty(LastSampleMdPath) || !File.Exists(LastSampleMdPath))
+        {
+            AppendLog("[Lỗi] Chưa có file preview mẫu nào.", "error");
+            return;
+        }
+        var app = Application.Current;
+        if (app == null) return;
+        app.Dispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                var window = new MdPreviewWindow(LastSampleMdPath, SelectedBook?.DisplayTitle ?? "Preview", SelectedBook?.Slug ?? "");
+                if (app.MainWindow != null) window.Owner = app.MainWindow;
+                window.Show();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Lỗi] Mở preview: {ex.Message}", "error");
+            }
+        });
     }
 
     [RelayCommand]
@@ -899,7 +1352,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    // ==================== PIPELINE COMMANDS ====================
+    // ==================== PIPELINE COMMANDS (DỊCH TOÀN BỘ SÁCH QUA API) ====================
 
     [RelayCommand]
     private async Task RunPipelineAsync(BookStatus book)
@@ -913,28 +1366,751 @@ public partial class MainViewModel : ObservableObject
 
         book.IsBusy = true;
         IsPipelineBusy = true;
-        BusyMessage = $"Đang chạy pipeline: {book.Slug}...";
+        BusyMessage = $"Đang chuẩn bị dịch: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
-        AppendLog($"Bắt đầu chạy pipeline: {book.Slug} (bước {PipelineFromStep}→{PipelineToStep}, ngôn ngữ={SelectedLang})");
+        AppendLog($"🚀 BẮT ĐẦU DỊCH TOÀN BỘ CUỐN SÁCH: {book.DisplayTitle} ({book.Slug})");
         try
         {
-            var ok = await _pipeline.RunPipelineAsync(
-                book.FilePath, book.Slug, SelectedLang,
-                PipelineFromStep, PipelineToStep, force: false,
-                author: EpubAuthor, ct: ct);
+            // === BƯỚC 1: TRÍCH XUẤT (EXTRACT) ===
+            var rawMdPath = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
+            BusyMessage = $"[1/6] Đang trích xuất nội dung: {book.Slug}...";
+            AppendLog($"[Bước 1/6] Trích xuất file gốc ({Path.GetFileName(book.FilePath)})...");
+            var okExtract = await _pipeline.RunExtractAsync(book.FilePath, book.Slug, string.IsNullOrWhiteSpace(book.PipelineLang) ? "auto" : book.PipelineLang, ct);
+            if (!okExtract || !File.Exists(rawMdPath))
+            {
+                AppendLog($"[Lỗi] Trích xuất nội dung thất bại: {book.FilePath}", "error");
+                return;
+            }
+            AppendLog("  ✅ Trích xuất nội dung hoàn tất.");
 
-            if (ok) AppendLog($"Pipeline hoàn thành: {book.Slug}");
-            else AppendLog($"[Lỗi] Pipeline thất bại: {book.Slug}", "error");
+            // === BƯỚC 2: CHIA CHUNK (SMART CHUNKING) ===
+            var chunksDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
+            BusyMessage = $"[2/6] Đang chia chunk: {book.Slug}...";
+            AppendLog($"[Bước 2/6] Phân đoạn văn bản (Chunking)...");
+            var okChunk = await _pipeline.RunChunkAsync(rawMdPath, chunksDir, ct);
+            if (!okChunk)
+            {
+                AppendLog($"[Lỗi] Chia chunk thất bại: {rawMdPath}", "error");
+                return;
+            }
+            AppendLog("  ✅ Phân đoạn văn bản hoàn tất.");
+
+            // === BƯỚC 3: KHỞI TẠO SKELETON PROGRESS ===
+            var progressDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
+            BusyMessage = $"[3/6] Đang tạo khung dịch (Skeleton)...";
+            AppendLog($"[Bước 3/6] Khởi tạo khung tiến trình (Skeleton progress)...");
+            await _pipeline.RunSkeletonAsync(chunksDir, progressDir, ct);
+            AppendLog("  ✅ Tạo khung dịch hoàn tất.");
+
+            // === BƯỚC 4: NẠP GLOSSARY MASTER & HỒ SƠ VĂN CHƯƠNG (BOOK PROFILE) ===
+            var glossary = ApiTranslationService.LoadGlossary(book.Slug, _projectRoot);
+            if (!string.IsNullOrWhiteSpace(glossary))
+            {
+                AppendLog($"[Bước 4/6] Đã nạp thuật ngữ từ glossary/master.csv ({glossary.Split('\n').Length} mục)");
+            }
+
+            var profilePath = Path.Combine(_projectRoot, "working", "profile", $"{book.Slug}.md");
+            string bookProfile = "";
+            try
+            {
+                if (!File.Exists(profilePath))
+                {
+                    await _pipeline.RunBookProfileAsync(chunksDir, progressDir, ct);
+                }
+                if (File.Exists(profilePath))
+                {
+                    bookProfile = await File.ReadAllTextAsync(profilePath, ct);
+                    AppendLog($"[Bước 4/6] Đã nạp hồ sơ văn chương (Book Profile) cho {book.Slug}");
+                }
+            }
+            catch { }
+
+            // === BƯỚC 5: VÒNG LẶP DỊCH TỰ ĐỘNG TỪNG CHUNK QUA API ===
+            var chunkFiles = Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(f => f).ToArray();
+            book.TotalChunks = chunkFiles.Length;
+            AppendLog($"[Bước 5/6] Bắt đầu dịch tự động {chunkFiles.Length} chunk qua API ({ActiveProvider})...");
+
+            int successCount = 0;
+            for (int i = 0; i < chunkFiles.Length; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var chunkFile = chunkFiles[i];
+
+                int chunkId = i;
+                string text = "";
+                string chapter = "";
+                try
+                {
+                    var json = await File.ReadAllTextAsync(chunkFile, ct);
+                    using var doc = JsonDocument.Parse(json);
+                    var c = doc.RootElement;
+                    chunkId = c.TryGetProperty("chunk_id", out var cid) ? cid.GetInt32() : i;
+                    text = c.TryGetProperty("text", out var tp) ? tp.GetString() ?? "" : "";
+                    chapter = c.TryGetProperty("chapter", out var ch) ? ch.GetString() ?? "" : "";
+                }
+                catch { }
+
+                var progChunkFile = Path.Combine(progressDir, $"chunk_{chunkId:D3}.json");
+                string origText = text;
+                string pinyinText = "";
+                string existingTrans = "";
+                bool isTrilingual = ContainsChinese(text);
+
+                Dictionary<string, object> progObj = new();
+                if (File.Exists(progChunkFile))
+                {
+                    try
+                    {
+                        using var pdoc = JsonDocument.Parse(File.ReadAllText(progChunkFile));
+                        foreach (var prop in pdoc.RootElement.EnumerateObject())
+                        {
+                            if (prop.Value.ValueKind == JsonValueKind.String)
+                                progObj[prop.Name] = prop.Value.GetString()!;
+                            else if (prop.Value.ValueKind == JsonValueKind.Number)
+                                progObj[prop.Name] = prop.Value.GetInt32();
+                            else if (prop.Value.ValueKind == JsonValueKind.True || prop.Value.ValueKind == JsonValueKind.False)
+                                progObj[prop.Name] = prop.Value.GetBoolean();
+                        }
+
+                        if (progObj.TryGetValue("original_text", out var ot) && !string.IsNullOrWhiteSpace(ot?.ToString()))
+                            origText = ot.ToString()!;
+                        if (progObj.TryGetValue("pinyin_text", out var pt) && !string.IsNullOrWhiteSpace(pt?.ToString()))
+                            pinyinText = pt.ToString()!;
+                    }
+                    catch { }
+                }
+
+                if (string.IsNullOrWhiteSpace(origText))
+                {
+                    continue;
+                }
+
+                // Lấy ngữ cảnh chunk trước (prev) để giữ mạch văn nhất quán giống Agent
+                var contextSb = new System.Text.StringBuilder();
+                if (!string.IsNullOrWhiteSpace(bookProfile))
+                {
+                    contextSb.AppendLine("### HỒ SƠ VĂN CHƯƠNG CUỐN SÁCH (BẮT BUỘC BÁM SÁT):");
+                    contextSb.AppendLine(bookProfile);
+                    contextSb.AppendLine();
+                }
+
+                BusyMessage = $"Đang dịch: [{i + 1}/{chunkFiles.Length}] ({book.Slug})...";
+                AppendLog($"  → [{i + 1}/{chunkFiles.Length}] Dịch chunk {chunkId} ({chapter})...");
+
+                var sourceLang = isTrilingual ? "Chinese" : "English";
+                var result = await _apiService.TranslateAsync(
+                    origText, ActiveProvider, glossary,
+                    context: contextSb.ToString(),
+                    sourceLang: sourceLang, targetLang: "Vietnamese",
+                    trilingual: isTrilingual,
+                    onStatusLog: msg => AppendLog(msg, "warning"),
+                    ct: ct);
+
+                if (string.IsNullOrWhiteSpace(result.Text))
+                {
+                    AppendLog($"    [Cảnh báo] Chunk {chunkId} dịch trả về rỗng, thử lại lần sau.", "warning");
+                    continue;
+                }
+
+                // Cập nhật kết quả dịch vào progress JSON giữ nguyên pinyin_text và original_text
+                progObj["chunk_id"] = chunkId;
+                progObj["total_chunks"] = chunkFiles.Length;
+                progObj["chapter"] = chapter;
+                progObj["source_text"] = origText;
+                progObj["original_text"] = origText;
+                progObj["pinyin_text"] = pinyinText;
+                progObj["translated_text"] = result.Text.Trim();
+                progObj["word_count_source"] = origText.Length;
+                progObj["word_count_translated"] = result.Text.Length;
+                progObj["mode"] = isTrilingual ? "trilingual" : "bilingual";
+                progObj["translated_at"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
+
+                // Lưu file progress JSON
+                var saveJson = JsonSerializer.Serialize(progObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+                await File.WriteAllTextAsync(progChunkFile, saveJson, new System.Text.UTF8Encoding(false), ct);
+
+                // QA nhanh cho chunk vừa dịch theo chuẩn /dich (Bước G.4)
+                await _pipeline.RunBatchQaAsync(progressDir, chunkId, ct);
+
+                successCount++;
+                book.ProgressCount = successCount;
+                AppendLog($"    ✅ Chunk {chunkId} dịch xong ({result.Text.Length} ký tự)");
+            }
+
+            AppendLog($"  🎉 Dịch hoàn tất {successCount}/{chunkFiles.Length} chunks!");
+
+            // === BƯỚC 6: MERGE CHUNKS & MAKE EPUB ===
+            BusyMessage = $"[6/6] Đang gộp file và tạo EPUB: {book.Slug}...";
+            AppendLog("[Bước 6/6] Gộp các bản dịch và tạo sách điện tử (EPUB)...");
+
+            var outputBookDir = Path.Combine(_projectRoot, "output", "books", book.Title);
+            var finalDir = Path.Combine(outputBookDir, "final");
+            Directory.CreateDirectory(finalDir);
+
+            // Gộp bản dịch tam ngữ và bản dịch thuần Việt
+            var isChineseBook = ContainsChinese(File.Exists(rawMdPath) ? File.ReadAllText(rawMdPath) : book.Slug);
+            if (isChineseBook)
+            {
+                await _pipeline.RunMergeAsync(book.Slug, "trilingual", outputDir: finalDir, force: true, ct: ct);
+                // Đổi tên file sau merge sang chuẩn tamngu.md
+                var rawTrilingual = Path.Combine(finalDir, $"{book.Slug}_trilingual.md");
+                var destTamNgu = Path.Combine(finalDir, "tamngu.md");
+                if (File.Exists(rawTrilingual))
+                {
+                    if (File.Exists(destTamNgu)) File.Delete(destTamNgu);
+                    File.Move(rawTrilingual, destTamNgu);
+                }
+
+                await _pipeline.RunMergeAsync(book.Slug, "bilingual", outputDir: finalDir, force: true, ct: ct);
+                var rawVi = Path.Combine(finalDir, $"{book.Slug}_translated.md");
+                var destVi = Path.Combine(finalDir, "vi.md");
+                if (File.Exists(rawVi))
+                {
+                    if (File.Exists(destVi)) File.Delete(destVi);
+                    File.Move(rawVi, destVi);
+                }
+
+                // Gộp câu nối dòng OCR và dọn số trang rác theo chuẩn /dich (mục I)
+                if (File.Exists(destTamNgu)) await _pipeline.RunMergeSentencesAsync(destTamNgu, ct);
+                if (File.Exists(destVi)) await _pipeline.RunMergeSentencesAsync(destVi, ct);
+            }
+            else
+            {
+                await _pipeline.RunMergeAsync(book.Slug, "bilingual", outputDir: finalDir, force: true, ct: ct);
+                var rawVi = Path.Combine(finalDir, $"{book.Slug}_translated.md");
+                var destVi = Path.Combine(finalDir, "vi.md");
+                if (File.Exists(rawVi))
+                {
+                    if (File.Exists(destVi)) File.Delete(destVi);
+                    File.Move(rawVi, destVi);
+                }
+
+                if (File.Exists(destVi)) await _pipeline.RunMergeSentencesAsync(destVi, ct);
+            }
+
+            // Tạo metadata.json đầy đủ theo checklist bắt buộc của /dich
+            var metaFile = Path.Combine(outputBookDir, "metadata.json");
+            var metaObj = new Dictionary<string, object>
+            {
+                ["slug"] = book.Slug,
+                ["title"] = book.Title,
+                ["source_file"] = Path.GetFileName(book.FilePath),
+                ["author"] = book.EpubAuthor ?? "",
+                ["language"] = isChineseBook ? "zh" : "en",
+                ["genre"] = "",
+                ["has_audio"] = false,
+                ["has_epub"] = true,
+                ["epub_file"] = $"{book.Title}.epub",
+                ["created"] = DateTime.Now.ToString("yyyy-MM-dd")
+            };
+            await File.WriteAllTextAsync(metaFile, JsonSerializer.Serialize(metaObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), ct);
+
+            // Copy ảnh từ working/extracted/<slug> sang output/books/<title>/images và final/images
+            try
+            {
+                var targetImagesDir = Path.Combine(outputBookDir, "images");
+                var finalImagesDir = Path.Combine(finalDir, "images");
+                Directory.CreateDirectory(targetImagesDir);
+                Directory.CreateDirectory(finalImagesDir);
+
+                var extractedBase = Path.Combine(_projectRoot, "working", "extracted", book.Slug);
+                if (Directory.Exists(extractedBase))
+                {
+                    var imgFiles = Directory.GetFiles(extractedBase, "*.*", SearchOption.AllDirectories)
+                        .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                                    f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                                    f.EndsWith(".png", StringComparison.OrdinalIgnoreCase));
+                    foreach (var img in imgFiles)
+                    {
+                        var destImg1 = Path.Combine(targetImagesDir, Path.GetFileName(img));
+                        var destImg2 = Path.Combine(finalImagesDir, Path.GetFileName(img));
+                        if (!File.Exists(destImg1)) File.Copy(img, destImg1, true);
+                        if (!File.Exists(destImg2)) File.Copy(img, destImg2, true);
+                    }
+                }
+            }
+            catch { }
+
+            // Tạo file EPUB thành phẩm
+            var sourceMdForEpub = isChineseBook && File.Exists(Path.Combine(finalDir, "tamngu.md"))
+                ? Path.Combine(finalDir, "tamngu.md")
+                : Path.Combine(finalDir, "vi.md");
+
+            if (File.Exists(sourceMdForEpub))
+            {
+                var resourcePath = $"{Path.Combine(outputBookDir, "images")};{Path.Combine(_projectRoot, "working", "extracted", book.Slug)}";
+                await _pipeline.RunMakeEpubAsync(sourceMdForEpub, book.Title, book.EpubAuthor ?? "", resourcePath, ct);
+                var generatedEpub = Path.ChangeExtension(sourceMdForEpub, ".epub");
+                var targetEpub = Path.Combine(outputBookDir, $"{book.Title}.epub");
+                if (File.Exists(generatedEpub))
+                {
+                    if (File.Exists(targetEpub)) File.Delete(targetEpub);
+                    File.Move(generatedEpub, targetEpub);
+                }
+            }
+
+            // Chuyển file nguồn sang input/da-dich/ theo checklist mục K của /dich
+            try
+            {
+                var daDichDir = Path.Combine(_projectRoot, "input", "da-dich");
+                Directory.CreateDirectory(daDichDir);
+                var destInputFile = Path.Combine(daDichDir, Path.GetFileName(book.FilePath));
+                if (File.Exists(book.FilePath) && book.FilePath != destInputFile)
+                {
+                    if (File.Exists(destInputFile)) File.Delete(destInputFile);
+                    File.Move(book.FilePath, destInputFile);
+                }
+            }
+            catch { }
+
+            AppendLog($"✨ HOÀN TẤT TOÀN BỘ SÁCH: {book.DisplayTitle}!");
+            AppendLog($"📂 Thư mục sản phẩm: {outputBookDir}");
+
+            // Tự động load lại danh sách sách
+            LoadBooks();
         }
         catch (OperationCanceledException)
         {
-            AppendLog($"Đã hủy pipeline: {book.Slug}");
+            AppendLog($"Đã hủy pipeline: {book.Slug}", "warning");
         }
         catch (Exception ex)
         {
-            AppendLog($"[Lỗi] {ex.Message}", "error");
+            AppendLog($"[Lỗi Pipeline] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            IsPipelineBusy = false;
+            BusyMessage = "";
+            _currentCts = null;
+            UpdateBookStatus(book);
+        }
+    }
+
+    [RelayCommand]
+    private async Task RepairBookAsync(BookStatus book)
+    {
+        if (book == null || string.IsNullOrWhiteSpace(book.Slug)) return;
+        if (IsPipelineBusy)
+        {
+            AppendLog("⚠️ Đang có tiến trình khác chạy, vui lòng đợi!", "warning");
+            return;
+        }
+
+        // Tìm internal slug chuẩn từ metadata.json (nếu có)
+        var actualSlug = book.Slug;
+        var bookDir = Path.Combine(_projectRoot, "output", "books", book.Title);
+        var metaPath = Path.Combine(bookDir, "metadata.json");
+        if (File.Exists(metaPath))
+        {
+            try
+            {
+                using var mdoc = JsonDocument.Parse(File.ReadAllText(metaPath));
+                if (mdoc.RootElement.TryGetProperty("slug", out var s) && !string.IsNullOrWhiteSpace(s.GetString()))
+                {
+                    actualSlug = s.GetString()!;
+                }
+            }
+            catch { }
+        }
+
+        IsPipelineBusy = true;
+        book.IsBusy = true;
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        AppendLog($"🔧 BẮT ĐẦU RÀ SOÁT & SỬA CHỮA THÔNG MINH: {book.DisplayTitle} ({actualSlug})");
+        try
+        {
+            // 1. Kiểm tra raw.md
+            var rawMdPath = Path.Combine(_projectRoot, "working", "extracted", actualSlug, "raw.md");
+            if (!File.Exists(rawMdPath) && File.Exists(book.FilePath))
+            {
+                BusyMessage = $"Trích xuất file gốc: {actualSlug}...";
+                AppendLog($"[Rà soát] Trích xuất file gốc ({Path.GetFileName(book.FilePath)})...");
+                await _pipeline.RunExtractAsync(book.FilePath, actualSlug, string.IsNullOrWhiteSpace(book.PipelineLang) ? "auto" : book.PipelineLang, ct);
+            }
+
+            // 2. Kiểm tra Chunks
+            var chunksDir = Path.Combine(_projectRoot, "working", "chunks", actualSlug);
+            if (!Directory.Exists(chunksDir) || Directory.GetFiles(chunksDir, "chunk-*.json").Length == 0)
+            {
+                BusyMessage = $"Phân đoạn chunk: {actualSlug}...";
+                AppendLog($"[Rà soát] Chia chunk văn bản...");
+                await _pipeline.RunChunkAsync(rawMdPath, chunksDir, ct);
+            }
+
+            // 3. Kiểm tra Skeleton
+            var progressDir = Path.Combine(_projectRoot, "working", "progress", actualSlug);
+            if (!Directory.Exists(progressDir) || Directory.GetFiles(progressDir, "chunk_*.json").Length == 0)
+            {
+                BusyMessage = $"Tạo khung dịch (Skeleton): {actualSlug}...";
+                AppendLog($"[Rà soát] Tạo khung tiến trình (Skeleton)...");
+                await _pipeline.RunSkeletonAsync(chunksDir, progressDir, ct);
+            }
+
+            // 4. Nạp Glossary Master & Book Profile
+            var glossary = ApiTranslationService.LoadGlossary(actualSlug, _projectRoot);
+            var profilePath = Path.Combine(_projectRoot, "working", "profile", $"{actualSlug}.md");
+            string bookProfile = "";
+            if (File.Exists(profilePath))
+            {
+                try { bookProfile = await File.ReadAllTextAsync(profilePath, ct); } catch { }
+            }
+
+            var chunkFiles = Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(f => f).ToArray();
+            book.TotalChunks = chunkFiles.Length;
+
+            // 0. Tự động dọn dẹp các chunk thừa / chunk rác vượt quá total_chunks chuẩn
+            try
+            {
+                var existingProgFiles = Directory.GetFiles(progressDir, "chunk_*.json");
+                int cleanedPhantom = 0;
+                foreach (var pf in existingProgFiles)
+                {
+                    var fn = Path.GetFileNameWithoutExtension(pf); // chunk_055
+                    if (fn.StartsWith("chunk_") && int.TryParse(fn.Substring(6), out int cid))
+                    {
+                        if (cid >= chunkFiles.Length)
+                        {
+                            File.Delete(pf);
+                            cleanedPhantom++;
+                        }
+                    }
+                }
+                if (cleanedPhantom > 0)
+                {
+                    AppendLog($"  🧹 Đã dọn dẹp {cleanedPhantom} chunk rác/thừa không thuộc sách.");
+                }
+            }
+            catch { }
+
+            AppendLog($"🔍 Đang quét và kiểm tra chất lượng đa tầng ({chunkFiles.Length} chunks)...");
+
+            int repairedCount = 0;
+            int validCount = 0;
+            int offlineFixedCount = 0;
+
+            for (int i = 0; i < chunkFiles.Length; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var chunkFile = chunkFiles[i];
+
+                int chunkId = i;
+                string text = "";
+                string chapter = "";
+                try
+                {
+                    var json = await File.ReadAllTextAsync(chunkFile, ct);
+                    using var doc = JsonDocument.Parse(json);
+                    var c = doc.RootElement;
+                    chunkId = c.TryGetProperty("chunk_id", out var cid) ? cid.GetInt32() : i;
+                    text = c.TryGetProperty("text", out var tp) ? tp.GetString() ?? "" : "";
+                    chapter = c.TryGetProperty("chapter", out var ch) ? ch.GetString() ?? "" : "";
+                }
+                catch { }
+
+                var progChunkFile = Path.Combine(progressDir, $"chunk_{chunkId:D3}.json");
+                string origText = text;
+                string pinyinText = "";
+                string currentTrans = "";
+                bool isTrilingual = ContainsChinese(text);
+
+                Dictionary<string, object> progObj = new();
+                if (File.Exists(progChunkFile))
+                {
+                    try
+                    {
+                        using var pdoc = JsonDocument.Parse(File.ReadAllText(progChunkFile));
+                        foreach (var prop in pdoc.RootElement.EnumerateObject())
+                        {
+                            if (prop.Value.ValueKind == JsonValueKind.String)
+                                progObj[prop.Name] = prop.Value.GetString()!;
+                            else if (prop.Value.ValueKind == JsonValueKind.Number)
+                                progObj[prop.Name] = prop.Value.GetInt32();
+                            else if (prop.Value.ValueKind == JsonValueKind.True || prop.Value.ValueKind == JsonValueKind.False)
+                                progObj[prop.Name] = prop.Value.GetBoolean();
+                        }
+
+                        if (progObj.TryGetValue("original_text", out var ot) && !string.IsNullOrWhiteSpace(ot?.ToString()))
+                            origText = ot.ToString()!;
+                        if (progObj.TryGetValue("pinyin_text", out var pt) && !string.IsNullOrWhiteSpace(pt?.ToString()))
+                            pinyinText = pt.ToString()!;
+                        if (progObj.TryGetValue("translated_text", out var tt) && !string.IsNullOrWhiteSpace(tt?.ToString()))
+                            currentTrans = tt.ToString()!;
+                    }
+                    catch { }
+                }
+
+                // KIỂM TRA ĐA TẦNG THÔNG MINH
+                bool needApiTranslate = false;
+                bool modifiedOffline = false;
+
+                if (string.IsNullOrWhiteSpace(currentTrans))
+                {
+                    needApiTranslate = true;
+                    AppendLog($"  ⚠️ Chunk {chunkId}: Chưa có bản dịch -> Đang dịch mới...");
+                }
+                else
+                {
+                    // Tầng 1: Kiểm tra Mojibake / hỏng font dấu hỏi
+                    bool hasMojibake = System.Text.RegularExpressions.Regex.IsMatch(currentTrans, @"[a-zA-ZÀ-ỹ]\?(?=[a-zA-ZÀ-ỹ])");
+                    if (hasMojibake)
+                    {
+                        needApiTranslate = true;
+                        AppendLog($"  ⚠️ Chunk {chunkId}: Phát hiện lỗi vỡ font/dấu hỏi (Mojibake) -> Cần dịch lại...");
+                    }
+
+                    // Tầng 2: Kiểm tra Hán sót và Lệch dòng
+                    if (!needApiTranslate && isTrilingual)
+                    {
+                        var origLines = origText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                        var transLines = currentTrans.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+                        int hanChars = currentTrans.Count(c => c >= 0x4E00 && c <= 0x9FFF);
+                        double hanRatio = currentTrans.Length > 0 ? (double)hanChars / currentTrans.Length : 0;
+
+                        if (hanRatio > 0.15 && currentTrans.Length > 50)
+                        {
+                            needApiTranslate = true;
+                            AppendLog($"  ⚠️ Chunk {chunkId}: Sót chữ Hán cao ({hanRatio:P0}) -> Đang dịch lại...");
+                        }
+                        else if (origLines.Length != transLines.Length)
+                        {
+                            // Thử tự động sửa lỗi lệch dòng nhỏ nếu chỉ do khoảng trắng thừa ở cuối
+                            if (origLines.Length > 0 && transLines.Length > origLines.Length && string.IsNullOrWhiteSpace(transLines.Last()))
+                            {
+                                currentTrans = string.Join("\n", transLines.Take(origLines.Length));
+                                modifiedOffline = true;
+                                offlineFixedCount++;
+                            }
+                            else
+                            {
+                                needApiTranslate = true;
+                                AppendLog($"  ⚠️ Chunk {chunkId}: Lệch cấu trúc dòng ({transLines.Length}/{origLines.Length}) -> Đang dịch lại...");
+                            }
+                        }
+                    }
+                    // Tầng 3: Kiểm tra lặp dòng / ảo giác AI (AI Hallucination / Loops)
+                    if (!needApiTranslate)
+                    {
+                        var transLinesForLoopCheck = currentTrans.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        int repeatCount = 0;
+                        for (int li = 1; li < transLinesForLoopCheck.Length; li++)
+                        {
+                            if (transLinesForLoopCheck[li].Length > 15 && transLinesForLoopCheck[li] == transLinesForLoopCheck[li - 1])
+                            {
+                                repeatCount++;
+                            }
+                        }
+                        if (repeatCount >= 3)
+                        {
+                            needApiTranslate = true;
+                            AppendLog($"  ⚠️ Chunk {chunkId}: Phát hiện lỗi lặp câu AI (AI Loop {repeatCount} lần) -> Đang dịch lại...");
+                        }
+                    }
+
+                    // Tầng 4: Tự làm sạch ký tự rác OCR "///" nếu có
+                    if (!needApiTranslate && currentTrans.Contains("///"))
+                    {
+                        currentTrans = currentTrans.Replace("///", "").Trim();
+                        modifiedOffline = true;
+                        offlineFixedCount++;
+                    }
+                }
+
+                // Cập nhật total_chunks chuẩn trong file nếu bị lệch
+                if (progObj.TryGetValue("total_chunks", out var tcVal) && Convert.ToInt32(tcVal) != chunkFiles.Length)
+                {
+                    progObj["total_chunks"] = chunkFiles.Length;
+                    modifiedOffline = true;
+                }
+
+                if (needApiTranslate)
+                {
+                    BusyMessage = $"Đang sửa chunk: [{i + 1}/{chunkFiles.Length}] ({book.Slug})...";
+                    AppendLog($"  🔄 Dịch sửa chunk {chunkId} ({chapter})...");
+
+                    var contextSb = new System.Text.StringBuilder();
+                    if (!string.IsNullOrWhiteSpace(bookProfile))
+                    {
+                        contextSb.AppendLine("### HỒ SƠ VĂN CHƯƠNG CUỐN SÁCH (BẮT BUỘC BÁM SÁT):");
+                        contextSb.AppendLine(bookProfile);
+                        contextSb.AppendLine();
+                    }
+
+                    var sourceLang = isTrilingual ? "Chinese" : "English";
+                    var result = await _apiService.TranslateAsync(
+                        origText, ActiveProvider, glossary,
+                        context: contextSb.ToString(),
+                        sourceLang: sourceLang, targetLang: "Vietnamese",
+                        trilingual: isTrilingual,
+                        onStatusLog: msg => AppendLog(msg, "warning"),
+                        ct: ct);
+
+                    if (!string.IsNullOrWhiteSpace(result.Text))
+                    {
+                        progObj["chunk_id"] = chunkId;
+                        progObj["total_chunks"] = chunkFiles.Length;
+                        progObj["chapter"] = chapter;
+                        progObj["source_text"] = origText;
+                        progObj["original_text"] = origText;
+                        progObj["pinyin_text"] = pinyinText;
+                        progObj["translated_text"] = result.Text.Trim();
+                        progObj["word_count_source"] = origText.Length;
+                        progObj["word_count_translated"] = result.Text.Length;
+                        progObj["mode"] = isTrilingual ? "trilingual" : "bilingual";
+                        progObj["translated_at"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
+
+                        var saveJson = JsonSerializer.Serialize(progObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+                        await File.WriteAllTextAsync(progChunkFile, saveJson, new System.Text.UTF8Encoding(false), ct);
+                        await _pipeline.RunBatchQaAsync(progressDir, chunkId, ct);
+                        repairedCount++;
+                        AppendLog($"    ✅ Đã sửa xong chunk {chunkId}");
+                    }
+                }
+                else
+                {
+                    if (modifiedOffline)
+                    {
+                        progObj["translated_text"] = currentTrans;
+                        var saveJson = JsonSerializer.Serialize(progObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+                        await File.WriteAllTextAsync(progChunkFile, saveJson, new System.Text.UTF8Encoding(false), ct);
+                    }
+                    validCount++;
+                }
+
+                book.ProgressCount = i + 1;
+            }
+
+            if (repairedCount == 0 && offlineFixedCount == 0)
+            {
+                AppendLog($"✨ [RÀ SOÁT HOÀN TẤT] Toàn bộ {validCount} chunk đều chuẩn xác 100%, không phát hiện lỗi nào!");
+            }
+            else
+            {
+                AppendLog($"✨ [SỬA CHỮA HOÀN TẤT] Đã sửa chữa thành công {repairedCount} chunk qua API, {offlineFixedCount} sửa nhanh offline, {validCount} chunk chuẩn được giữ nguyên.");
+            }
+
+            // 5. Gộp file & tạo lại EPUB hoàn chỉnh
+            BusyMessage = $"Gộp file và cập nhật EPUB: {actualSlug}...";
+            AppendLog("🔨 Đang gộp lại bản dịch và đóng gói EPUB...");
+
+            var outputBookDir = Path.Combine(_projectRoot, "output", "books", book.Title);
+            var finalDir = Path.Combine(outputBookDir, "final");
+            Directory.CreateDirectory(finalDir);
+
+            var isChineseBook = ContainsChinese(File.Exists(rawMdPath) ? File.ReadAllText(rawMdPath) : actualSlug);
+            if (isChineseBook)
+            {
+                await _pipeline.RunMergeAsync(actualSlug, "trilingual", outputDir: finalDir, force: true, ct: ct);
+                var rawTrilingual = Path.Combine(finalDir, $"{actualSlug}_trilingual.md");
+                var destTamNgu = Path.Combine(finalDir, "tamngu.md");
+                if (File.Exists(rawTrilingual))
+                {
+                    if (File.Exists(destTamNgu)) File.Delete(destTamNgu);
+                    File.Move(rawTrilingual, destTamNgu);
+                }
+
+                await _pipeline.RunMergeAsync(actualSlug, "bilingual", outputDir: finalDir, force: true, ct: ct);
+                var rawVi = Path.Combine(finalDir, $"{actualSlug}_translated.md");
+                var destVi = Path.Combine(finalDir, "vi.md");
+                if (File.Exists(rawVi))
+                {
+                    if (File.Exists(destVi)) File.Delete(destVi);
+                    File.Move(rawVi, destVi);
+                }
+
+                if (File.Exists(destTamNgu)) await _pipeline.RunMergeSentencesAsync(destTamNgu, ct);
+                if (File.Exists(destVi)) await _pipeline.RunMergeSentencesAsync(destVi, ct);
+            }
+            else
+            {
+                await _pipeline.RunMergeAsync(actualSlug, "bilingual", outputDir: finalDir, force: true, ct: ct);
+                var rawVi = Path.Combine(finalDir, $"{actualSlug}_translated.md");
+                var destVi = Path.Combine(finalDir, "vi.md");
+                if (File.Exists(rawVi))
+                {
+                    if (File.Exists(destVi)) File.Delete(destVi);
+                    File.Move(rawVi, destVi);
+                }
+
+                if (File.Exists(destVi)) await _pipeline.RunMergeSentencesAsync(destVi, ct);
+            }
+
+            // Tạo metadata.json
+            var metaFile = Path.Combine(outputBookDir, "metadata.json");
+            var metaObj = new Dictionary<string, object>
+            {
+                ["slug"] = actualSlug,
+                ["title"] = book.Title,
+                ["source_file"] = Path.GetFileName(book.FilePath),
+                ["author"] = book.EpubAuthor ?? "",
+                ["language"] = isChineseBook ? "zh" : "en",
+                ["genre"] = "",
+                ["has_audio"] = false,
+                ["has_epub"] = true,
+                ["epub_file"] = $"{book.Title}.epub",
+                ["created"] = DateTime.Now.ToString("yyyy-MM-dd")
+            };
+            await File.WriteAllTextAsync(metaFile, JsonSerializer.Serialize(metaObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), ct);
+
+            // Copy ảnh từ working/extracted/<slug> sang output/books/<title>/images và final/images
+            try
+            {
+                var targetImagesDir = Path.Combine(outputBookDir, "images");
+                var finalImagesDir = Path.Combine(finalDir, "images");
+                Directory.CreateDirectory(targetImagesDir);
+                Directory.CreateDirectory(finalImagesDir);
+
+                var extractedBase = Path.Combine(_projectRoot, "working", "extracted", actualSlug);
+                if (Directory.Exists(extractedBase))
+                {
+                    var imgFiles = Directory.GetFiles(extractedBase, "*.*", SearchOption.AllDirectories)
+                        .Where(f => f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                                    f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                                    f.EndsWith(".png", StringComparison.OrdinalIgnoreCase));
+                    foreach (var img in imgFiles)
+                    {
+                        var destImg1 = Path.Combine(targetImagesDir, Path.GetFileName(img));
+                        var destImg2 = Path.Combine(finalImagesDir, Path.GetFileName(img));
+                        if (!File.Exists(destImg1)) File.Copy(img, destImg1, true);
+                        if (!File.Exists(destImg2)) File.Copy(img, destImg2, true);
+                    }
+                }
+            }
+            catch { }
+
+            // Tạo lại duy nhất 1 file EPUB chuẩn ở gốc thư mục (<Tên Sách>.epub) theo đúng quy chuẩn dự án
+            var viMd = Path.Combine(finalDir, "vi.md");
+            var tamNguMd = Path.Combine(finalDir, "tamngu.md");
+            var sourceMdForEpub = isChineseBook && File.Exists(tamNguMd) ? tamNguMd : (File.Exists(viMd) ? viMd : tamNguMd);
+            var resourcePath = $"{Path.Combine(outputBookDir, "images")};{Path.Combine(_projectRoot, "working", "extracted", actualSlug)}";
+
+            if (File.Exists(sourceMdForEpub))
+            {
+                await _pipeline.RunMakeEpubAsync(sourceMdForEpub, book.Title, book.EpubAuthor ?? "", resourcePath, ct);
+                var generatedEpub = Path.ChangeExtension(sourceMdForEpub, ".epub");
+                var targetEpub = Path.Combine(outputBookDir, $"{book.Title}.epub");
+                if (File.Exists(generatedEpub))
+                {
+                    if (File.Exists(targetEpub)) File.Delete(targetEpub);
+                    File.Move(generatedEpub, targetEpub);
+                }
+            }
+
+            AppendLog($"✨ HOÀN TẤT RÀ SOÁT & SỬA CHỮA THÀNH CÔNG: {book.DisplayTitle}!");
+            LoadBooks();
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy sửa chữa: {book.Slug}", "warning");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi Sửa chữa] {ex.Message}", "error");
         }
         finally
         {
@@ -1048,7 +2224,7 @@ public partial class MainViewModel : ObservableObject
         AppendLog($"Bắt đầu gộp chunks: {book.Slug} (format={lang})");
         try
         {
-            var ok = await _pipeline.RunMergeAsync(book.Slug, lang, force: true, ct);
+            var ok = await _pipeline.RunMergeAsync(book.Slug, lang, outputDir: "", force: true, ct: ct);
             if (ok) AppendLog($"Gộp chunks thành công: {book.Slug}");
             else AppendLog($"[Lỗi] Gộp chunks thất bại: {book.Slug}", "error");
         }
@@ -1082,11 +2258,11 @@ public partial class MainViewModel : ObservableObject
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
-        var title = string.IsNullOrWhiteSpace(EpubTitle) ? book.DisplayTitle : EpubTitle;
-        AppendLog($"Bắt đầu tạo EPUB: {book.Slug} (title={title})");
+        var title = string.IsNullOrWhiteSpace(book.EpubTitle) ? book.DisplayTitle : book.EpubTitle;
+        AppendLog($"Bắt đầu tạo EPUB: {book.Slug} (title={title}, author={book.EpubAuthor})");
         try
         {
-            var ok = await _pipeline.RunMakeEpubAsync(book.Slug, title, EpubAuthor, ct);
+            var ok = await _pipeline.RunMakeEpubAsync(book.Slug, title, book.EpubAuthor ?? "", "", ct);
             if (ok) AppendLog($"EPUB đã tạo: {book.Slug}");
             else AppendLog($"[Lỗi] Tạo EPUB thất bại: {book.Slug}", "error");
         }

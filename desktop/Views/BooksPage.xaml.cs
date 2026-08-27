@@ -105,6 +105,51 @@ public partial class BooksPage : Page
         if (OutputPanel != null) AnimatePanelIn(OutputPanel);
     }
 
+    /// <summary>Khi mỗi ComboBox chương load, tải danh sách chapter cho sách tương ứng.
+    /// Đặt trong BooksPage.xaml.cs để có thể truy cập DataContext Window.</summary>
+    private void ChapterCombo_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.ComboBox combo) return;
+        // Lấy BookStatus từ DataContext của ComboBox (vì ComboBox nằm trong DataTemplate của BookStatus)
+        if (combo.DataContext is not Models.BookStatus book) return;
+        // Gọi LoadChapters qua ViewModel của Window
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null && vm.LoadChaptersCommand.CanExecute(book))
+        {
+            vm.LoadChaptersCommand.Execute(book);
+        }
+    }
+
+    private void SampleTranslate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.DataContext is not Models.BookStatus book) return;
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            _ = vm.SampleTranslateCommand.ExecuteAsync(book);
+        }
+    }
+
+    private void RunPipeline_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.DataContext is not Models.BookStatus book) return;
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            _ = vm.RunPipelineCommand.ExecuteAsync(book);
+        }
+    }
+
+    private void RepairBook_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.DataContext is not Models.BookStatus book) return;
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            _ = vm.RepairBookCommand.ExecuteAsync(book);
+        }
+    }
+
     /// <summary>Fades the target panel in with a slight upward slide.</summary>
     private static void AnimatePanelIn(UIElement panel)
     {

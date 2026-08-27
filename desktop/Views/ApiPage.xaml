@@ -5,15 +5,17 @@
         Loaded="Page_Loaded"
         ScrollViewer.CanContentScroll="False">
 
-    <Grid Margin="12,8,16,0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <TextBlock Text="Cài đặt API" FontSize="26" FontWeight="Bold"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,24"/>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="12,8,16,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Cài đặt API" FontSize="26" FontWeight="Bold"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,24"/>
 
-        <ui:Card Grid.Row="1" Padding="24" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
+            <ui:Card Grid.Row="1" Padding="24" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
             <StackPanel>
                 <TextBlock Text="Nhà cung cấp (Provider)" FontSize="13" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
@@ -72,5 +74,54 @@
                 </StackPanel>
             </StackPanel>
         </ui:Card>
-    </Grid>
+
+        <!-- ============== 🧪 DEMO DỊCH THỬ (Luồng 2 - UI + API) ============== -->
+        <ui:Card Grid.Row="2" Padding="24" Margin="0,16,0,0" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="🧪" FontSize="22" Margin="0,0,8,0"/>
+                    <TextBlock Text="Demo dịch thử (Luồng 2 - UI + API)" FontSize="20" FontWeight="Bold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,0,0,16"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                    Bấm 1 trong 3 nút bên dưới để dịch thử 1 câu mẫu qua API hiện tại.
+                    Dùng để thí điểm Luồng 2 (UI + API) so với Luồng 1 (Agent chat).
+                    Tốn khoảng 20-80 token / lần, gần như miễn phí.
+                </TextBlock>
+
+                <TextBlock Text="Text nguồn:" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <ui:TextBox x:Name="DemoSourceBox" Height="60" TextWrapping="Wrap" AcceptsReturn="True"
+                            Style="{StaticResource InteractiveTextBox}"
+                            ToolTip="Nhập text muốn dịch thử (mặc định có sẵn ở 3 nút bên dưới)"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <ui:Button Style="{StaticResource InteractiveButton}" Content="🌐 Anh → Việt" Icon="{ui:SymbolIcon Globe24}"
+                               Height="40" Padding="14,0" FontSize="13" Click="DemoEnVi_Click"
+                               Tag="en|Hello, how are you today? I hope you are doing well. This is a sample sentence for testing translation quality."/>
+                    <ui:Button Style="{StaticResource InteractiveButton}" Content="🇨🇳 Trung → Việt" Icon="{ui:SymbolIcon Translate24}"
+                               Height="40" Padding="14,0" FontSize="13" Margin="8,0,0,0" Click="DemoZhVi_Click"
+                               Tag="zh|在这个快节奏的时代,我们常常忘记停下脚步,倾听内心的声音。"/>
+                    <ui:Button Style="{StaticResource InteractiveButton}" Content="🇻🇳 Việt → Anh" Icon="{ui:SymbolIcon ArrowSwap24}"
+                               Height="40" Padding="14,0" FontSize="13" Margin="8,0,0,0" Click="DemoViEn_Click"
+                               Tag="vi|Cuộc sống là những chuyến đi dài, mỗi trải nghiệm đều là một bài học quý giá."/>
+                </StackPanel>
+
+                <TextBlock Text="Kết quả dịch:" FontSize="13" FontWeight="SemiBold" Margin="0,20,0,6"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <Border BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.5"
+                        CornerRadius="6" Background="{DynamicResource GlassElementBackground2Brush}" Padding="10">
+                    <ui:TextBox x:Name="DemoResultBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"
+                                IsReadOnly="True" Style="{StaticResource InteractiveTextBox}"
+                                Background="Transparent" BorderThickness="0"/>
+                </Border>
+
+                <TextBlock x:Name="DemoStatsText" FontSize="11" Margin="0,8,0,0"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="(Bấm nút ở trên để dịch thử — chưa có kết quả)"/>
+            </StackPanel>
+        </ui:Card>
+        </Grid>
+    </ScrollViewer>
 </Page>

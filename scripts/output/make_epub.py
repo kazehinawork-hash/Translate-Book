@@ -5,6 +5,7 @@ Yêu cầu: pandoc (https://pandoc.org/installing.html)
 """
 
 import os
+import re
 import argparse
 import shutil
 import subprocess
@@ -42,6 +43,32 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Làm sạch heading kỹ thuật dạng ## [N] text0000X.html, **[N]...**, *[N]...* và xml version trước khi đóng gói EPUB
+    try:
+        content = input_path.read_text(encoding='utf-8')
+        # Xóa toàn bộ khối tri-block chứa xml version
+        content = re.sub(r'<div class="tri-block">\s*<p class="src-zh">xml version=[^<]*</p>\s*<p class="pinyin">[^<]*</p>\s*<p class="vi">[^<]*</p>\s*</div>', '', content, flags=re.DOTALL)
+        # Xóa các thẻ div rỗng
+        content = re.sub(r'<div class="tri-block">\s*</div>', '', content)
+        # Bỏ thẻ <div> và </div> bao ngoài để Pandoc không bị chặn nhận diện Heading TOC
+        content = content.replace('<div class="tri-block">', '').replace('</div>', '')
+        lines = content.splitlines()
+        clean_lines = []
+        for line in lines:
+            s = line.strip()
+            # Bỏ dòng rác xml version
+            if "xml version=" in s:
+                continue
+            # Bỏ tiêu đề kỹ thuật bóc tách epub ## [1] text00000.html hoặc **[1] text...**
+            if re.match(r'^(##|\*\*|\*)\s*\[\d+\]\s*text\d+\.html', s, re.IGNORECASE):
+                continue
+            clean_lines.append(line)
+        cleaned_content = '\n'.join(clean_lines)
+        if cleaned_content != content:
+            input_path.write_text(cleaned_content, encoding='utf-8')
+    except Exception:
+        pass
+
     output_path = input_path.with_suffix('.epub')
     title = args.title or input_path.stem
     author = args.author or ''
@@ -57,6 +84,8 @@ def main() -> None:
         '--css', str(css_path),
         '--metadata', f'title={title}',
         '--toc',
+        '--split-level=1',
+        '--epub-chapter-level=1',
     ]
     if author:
         cmd.extend(['--metadata', f'author={author}'])
