@@ -32,11 +32,24 @@
 
         <ui:TitleBar Grid.Row="0" Title="Translate Book" Icon="{ui:SymbolIcon Library24}">
             <ui:TitleBar.Header>
-                <ui:TextBox x:Name="GlobalSearchBox" Width="260" Height="30" Margin="16,0,0,0"
-                            PlaceholderText="Tìm kiếm toàn bộ... (Enter để tìm)"
-                            Text="{Binding GlobalSearchQuery, UpdateSourceTrigger=PropertyChanged}"
-                            KeyDown="GlobalSearch_KeyDown"
-                            Style="{StaticResource InteractiveTextBox}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:TextBox x:Name="GlobalSearchBox" Grid.Column="0" Width="260" Height="30" Margin="16,0,0,0"
+                                PlaceholderText="Tìm kiếm toàn bộ... (Enter để tìm)"
+                                Text="{Binding GlobalSearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                KeyDown="GlobalSearch_KeyDown"
+                                Style="{StaticResource InteractiveTextBox}"/>
+                    <!-- Busy Indicator Badge on TitleBar -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0"
+                                Visibility="{Binding IsBusyAny, Converter={StaticResource BoolToVisibility}}">
+                        <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding BusyMessage}" FontSize="11" FontWeight="Medium"
+                                   Foreground="{DynamicResource AccentFillColorDefaultBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
             </ui:TitleBar.Header>
         </ui:TitleBar>
 
@@ -75,7 +88,7 @@
                         <ui:NavigationViewItem IsHitTestVisible="False">
                             <StackPanel Margin="0,6">
                                 <TextBlock Text="API" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.8"/>
-                                <TextBlock Text="{Binding ActiveProvider, Mode=OneWay}" FontSize="13"
+                                <TextBlock Text="{Binding DisplayActiveProvider, Mode=OneWay}" FontSize="13"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
                             </StackPanel>
                         </ui:NavigationViewItem>

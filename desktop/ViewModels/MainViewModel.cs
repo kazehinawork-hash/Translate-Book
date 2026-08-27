@@ -27,7 +27,18 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private BookStatus? _selectedBook;
     [ObservableProperty] private int _selectedTabIndex;
     [ObservableProperty] private string _logText = "";
-    [ObservableProperty] private string _activeProvider = "";
+    [ObservableProperty] 
+    [NotifyPropertyChangedFor(nameof(DisplayActiveProvider))]
+    private string _activeProvider = "";
+
+    public string DisplayActiveProvider => ActiveProvider switch
+    {
+        "gemini" => "Gemini",
+        "deepseek" => "DeepSeek",
+        "custom" => "Custom",
+        _ => string.IsNullOrEmpty(ActiveProvider) ? "" : char.ToUpper(ActiveProvider[0]) + ActiveProvider[1..]
+    };
+
     [ObservableProperty] private bool _isApiOk;
     [ObservableProperty] private bool _logExpanded = true;
     [ObservableProperty] private string _logFilter = "";
@@ -113,7 +124,57 @@ public partial class MainViewModel : ObservableObject
         _pipeline.OutputReceived += msg =>
         {
             if (App.Current != null)
-                App.Current.Dispatcher.Invoke(() => AppendLog(msg));
+            {
+                App.Current.Dispatcher.Invoke(() =>
+                {
+                    AppendLog(msg);
+
+                    // Tự động phân tích log Audiobook để cập nhật realtime Progress trên thẻ Audio
+                    try
+                    {
+                        var activeAudioBook = OutputBooks.FirstOrDefault(b => b.IsBusy);
+                        if (activeAudioBook != null)
+                        {
+                            // 1. Bắt dòng: [Chương X/Y] hoặc Chapter X/Y
+                            var chMatch = System.Text.RegularExpressions.Regex.Match(msg, @"(?:\[Chương|Chapter|Chương)\s*(\d+)\s*/\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                            if (chMatch.Success && int.TryParse(chMatch.Groups[1].Value, out int chCur) && int.TryParse(chMatch.Groups[2].Value, out int chTot))
+                            {
+                                activeAudioBook.AudioDone = chCur;
+                                activeAudioBook.AudioTotal = chTot;
+                                activeAudioBook.BusyStatusText = $"Đang tạo Audio: Chương {chCur}/{chTot}";
+                                if (chTot > 0)
+                                {
+                                    activeAudioBook.BusyProgressPercent = Math.Clamp(((double)(chCur - 1) / chTot) * 100, 0, 100);
+                                }
+                            }
+
+                            // 2. Bắt dòng chunk audio: [chunk X/Y]
+                            var chunkMatch = System.Text.RegularExpressions.Regex.Match(msg, @"(?:chunk|đoạn)\s*(\d+)\s*/\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                            if (chunkMatch.Success && int.TryParse(chunkMatch.Groups[1].Value, out int ckCur) && int.TryParse(chunkMatch.Groups[2].Value, out int ckTot))
+                            {
+                                activeAudioBook.BusyDetailText = $"Đang đọc chunk {ckCur}/{ckTot}...";
+                                if (activeAudioBook.AudioTotal > 0 && ckTot > 0)
+                                {
+                                    double baseP = ((double)(Math.Max(1, activeAudioBook.AudioDone) - 1) / activeAudioBook.AudioTotal) * 100;
+                                    double stepP = (1.0 / activeAudioBook.AudioTotal) * ((double)ckCur / ckTot) * 100;
+                                    activeAudioBook.BusyProgressPercent = Math.Clamp(baseP + stepP, 0, 99);
+                                }
+                            }
+
+                            // 3. Bắt dòng tốc độ RTF / GPU: RTF 0.12x hoặc GPU
+                            if (msg.Contains("RTF", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var rtfMatch = System.Text.RegularExpressions.Regex.Match(msg, @"RTF\s*([0-9\.]+)");
+                                if (rtfMatch.Success)
+                                {
+                                    activeAudioBook.BusyDetailText = $"Tốc độ GPU RTX: RTF {rtfMatch.Groups[1].Value} (Siêu nhanh)";
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                });
+            }
         };
         _pipeline.ErrorReceived += msg =>
         {
@@ -880,6 +941,74 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task GenerateFullAudiobookAsync(BookStatus book)
+    {
+        if (book == null || book.IsBusy) return;
+        if (_currentCts != null)
+        {
+            AppendLog("Đang có thao tác khác chạy, vui lòng đợi hoặc nhấn Hủy.", "warning");
+            return;
+        }
+
+        book.IsBusy = true;
+        book.BusyStatusText = "Đang khởi tạo Audio Toàn bộ...";
+        book.BusyProgressPercent = 5;
+        book.BusyDetailText = "Nạp model VieNeu-TTS Turbo & Chuẩn bị GPU RTX...";
+        IsVoiceBusy = true;
+        BusyMessage = $"Đang tạo mới toàn bộ audio: {book.Slug}...";
+        _currentCts = new CancellationTokenSource();
+        var ct = _currentCts.Token;
+
+        AppendLog($"🚀 BẮT ĐẦU TẠO AUDIO TOÀN BỘ SÁCH: {book.DisplayTitle} ({book.Slug})");
+        AppendLog($"  Cấu hình: GPU={AudioUseGpu}, batch={AudioBatchSize}, Nhạc nền AI={AudioMusicAuto} (vol={AudioMusicVolume:0.00}), bitrate={AudioBitrate}, force=TRUE");
+        try
+        {
+            var ok = await _pipeline.RunAudiobookAsync(
+                book.Slug,
+                AudioTemperature.ToString("0.0"),
+                AudioTopK.ToString(),
+                AudioBitrate,
+                AudioReadTitles,
+                AudioMergeChapters,
+                force: true,
+                book.ChapterInput,
+                AudioUseGpu,
+                AudioBatchSize,
+                AudioMusicAuto,
+                AudioMusicVolume,
+                isSample: false,
+                sampleChars: 400,
+                ct: ct);
+            if (ok)
+            {
+                book.BusyProgressPercent = 100;
+                book.BusyStatusText = "Hoàn tất";
+                book.BusyDetailText = "Tạo mới Audiobook toàn bộ thành công 100%";
+                AppendLog($"✨ HOÀN TẤT: Tạo toàn bộ audio thành công cho {book.Slug}!");
+            }
+            else AppendLog($"[Lỗi] Tạo audio toàn bộ thất bại: {book.Slug}", "error");
+        }
+        catch (OperationCanceledException)
+        {
+            AppendLog($"Đã hủy bỏ tạo audio: {book.Slug}", "warning");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi] {ex.Message}", "error");
+        }
+        finally
+        {
+            book.IsBusy = false;
+            book.BusyProgressPercent = -1;
+            book.BusyDetailText = "";
+            IsVoiceBusy = false;
+            BusyMessage = "";
+            _currentCts = null;
+            UpdateBookStatus(book);
+        }
+    }
+
+    [RelayCommand]
     private async Task GenerateAudiobookAsync(BookStatus book)
     {
         if (book == null || book.IsBusy) return;
@@ -890,12 +1019,16 @@ public partial class MainViewModel : ObservableObject
         }
 
         book.IsBusy = true;
+        book.BusyStatusText = "Đang rà soát Audio...";
+        book.BusyProgressPercent = 5;
+        book.BusyDetailText = "Rà soát MP3 các chương và nạp model...";
         IsVoiceBusy = true;
-        BusyMessage = $"Đang tạo audio: {book.Slug}...";
+        BusyMessage = $"Đang sửa/tạo audio: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
         var ct = _currentCts.Token;
 
-        AppendLog($"Bắt đầu tạo audio: {book.Slug} (GPU={AudioUseGpu}, batch={AudioBatchSize}, music={AudioMusicAuto} v={AudioMusicVolume:0.00}, nhiệt độ={AudioTemperature}, top_k={AudioTopK}, bitrate={AudioBitrate})");
+        AppendLog($"🔧 BẮT ĐẦU SỬA CHỮA & RÀ SOÁT AUDIOBOOK: {book.DisplayTitle} ({book.Slug})");
+        AppendLog($"  Chế độ thông minh: Chỉ tạo các chương còn thiếu/lỗi, giữ nguyên các chương MP3 chuẩn.");
         try
         {
             var ok = await _pipeline.RunAudiobookAsync(
@@ -914,7 +1047,13 @@ public partial class MainViewModel : ObservableObject
                 isSample: false,
                 sampleChars: 400,
                 ct: ct);
-            if (ok) AppendLog($"Audio hoàn thành: {book.Slug}");
+            if (ok)
+            {
+                book.BusyProgressPercent = 100;
+                book.BusyStatusText = "Hoàn tất";
+                book.BusyDetailText = "Tạo Audiobook thành công 100%";
+                AppendLog($"Audio hoàn thành: {book.Slug}");
+            }
             else AppendLog($"[Lỗi] Tạo audio thất bại: {book.Slug}", "error");
         }
         catch (OperationCanceledException)
@@ -928,6 +1067,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            book.BusyProgressPercent = -1;
+            book.BusyDetailText = "";
             IsVoiceBusy = false;
             BusyMessage = "";
             _currentCts = null;
@@ -946,6 +1087,9 @@ public partial class MainViewModel : ObservableObject
         }
 
         book.IsBusy = true;
+        book.BusyStatusText = "Đang tạo mẫu audio thử...";
+        book.BusyProgressPercent = 15;
+        book.BusyDetailText = "Đọc thử đoạn văn bản mẫu (~30s)...";
         IsVoiceBusy = true;
         BusyMessage = $"Đang tạo mẫu audio: {book.Slug}...";
         _currentCts = new CancellationTokenSource();
@@ -973,6 +1117,9 @@ public partial class MainViewModel : ObservableObject
 
             if (ok)
             {
+                book.BusyProgressPercent = 100;
+                book.BusyStatusText = "Hoàn tất";
+                book.BusyDetailText = "Đã tạo mẫu audio xong";
                 AppendLog($"Tạo audio mẫu hoàn tất: {book.Slug}");
                 var samplePath = Path.Combine(_projectRoot, "output", "samples", $"{book.Slug}-sample.wav");
                 if (File.Exists(samplePath))
@@ -1000,6 +1147,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            book.BusyProgressPercent = -1;
+            book.BusyDetailText = "";
             IsVoiceBusy = false;
             BusyMessage = "";
             _currentCts = null;
@@ -1145,6 +1294,20 @@ public partial class MainViewModel : ObservableObject
     private static bool ContainsChinese(string text)
     {
         return text.Any(c => (c >= 0x3400 && c <= 0x9FFF) || (c >= 0xFF00 && c <= 0xFFEF));
+    }
+
+    private static bool IsVietnameseText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        // Kiểm tra chữ Hán trước — nếu có chữ Hán thì là sách Trung
+        if (ContainsChinese(text)) return false;
+
+        // Đếm mật độ các nguyên âm có dấu đặc trưng của tiếng Việt
+        var viChars = "àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ";
+        int countVi = text.Count(c => viChars.Contains(c));
+        
+        // Nếu có trên 15 ký tự dấu tiếng Việt hoặc tỷ lệ dấu trên tổng ký tự > 1.5%
+        return countVi >= 15 || (text.Length > 50 && (double)countVi / text.Length > 0.015);
     }
 
     /// <summary>
@@ -1376,6 +1539,9 @@ public partial class MainViewModel : ObservableObject
             // === BƯỚC 1: TRÍCH XUẤT (EXTRACT) ===
             var rawMdPath = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
             BusyMessage = $"[1/6] Đang trích xuất nội dung: {book.Slug}...";
+            book.BusyStatusText = "[1/6] Đang trích xuất...";
+            book.BusyProgressPercent = 5;
+            book.BusyDetailText = "Trích xuất văn bản & cấu trúc (MinerU/EPUB)...";
             AppendLog($"[Bước 1/6] Trích xuất file gốc ({Path.GetFileName(book.FilePath)})...");
             var okExtract = await _pipeline.RunExtractAsync(book.FilePath, book.Slug, string.IsNullOrWhiteSpace(book.PipelineLang) ? "auto" : book.PipelineLang, ct);
             if (!okExtract || !File.Exists(rawMdPath))
@@ -1383,11 +1549,81 @@ public partial class MainViewModel : ObservableObject
                 AppendLog($"[Lỗi] Trích xuất nội dung thất bại: {book.FilePath}", "error");
                 return;
             }
+            book.BusyProgressPercent = 12;
             AppendLog("  ✅ Trích xuất nội dung hoàn tất.");
+
+            var rawText = await File.ReadAllTextAsync(rawMdPath, ct);
+
+            // KIỂM TRA: NẾU SÁCH ĐÃ LÀ TIẾNG VIỆT
+            if (book.PipelineLang == "vi" || IsVietnameseText(rawText))
+            {
+                AppendLog($"ℹ️ [THÔNG BÁO] Cuốn sách '{book.DisplayTitle}' vốn đã là TIẾNG VIỆT!");
+                AppendLog("  → Không cần dịch qua API (để bảo toàn 100% nguyên tác và tiết kiệm token).");
+                AppendLog("  → Tự động xuất bản thành phẩm và chuyển sang trạng thái sẵn sàng Tạo Audiobook...");
+
+                book.BusyStatusText = "Đang đóng gói sách tiếng Việt...";
+                book.BusyProgressPercent = 50;
+                book.BusyDetailText = "Đóng gói EPUB & lưu bản dịch thuần Việt...";
+
+                var outBookDir = Path.Combine(_projectRoot, "output", "books", book.Title);
+                var fnDir = Path.Combine(outBookDir, "final");
+                Directory.CreateDirectory(fnDir);
+                var destViPath = Path.Combine(fnDir, "vi.md");
+                await File.WriteAllTextAsync(destViPath, rawText, new System.Text.UTF8Encoding(false), ct);
+
+                // Tạo metadata.json
+                var metaF = Path.Combine(outBookDir, "metadata.json");
+                var metaObjVi = new Dictionary<string, object>
+                {
+                    ["slug"] = book.Slug,
+                    ["title"] = book.Title,
+                    ["source_file"] = Path.GetFileName(book.FilePath),
+                    ["author"] = book.EpubAuthor ?? "",
+                    ["language"] = "vi",
+                    ["genre"] = "",
+                    ["has_audio"] = false,
+                    ["has_epub"] = true,
+                    ["epub_file"] = $"{book.Title}.epub",
+                    ["created"] = DateTime.Now.ToString("yyyy-MM-dd")
+                };
+                await File.WriteAllTextAsync(metaF, JsonSerializer.Serialize(metaObjVi, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), ct);
+
+                // Tạo EPUB
+                book.BusyProgressPercent = 80;
+                var resPath = $"{Path.Combine(outBookDir, "images")};{Path.Combine(_projectRoot, "working", "extracted", book.Slug)}";
+                await _pipeline.RunMakeEpubAsync(destViPath, book.Title, book.EpubAuthor ?? "", resPath, ct);
+                var genEpub = Path.ChangeExtension(destViPath, ".epub");
+                var tgEpub = Path.Combine(outBookDir, $"{book.Title}.epub");
+                if (File.Exists(genEpub))
+                {
+                    if (File.Exists(tgEpub)) File.Delete(tgEpub);
+                    File.Move(genEpub, tgEpub);
+                }
+
+                // Chuyển file nguồn sang input/da-dich/
+                var daDichFolder = Path.Combine(_projectRoot, "input", "da-dich");
+                Directory.CreateDirectory(daDichFolder);
+                var destInFile = Path.Combine(daDichFolder, Path.GetFileName(book.FilePath));
+                if (File.Exists(book.FilePath) && book.FilePath != destInFile)
+                {
+                    if (File.Exists(destInFile)) File.Delete(destInFile);
+                    File.Move(book.FilePath, destInFile);
+                }
+
+                book.BusyProgressPercent = 100;
+                book.BusyStatusText = "Hoàn tất";
+                book.BusyDetailText = "Sách tiếng Việt đã sẵn sàng";
+                AppendLog($"✨ HOÀN TẤT: Đã sẵn sàng sách tiếng Việt cho {book.DisplayTitle} (có thể tạo Audio ngay bên tab Audio)!");
+                LoadBooks();
+                return;
+            }
 
             // === BƯỚC 2: CHIA CHUNK (SMART CHUNKING) ===
             var chunksDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
             BusyMessage = $"[2/6] Đang chia chunk: {book.Slug}...";
+            book.BusyStatusText = "[2/6] Đang chia chunk...";
+            book.BusyProgressPercent = 15;
+            book.BusyDetailText = "Phân tích cấu trúc đoạn văn thông minh...";
             AppendLog($"[Bước 2/6] Phân đoạn văn bản (Chunking)...");
             var okChunk = await _pipeline.RunChunkAsync(rawMdPath, chunksDir, ct);
             if (!okChunk)
@@ -1395,16 +1631,24 @@ public partial class MainViewModel : ObservableObject
                 AppendLog($"[Lỗi] Chia chunk thất bại: {rawMdPath}", "error");
                 return;
             }
+            book.BusyProgressPercent = 20;
             AppendLog("  ✅ Phân đoạn văn bản hoàn tất.");
 
             // === BƯỚC 3: KHỞI TẠO SKELETON PROGRESS ===
             var progressDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
             BusyMessage = $"[3/6] Đang tạo khung dịch (Skeleton)...";
+            book.BusyStatusText = "[3/6] Tạo khung dịch...";
+            book.BusyProgressPercent = 22;
+            book.BusyDetailText = "Khởi tạo khung tiến trình Tam ngữ...";
             AppendLog($"[Bước 3/6] Khởi tạo khung tiến trình (Skeleton progress)...");
             await _pipeline.RunSkeletonAsync(chunksDir, progressDir, ct);
+            book.BusyProgressPercent = 25;
             AppendLog("  ✅ Tạo khung dịch hoàn tất.");
 
             // === BƯỚC 4: NẠP GLOSSARY MASTER & HỒ SƠ VĂN CHƯƠNG (BOOK PROFILE) ===
+            book.BusyStatusText = "[4/6] Nạp hồ sơ văn chương...";
+            book.BusyProgressPercent = 27;
+            book.BusyDetailText = "Nạp từ điển thuật ngữ & Book Profile...";
             var glossary = ApiTranslationService.LoadGlossary(book.Slug, _projectRoot);
             if (!string.IsNullOrWhiteSpace(glossary))
             {
@@ -1426,10 +1670,12 @@ public partial class MainViewModel : ObservableObject
                 }
             }
             catch { }
+            book.BusyProgressPercent = 30;
 
             // === BƯỚC 5: VÒNG LẶP DỊCH TỰ ĐỘNG TỪNG CHUNK QUA API ===
             var chunkFiles = Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(f => f).ToArray();
             book.TotalChunks = chunkFiles.Length;
+            book.ProgressCount = 0;
             AppendLog($"[Bước 5/6] Bắt đầu dịch tự động {chunkFiles.Length} chunk qua API ({ActiveProvider})...");
 
             int successCount = 0;
@@ -1496,6 +1742,11 @@ public partial class MainViewModel : ObservableObject
                     contextSb.AppendLine();
                 }
 
+                // Tính toán % tiến độ cho Bước 5 (chiếm từ 30% đến 88%)
+                double translatePhasePercent = chunkFiles.Length > 0 ? (double)i / chunkFiles.Length : 0;
+                book.BusyProgressPercent = 30 + (translatePhasePercent * 58);
+                book.BusyStatusText = $"[5/6] Dịch chunk {i + 1}/{chunkFiles.Length}";
+                book.BusyDetailText = $"Đang dịch chương: {chapter}";
                 BusyMessage = $"Đang dịch: [{i + 1}/{chunkFiles.Length}] ({book.Slug})...";
                 AppendLog($"  → [{i + 1}/{chunkFiles.Length}] Dịch chunk {chunkId} ({chapter})...");
 
@@ -1535,7 +1786,8 @@ public partial class MainViewModel : ObservableObject
                 await _pipeline.RunBatchQaAsync(progressDir, chunkId, ct);
 
                 successCount++;
-                book.ProgressCount = successCount;
+                book.ProgressCount = i + 1;
+                book.BusyProgressPercent = 30 + (((double)(i + 1) / chunkFiles.Length) * 58);
                 AppendLog($"    ✅ Chunk {chunkId} dịch xong ({result.Text.Length} ký tự)");
             }
 
@@ -1543,6 +1795,9 @@ public partial class MainViewModel : ObservableObject
 
             // === BƯỚC 6: MERGE CHUNKS & MAKE EPUB ===
             BusyMessage = $"[6/6] Đang gộp file và tạo EPUB: {book.Slug}...";
+            book.BusyStatusText = "[6/6] Đang tạo EPUB...";
+            book.BusyProgressPercent = 90;
+            book.BusyDetailText = "Gộp file tamngu.md, vi.md & nhúng font Noto Serif SC...";
             AppendLog("[Bước 6/6] Gộp các bản dịch và tạo sách điện tử (EPUB)...");
 
             var outputBookDir = Path.Combine(_projectRoot, "output", "books", book.Title);
@@ -1665,6 +1920,9 @@ public partial class MainViewModel : ObservableObject
             }
             catch { }
 
+            book.BusyProgressPercent = 100;
+            book.BusyStatusText = "Hoàn tất";
+            book.BusyDetailText = "Đã dịch và tạo EPUB thành công 100%";
             AppendLog($"✨ HOÀN TẤT TOÀN BỘ SÁCH: {book.DisplayTitle}!");
             AppendLog($"📂 Thư mục sản phẩm: {outputBookDir}");
 
@@ -1682,6 +1940,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            book.BusyProgressPercent = -1;
+            book.BusyDetailText = "";
             IsPipelineBusy = false;
             BusyMessage = "";
             _currentCts = null;
@@ -1726,32 +1986,62 @@ public partial class MainViewModel : ObservableObject
         {
             // 1. Kiểm tra raw.md
             var rawMdPath = Path.Combine(_projectRoot, "working", "extracted", actualSlug, "raw.md");
+            book.BusyProgressPercent = 5;
+            book.BusyStatusText = "[1/5] Kiểm tra bản trích xuất...";
+            book.BusyDetailText = "Kiểm tra raw.md (MinerU/EPUB)...";
             if (!File.Exists(rawMdPath) && File.Exists(book.FilePath))
             {
                 BusyMessage = $"Trích xuất file gốc: {actualSlug}...";
+                book.BusyStatusText = "Đang trích xuất...";
                 AppendLog($"[Rà soát] Trích xuất file gốc ({Path.GetFileName(book.FilePath)})...");
                 await _pipeline.RunExtractAsync(book.FilePath, actualSlug, string.IsNullOrWhiteSpace(book.PipelineLang) ? "auto" : book.PipelineLang, ct);
             }
 
+            if (File.Exists(rawMdPath))
+            {
+                var checkRawText = await File.ReadAllTextAsync(rawMdPath, ct);
+                if (book.PipelineLang == "vi" || IsVietnameseText(checkRawText))
+                {
+                    AppendLog($"ℹ️ [THÔNG BÁO] Cuốn sách '{book.DisplayTitle}' là sách TIẾNG VIỆT chuẩn!");
+                    AppendLog("  → Toàn bộ nội dung đã hoàn hảo, không cần rà soát hay dịch qua API.");
+                    AppendLog("  → Bạn có thể sang tab Audio để tạo Audiobook ngay bất cứ lúc nào.");
+                    return;
+                }
+            }
+            book.BusyProgressPercent = 12;
+
             // 2. Kiểm tra Chunks
             var chunksDir = Path.Combine(_projectRoot, "working", "chunks", actualSlug);
+            book.BusyProgressPercent = 15;
+            book.BusyStatusText = "[2/5] Kiểm tra cấu trúc chunks...";
+            book.BusyDetailText = "Rà soát phân đoạn văn bản...";
             if (!Directory.Exists(chunksDir) || Directory.GetFiles(chunksDir, "chunk-*.json").Length == 0)
             {
                 BusyMessage = $"Phân đoạn chunk: {actualSlug}...";
+                book.BusyStatusText = "Đang chia chunk...";
                 AppendLog($"[Rà soát] Chia chunk văn bản...");
                 await _pipeline.RunChunkAsync(rawMdPath, chunksDir, ct);
             }
+            book.BusyProgressPercent = 20;
 
             // 3. Kiểm tra Skeleton
             var progressDir = Path.Combine(_projectRoot, "working", "progress", actualSlug);
+            book.BusyProgressPercent = 22;
+            book.BusyStatusText = "[3/5] Kiểm tra khung Skeleton...";
+            book.BusyDetailText = "Đồng bộ tiến trình đa ngữ...";
             if (!Directory.Exists(progressDir) || Directory.GetFiles(progressDir, "chunk_*.json").Length == 0)
             {
                 BusyMessage = $"Tạo khung dịch (Skeleton): {actualSlug}...";
+                book.BusyStatusText = "Tạo khung dịch...";
                 AppendLog($"[Rà soát] Tạo khung tiến trình (Skeleton)...");
                 await _pipeline.RunSkeletonAsync(chunksDir, progressDir, ct);
             }
+            book.BusyProgressPercent = 25;
 
             // 4. Nạp Glossary Master & Book Profile
+            book.BusyProgressPercent = 27;
+            book.BusyStatusText = "[4/5] Nạp thuật ngữ & hồ sơ...";
+            book.BusyDetailText = "Nạp glossary/master.csv & Book Profile...";
             var glossary = ApiTranslationService.LoadGlossary(actualSlug, _projectRoot);
             var profilePath = Path.Combine(_projectRoot, "working", "profile", $"{actualSlug}.md");
             string bookProfile = "";
@@ -1762,6 +2052,7 @@ public partial class MainViewModel : ObservableObject
 
             var chunkFiles = Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(f => f).ToArray();
             book.TotalChunks = chunkFiles.Length;
+            book.ProgressCount = 0;
 
             // 0. Tự động dọn dẹp các chunk thừa / chunk rác vượt quá total_chunks chuẩn
             try
@@ -1860,64 +2151,28 @@ public partial class MainViewModel : ObservableObject
                     if (hasMojibake)
                     {
                         needApiTranslate = true;
-                        AppendLog($"  ⚠️ Chunk {chunkId}: Phát hiện lỗi vỡ font/dấu hỏi (Mojibake) -> Cần dịch lại...");
+                        AppendLog($"  ⚠️ Chunk {chunkId}: Phát hiện lỗi Font/Mojibake -> Sửa lại qua API...");
                     }
 
-                    // Tầng 2: Kiểm tra Hán sót và Lệch dòng
+                    // Tầng 2: Kiểm tra lệch số dòng đối ứng (đặc biệt quan trọng với Tam ngữ)
                     if (!needApiTranslate && isTrilingual)
                     {
-                        var origLines = origText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-                        var transLines = currentTrans.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-
-                        int hanChars = currentTrans.Count(c => c >= 0x4E00 && c <= 0x9FFF);
-                        double hanRatio = currentTrans.Length > 0 ? (double)hanChars / currentTrans.Length : 0;
-
-                        if (hanRatio > 0.15 && currentTrans.Length > 50)
+                        var origLines = origText.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                        var transLines = currentTrans.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                        if (Math.Abs(origLines.Length - transLines.Length) >= 3 && origLines.Length > 2)
                         {
                             needApiTranslate = true;
-                            AppendLog($"  ⚠️ Chunk {chunkId}: Sót chữ Hán cao ({hanRatio:P0}) -> Đang dịch lại...");
-                        }
-                        else if (origLines.Length != transLines.Length)
-                        {
-                            // Thử tự động sửa lỗi lệch dòng nhỏ nếu chỉ do khoảng trắng thừa ở cuối
-                            if (origLines.Length > 0 && transLines.Length > origLines.Length && string.IsNullOrWhiteSpace(transLines.Last()))
-                            {
-                                currentTrans = string.Join("\n", transLines.Take(origLines.Length));
-                                modifiedOffline = true;
-                                offlineFixedCount++;
-                            }
-                            else
-                            {
-                                needApiTranslate = true;
-                                AppendLog($"  ⚠️ Chunk {chunkId}: Lệch cấu trúc dòng ({transLines.Length}/{origLines.Length}) -> Đang dịch lại...");
-                            }
-                        }
-                    }
-                    // Tầng 3: Kiểm tra lặp dòng / ảo giác AI (AI Hallucination / Loops)
-                    if (!needApiTranslate)
-                    {
-                        var transLinesForLoopCheck = currentTrans.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                        int repeatCount = 0;
-                        for (int li = 1; li < transLinesForLoopCheck.Length; li++)
-                        {
-                            if (transLinesForLoopCheck[li].Length > 15 && transLinesForLoopCheck[li] == transLinesForLoopCheck[li - 1])
-                            {
-                                repeatCount++;
-                            }
-                        }
-                        if (repeatCount >= 3)
-                        {
-                            needApiTranslate = true;
-                            AppendLog($"  ⚠️ Chunk {chunkId}: Phát hiện lỗi lặp câu AI (AI Loop {repeatCount} lần) -> Đang dịch lại...");
+                            AppendLog($"  ⚠️ Chunk {chunkId}: Lệch số dòng nghiêm trọng ({transLines.Length} vs {origLines.Length} dòng gốc) -> Sửa lại qua API...");
                         }
                     }
 
-                    // Tầng 4: Tự làm sạch ký tự rác OCR "///" nếu có
+                    // Tầng 3: Kiểm tra rác OCR /// dư thừa
                     if (!needApiTranslate && currentTrans.Contains("///"))
                     {
                         currentTrans = currentTrans.Replace("///", "").Trim();
                         modifiedOffline = true;
                         offlineFixedCount++;
+                        AppendLog($"  🧹 Chunk {chunkId}: Đã dọn sạch ký tự rác OCR '///' (sửa nhanh offline)");
                     }
                 }
 
@@ -1928,9 +2183,15 @@ public partial class MainViewModel : ObservableObject
                     modifiedOffline = true;
                 }
 
+                // Tính toán % tiến độ cho bước quét & sửa (30% đến 88%)
+                double repairPhasePercent = chunkFiles.Length > 0 ? (double)i / chunkFiles.Length : 0;
+                book.BusyProgressPercent = 30 + (repairPhasePercent * 58);
+
                 if (needApiTranslate)
                 {
                     BusyMessage = $"Đang sửa chunk: [{i + 1}/{chunkFiles.Length}] ({book.Slug})...";
+                    book.BusyStatusText = $"[5/5] Sửa chunk {i + 1}/{chunkFiles.Length}";
+                    book.BusyDetailText = $"Dịch sửa chương: {chapter}";
                     AppendLog($"  🔄 Dịch sửa chunk {chunkId} ({chapter})...");
 
                     var contextSb = new System.Text.StringBuilder();
@@ -1973,6 +2234,8 @@ public partial class MainViewModel : ObservableObject
                 }
                 else
                 {
+                    book.BusyStatusText = $"[5/5] Rà soát chunk {i + 1}/{chunkFiles.Length}";
+                    book.BusyDetailText = $"Kiểm tra chương: {chapter}";
                     if (modifiedOffline)
                     {
                         progObj["translated_text"] = currentTrans;
@@ -1983,6 +2246,7 @@ public partial class MainViewModel : ObservableObject
                 }
 
                 book.ProgressCount = i + 1;
+                book.BusyProgressPercent = 30 + (((double)(i + 1) / chunkFiles.Length) * 58);
             }
 
             if (repairedCount == 0 && offlineFixedCount == 0)
@@ -1996,6 +2260,9 @@ public partial class MainViewModel : ObservableObject
 
             // 5. Gộp file & tạo lại EPUB hoàn chỉnh
             BusyMessage = $"Gộp file và cập nhật EPUB: {actualSlug}...";
+            book.BusyStatusText = "Đang gộp và tạo lại EPUB...";
+            book.BusyProgressPercent = 90;
+            book.BusyDetailText = "Cập nhật tamngu.md, vi.md & đóng gói EPUB...";
             AppendLog("🔨 Đang gộp lại bản dịch và đóng gói EPUB...");
 
             var outputBookDir = Path.Combine(_projectRoot, "output", "books", book.Title);
@@ -2101,6 +2368,9 @@ public partial class MainViewModel : ObservableObject
                 }
             }
 
+            book.BusyProgressPercent = 100;
+            book.BusyStatusText = "Hoàn tất";
+            book.BusyDetailText = "Rà soát & Sửa chữa thành công 100%";
             AppendLog($"✨ HOÀN TẤT RÀ SOÁT & SỬA CHỮA THÀNH CÔNG: {book.DisplayTitle}!");
             LoadBooks();
         }
@@ -2115,6 +2385,8 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             book.IsBusy = false;
+            book.BusyProgressPercent = -1;
+            book.BusyDetailText = "";
             IsPipelineBusy = false;
             BusyMessage = "";
             _currentCts = null;

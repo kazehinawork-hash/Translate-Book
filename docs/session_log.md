@@ -2106,4 +2106,41 @@
 ### Git
 - Sẵn sàng commit và push theo yêu cầu của người dùng.
 
+---
+
+## 2026-08-27 — Nâng cấp Thanh tiến độ % (ProgressBar Glass 3.0), Chuẩn hóa Provider Gemini & Tinh gọn Cài đặt API
+
+### Đã làm
+- **Đồng bộ toàn diện Giao diện & Tính năng Tab Audio theo chuẩn Tab Sách**:
+  - Bổ sung cặp nút thao tác chuyên nghiệp trên mỗi thẻ sách Audio:
+    - **Nút 1 (Primary)**: **`🎧 Tạo Audio Toàn bộ`** (`GenerateFullAudiobookCommand`) — Tạo mới 100% toàn bộ Audiobook từ đầu (`force=true`, xóa cache và chạy toàn bộ các chương).
+    - **Nút 2 (Secondary)**: **`🔧 Sửa chữa & Rà soát Audio`** (`GenerateAudiobookCommand`) — Chế độ thông minh: rà soát các chương đã có file MP3, giữ lại chương chuẩn, chỉ tạo tiếp các chương còn thiếu hoặc bị lỗi.
+    - Kèm **Nút Play** nghe thử mẫu ~30s giọng đọc & nhạc nền AI + **Nút Folder** mở trực tiếp thư mục MP3.
+  - Thanh tiến độ `GlassProgressBar` 3 tầng đồng bộ hoàn toàn với tab Sách (Header trạng thái + % to rõ màu Accent + Thanh phát sáng + Dòng phụ GPU RTX / tên chương).
+- **Tự động nhận diện sách Tiếng Việt & Thông báo trên Realtime Log**:
+  - Tích hợp bộ nhận diện `IsVietnameseText()` và `PipelineLang == "vi"` vào cả 2 chế độ **Dịch Toàn bộ** & **Sửa chữa / Rà soát**.
+  - Hiển thị trực tiếp thông báo nổi bật ngay trên khung **Realtime Log**:
+    ```
+    ℹ️ [THÔNG BÁO] Cuốn sách 'Tên Sách' vốn đã là TIẾNG VIỆT!
+      → Không cần dịch qua API (để bảo toàn 100% nguyên tác và tiết kiệm token).
+      → Tự động xuất bản thành phẩm và chuyển sang trạng thái sẵn sàng Tạo Audiobook...
+    ```
+  - Tự động đóng gói EPUB, di chuyển sách vào `input/da-dich/` và hoàn tất mà không tiêu tốn token API.
+
+### File đổi
+- `desktop/Views/BooksPage.xaml` (đổi tên nút sang "Dịch Toàn bộ", giao diện thanh tiến độ GlassProgressBar mới cho Input/Output)
+- `desktop/ViewModels/MainViewModel.cs` (cập nhật BusyStatusText, DisplayActiveProvider, tính toán tiến độ các bước)
+- `desktop/Models/BookStatus.cs` (thêm BusyStatusText, tối ưu hóa getter StatusText & ProgressPercent)
+- `desktop/Views/BooksPage.xaml` (giao diện thanh tiến độ GlassProgressBar mới cho Input/Output)
+- `desktop/Views/AudioPage.xaml` (nâng cấp thanh tiến độ Audiobook)
+- `desktop/Views/MainWindow.xaml` (chỉ báo toàn cục TitleBar + chuẩn hóa hiển thị DisplayActiveProvider)
+- `desktop/Views/ApiPage.xaml`, `desktop/Views/ApiPage.xaml.cs` (xóa Demo dịch thử, chuẩn hóa Dropdown Provider)
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng. App đã build thành công 0 warning, 0 error.
+
+### Git
+- Sẵn sàng commit và push theo lệnh của người dùng.
+
 

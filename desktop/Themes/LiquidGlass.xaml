@@ -448,4 +448,46 @@
         <Setter Property="Padding" Value="8,4"/>
     </Style>
 
+    <!-- ===== 16. PROGRESS BAR GLASS 3.0 (Gradient, Glow & Smooth Corner) ===== -->
+    <LinearGradientBrush x:Key="ProgressBarGlassTrackBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#40101020" Offset="0"/>
+        <GradientStop Color="#6016162E" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="ProgressBarGlassIndicatorBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00B4D8" Offset="0"/>
+        <GradientStop Color="#48CAE4" Offset="0.4"/>
+        <GradientStop Color="#7B2CBF" Offset="0.85"/>
+        <GradientStop Color="#9D4EDD" Offset="1"/>
+    </LinearGradientBrush>
+
+    <Style x:Key="GlassProgressBar" TargetType="ProgressBar">
+        <Setter Property="Background" Value="{StaticResource ProgressBarGlassTrackBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassElementBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0.5"/>
+        <Setter Property="Height" Value="6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border x:Name="Track" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3" ClipToBounds="True">
+                        <Grid x:Name="PART_Track">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    CornerRadius="3"
+                                    Background="{StaticResource ProgressBarGlassIndicatorBrush}"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsIndeterminate" Value="True">
+                            <Setter TargetName="PART_Indicator" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

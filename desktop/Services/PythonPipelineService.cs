@@ -174,7 +174,7 @@ public class PythonPipelineService
         var ext = Path.GetExtension(inputPath).ToLower();
         if (ext == ".pdf")
         {
-            var args = $"--input \"{inputPath}\" --output \"working/extracted/{slug}/raw.md\" --lang {lang}";
+            var args = $"--input \"{inputPath}\" --output \"working/extracted/{slug}/raw.md\" --lang {lang} --device cuda";
             return await RunScriptAsync("extract/mineru_extract.py", args, ct);
         }
         else if (ext == ".epub")

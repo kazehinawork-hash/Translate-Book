@@ -10,7 +10,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock Text="Cài đặt API" FontSize="26" FontWeight="Bold"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,24"/>
@@ -20,13 +19,13 @@
                 <TextBlock Text="Nhà cung cấp (Provider)" FontSize="13" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
                 <ComboBox x:Name="ProviderCombo" Width="250" HorizontalAlignment="Left"
-                          SelectedValuePath="Content"
+                          SelectedValuePath="Tag"
                           SelectedValue="{Binding SelectedProvider, Mode=TwoWay}" Margin="0,0,0,24"
                           ToolTip="Chọn nhà cung cấp API đang sử dụng"
                           Style="{StaticResource GlassComboBox}">
-                    <ComboBoxItem Content="gemini"/>
-                    <ComboBoxItem Content="deepseek"/>
-                    <ComboBoxItem Content="custom"/>
+                    <ComboBoxItem Content="Gemini" Tag="gemini"/>
+                    <ComboBoxItem Content="DeepSeek" Tag="deepseek"/>
+                    <ComboBoxItem Content="Custom (OpenAI, Claude, Qwen...)" Tag="custom"/>
                 </ComboBox>
 
                 <TextBlock Text="Mã truy cập (API Key)" FontSize="13" FontWeight="SemiBold"
@@ -45,81 +44,36 @@
                               IsEditable="True"
                               ItemsSource="{Binding AvailableModels}"
                               Text="{Binding ModelInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              ToolTip="Chọn mô hình có sẵn trong danh sách hoặc gõ tên mô hình tùy ý"
+                              ToolTip="Chọn model từ danh sách hoặc nhập tên model tùy chỉnh"
                               Style="{StaticResource GlassComboBox}"/>
-                    <Button Width="34" Height="34" Margin="6,0,0,0" Style="{StaticResource GlassIconButton}"
-                            ToolTip="Quét trực tiếp danh sách Model từ API Key"
-                            Click="FetchModels_Click">
-                        <ui:SymbolIcon Symbol="ArrowClockwise24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
-                    </Button>
+                    <ui:Button Content="[↻] Quét" Width="80" Height="34" Margin="8,0,0,0"
+                               ToolTip="Quét lại danh sách Model hỗ trợ từ API key"
+                               Style="{StaticResource GlassPlainButton}"
+                               Click="FetchModels_Click"/>
                 </StackPanel>
+                <TextBlock Text="Ví dụ: gemini-3.6-flash, deepseek-chat, gpt-4o-mini..." FontSize="11"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
 
-                <TextBlock Text="Base URL (nếu có)" FontSize="13" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,24,0,8"/>
+                <TextBlock Text="Địa chỉ máy chủ (Base URL)" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
                 <ui:TextBox x:Name="BaseUrlBox" Width="400" HorizontalAlignment="Left"
-                            Style="{StaticResource InteractiveTextBox}"
-                            PlaceholderText="Ví dụ: https://api.deepseek.com/v1"
-                            Text="{Binding BaseUrlInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                            Text="{Binding BaseUrlInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            PlaceholderText="Để trống nếu dùng mặc định" Margin="0,0,0,0"
+                            ToolTip="Địa chỉ endpoint API tùy chỉnh nếu sử dụng dịch vụ trung gian"/>
+                <TextBlock Text="Chỉ cần khi dùng API trung gian hoặc tự host (Local/Ollama)." FontSize="11"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
 
-                <StackPanel Orientation="Horizontal" Margin="0,32,0,0">
-                    <ui:Button Appearance="Primary" Style="{StaticResource InteractiveButton}" Content="Lưu cấu hình" Icon="{ui:SymbolIcon Save24}"
-                               Width="160" Height="42" FontSize="14"
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <ui:Button Appearance="Primary" Style="{StaticResource InteractiveButton}" Content="Lưu cấu hình" Height="36" Padding="18,0"
+                               Icon="{ui:SymbolIcon Save24}"
                                Command="{Binding SaveApiConfigCommand}"/>
-                    <ui:Button Style="{StaticResource InteractiveButton}" Content="Kiểm tra kết nối" Icon="{ui:SymbolIcon Globe24}"
-                               Width="160" Height="42" FontSize="14" Margin="12,0,0,0"
+                    <ui:Button Style="{StaticResource InteractiveButton}" Content="Kiểm tra kết nối" Margin="12,0,0,0" Height="36" Padding="18,0"
+                               Icon="{ui:SymbolIcon CheckmarkCircle24}"
                                Click="TestApi_Click"/>
 
                     <TextBlock x:Name="ApiStatus" FontSize="14" Margin="16,0,0,0" VerticalAlignment="Center"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                 </StackPanel>
-            </StackPanel>
-        </ui:Card>
-
-        <!-- ============== 🧪 DEMO DỊCH THỬ (Luồng 2 - UI + API) ============== -->
-        <ui:Card Grid.Row="2" Padding="24" Margin="0,16,0,0" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="🧪" FontSize="22" Margin="0,0,8,0"/>
-                    <TextBlock Text="Demo dịch thử (Luồng 2 - UI + API)" FontSize="20" FontWeight="Bold"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,0,0,16"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                    Bấm 1 trong 3 nút bên dưới để dịch thử 1 câu mẫu qua API hiện tại.
-                    Dùng để thí điểm Luồng 2 (UI + API) so với Luồng 1 (Agent chat).
-                    Tốn khoảng 20-80 token / lần, gần như miễn phí.
-                </TextBlock>
-
-                <TextBlock Text="Text nguồn:" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                <ui:TextBox x:Name="DemoSourceBox" Height="60" TextWrapping="Wrap" AcceptsReturn="True"
-                            Style="{StaticResource InteractiveTextBox}"
-                            ToolTip="Nhập text muốn dịch thử (mặc định có sẵn ở 3 nút bên dưới)"/>
-
-                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                    <ui:Button Style="{StaticResource InteractiveButton}" Content="🌐 Anh → Việt" Icon="{ui:SymbolIcon Globe24}"
-                               Height="40" Padding="14,0" FontSize="13" Click="DemoEnVi_Click"
-                               Tag="en|Hello, how are you today? I hope you are doing well. This is a sample sentence for testing translation quality."/>
-                    <ui:Button Style="{StaticResource InteractiveButton}" Content="🇨🇳 Trung → Việt" Icon="{ui:SymbolIcon Translate24}"
-                               Height="40" Padding="14,0" FontSize="13" Margin="8,0,0,0" Click="DemoZhVi_Click"
-                               Tag="zh|在这个快节奏的时代,我们常常忘记停下脚步,倾听内心的声音。"/>
-                    <ui:Button Style="{StaticResource InteractiveButton}" Content="🇻🇳 Việt → Anh" Icon="{ui:SymbolIcon ArrowSwap24}"
-                               Height="40" Padding="14,0" FontSize="13" Margin="8,0,0,0" Click="DemoViEn_Click"
-                               Tag="vi|Cuộc sống là những chuyến đi dài, mỗi trải nghiệm đều là một bài học quý giá."/>
-                </StackPanel>
-
-                <TextBlock Text="Kết quả dịch:" FontSize="13" FontWeight="SemiBold" Margin="0,20,0,6"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                <Border BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.5"
-                        CornerRadius="6" Background="{DynamicResource GlassElementBackground2Brush}" Padding="10">
-                    <ui:TextBox x:Name="DemoResultBox" Height="80" TextWrapping="Wrap" AcceptsReturn="True"
-                                IsReadOnly="True" Style="{StaticResource InteractiveTextBox}"
-                                Background="Transparent" BorderThickness="0"/>
-                </Border>
-
-                <TextBlock x:Name="DemoStatsText" FontSize="11" Margin="0,8,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="(Bấm nút ở trên để dịch thử — chưa có kết quả)"/>
             </StackPanel>
         </ui:Card>
         </Grid>

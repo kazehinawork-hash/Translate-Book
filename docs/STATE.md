@@ -34,6 +34,13 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Đồng bộ Giao diện & Tính năng Tab Audio chuẩn Tab Sách (08-27, XONG)**:
+  - **Cặp nút thao tác trực quan**:
+    - **Nút 1 (Primary)**: **`🎧 Tạo Audio Toàn bộ`** — Tạo mới 100% toàn bộ Audiobook từ đầu (`force=true`, xóa cache và chạy toàn bộ các chương).
+    - **Nút 2 (Secondary)**: **`🔧 Sửa chữa & Rà soát Audio`** — Chế độ thông minh: rà soát các file MP3 từng chương, giữ lại các chương đã tạo chuẩn, chỉ tạo tiếp các chương còn thiếu hoặc bị lỗi mà không làm lại từ đầu.
+    - Kèm **Nút Play** nghe thử mẫu ~30s giọng đọc & nhạc nền AI + **Nút Folder** mở trực tiếp thư mục MP3.
+  - **Thanh tiến độ 3 tầng GlassProgressBar**: Hiển thị đồng bộ % to rõ + thanh phát sáng gradient + dòng phụ trạng thái chi tiết theo GPU RTX.
+
 - **Rà soát & Sửa chữa thông minh (Smart Multi-layer Audit) & Chuẩn hóa EPUB Tam ngữ (08-27, XONG)**:
   - **Nâng cấp tính năng Rà soát & Sửa chữa (MainViewModel.cs)**: Quét và kiểm tra chất lượng 5 tầng (Mojibake, tỷ lệ Hán sót, lỗi lặp câu AI, lệch số dòng song ngữ/tam ngữ, ký tự rác OCR). Tự động dọn sạch các chunk rác mồ côi ngoài phạm vi total_chunks và tự sửa offline các lỗi định dạng mà không tốn token API.
   - **Sửa triệt để Mục lục EPUB Tam ngữ (make_epub.py & epub_style.css)**: Khắc phục lỗi Pandoc nuốt Heading cấp 1 khi gặp thẻ `<div class="tri-block">` bao ngoài bằng cách tách trực tiếp sang các thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">` độc lập. Cập nhật CSS định dạng font, màu sắc và khoảng cách câu tam ngữ hoàn hảo.

@@ -153,8 +153,8 @@
                                 <!-- Nút chạy Dịch toàn bộ cuốn sách & Sửa chữa -->
                                 <StackPanel Margin="0,2,0,0">
                                     <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}"
-                                               Content="Dịch lại Toàn bộ" Height="34" HorizontalAlignment="Stretch"
-                                               ToolTip="Chạy lại toàn bộ quy trình từ đầu: Trích xuất → Chia chunk → Tạo khung → Dịch mới → Merge → EPUB"
+                                               Content="Dịch Toàn bộ" Height="34" HorizontalAlignment="Stretch"
+                                               ToolTip="Chạy toàn bộ quy trình dịch từ đầu: Trích xuất → Chia chunk → Tạo khung → Dịch mới → Merge → EPUB"
                                                Click="RunPipeline_Click">
                                         <ui:Button.Style>
                                             <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
@@ -185,9 +185,10 @@
                                     </ui:Button>
                                 </StackPanel>
 
-                                        <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" Height="4" Margin="0,8,0,0">
-                                            <ProgressBar.Style>
-                                                <Style TargetType="ProgressBar">
+                                        <!-- Progress area with GlassProgressBar + realtime percentage -->
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsBusy}" Value="True">
@@ -195,22 +196,34 @@
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </ProgressBar.Style>
-                                        </ProgressBar>
-                                        <TextBlock Text="{Binding StatusText}" FontSize="11"
-                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                   HorizontalAlignment="Center" Margin="0,4,0,0">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
+                                            </Grid.Style>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Progress info bar -->
+                                            <Grid Grid.Row="0" Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding StatusText}" FontSize="11" FontWeight="Medium"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0:F0}%}"
+                                                           FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            </Grid>
+
+                                            <!-- Glowing Glass Progress Bar -->
+                                            <ProgressBar Grid.Row="1" Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100"
+                                                         Style="{StaticResource GlassProgressBar}" Height="7"/>
+
+                                            <!-- Sub details / Step counter -->
+                                            <TextBlock Grid.Row="2" Text="{Binding BusyDetailText}"
+                                                       FontSize="10" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </Grid>
                                         <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}" Margin="0,6,0,0"
                                                    HorizontalAlignment="Center" Padding="12,2"
                                                    Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
@@ -341,10 +354,10 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <ProgressBar Grid.Column="0" Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100"
-                                                         Height="6" Margin="0,0,8,0"/>
+                                                         Style="{StaticResource GlassProgressBar}" Height="7" Margin="0,0,8,0"/>
                                             <TextBlock Grid.Column="1" Text="{Binding ProgressPercent, StringFormat={}{0:F0}%}"
-                                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Top"
-                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,2"/>
+                                                       FontSize="11" FontWeight="Bold" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
                                         </Grid>
 
                                         <!-- Stat tiles: Chunks / EPUB / Audio (Fluent Icons) -->

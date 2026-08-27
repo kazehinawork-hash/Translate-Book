@@ -253,8 +253,8 @@
                                             </Grid>
                                         </Border>
 
-                                        <!-- Chapter progress while generating -->
-                                        <Grid Margin="0,4,0,4">
+                                        <!-- Chapter progress while generating (GlassProgressBar đồng bộ phong cách tab Sách) -->
+                                        <Grid Margin="0,8,0,8">
                                             <Grid.Style>
                                                 <Style TargetType="Grid">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -265,11 +265,32 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </Grid.Style>
-                                            <ProgressBar Value="{Binding AudioDone, Mode=OneWay}" Maximum="{Binding AudioTotal, Mode=OneWay}"
-                                                         Height="4"/>
-                                            <TextBlock Text="{Binding AudioDone, StringFormat='Đang tạo: Chương {0}'}" FontSize="10"
-                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                       HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Progress header -->
+                                            <Grid Grid.Row="0" Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding StatusText}" FontSize="11" FontWeight="Medium"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding AudioProgressPercent, StringFormat={}{0:F0}%}" FontSize="11" FontWeight="Bold"
+                                                           Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            </Grid>
+
+                                            <!-- Glowing Glass Progress Bar -->
+                                            <ProgressBar Grid.Row="1" Value="{Binding AudioProgressPercent, Mode=OneWay}" Maximum="100"
+                                                         Style="{StaticResource GlassProgressBar}" Height="7"/>
+
+                                            <!-- Sub details / Step & Chapter counter -->
+                                            <TextBlock Grid.Row="2" Text="{Binding BusyDetailText}"
+                                                       FontSize="10" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                         </Grid>
 
                                         <ui:TextBox PlaceholderText="Chương (VD: 1 2 3 hoặc để trống = tất cả)"
@@ -277,44 +298,66 @@
                                                     Style="{StaticResource InteractiveTextBox}"
                                                     Margin="0,6,0,0" Height="28" FontSize="11"/>
 
-                                        <Grid Margin="0,10,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Appearance="Primary" Content="Tạo Audio"
-                                                       Icon="{ui:SymbolIcon Headphones24}" FontSize="12"
+                                        <!-- Cặp nút Tạo Audio Toàn bộ & Sửa chữa / Rà soát Audio tương tự tab Sách -->
+                                        <StackPanel Margin="0,10,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="6"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="6"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ui:Button Grid.Column="0" Appearance="Primary" Content="Tạo Audio Toàn bộ"
+                                                           Icon="{ui:SymbolIcon Headphones24}" Height="34" FontSize="12"
+                                                           ToolTip="Tạo mới toàn bộ Audiobook từ đầu (xóa cache và tạo lại toàn bộ các chương)"
+                                                           Command="{Binding DataContext.GenerateFullAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:Button.Style>
+                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                                    <Setter Property="Content" Value="Đang tạo..."/>
+                                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:Button.Style>
+                                                </ui:Button>
+                                                <Button Grid.Column="2" Width="34" Height="34"
+                                                        Style="{StaticResource GlassIconButton}"
+                                                        ToolTip="Nghe thử mẫu ~30s giọng đọc &amp; nhạc nền AI"
+                                                        Command="{Binding DataContext.GenerateSampleCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                        CommandParameter="{Binding}">
+                                                    <ui:SymbolIcon Symbol="Play24" FontSize="15" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                                </Button>
+                                                <Button Grid.Column="4" Width="34" Height="34"
+                                                        Style="{StaticResource GlassIconButton}"
+                                                        ToolTip="Mở thư mục Audiobook (MP3)"
+                                                        Command="{Binding DataContext.OpenAudioFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                        CommandParameter="{Binding}">
+                                                    <ui:SymbolIcon Symbol="Folder24" FontSize="15"/>
+                                                </Button>
+                                            </Grid>
+
+                                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}" Margin="0,6,0,0"
+                                                       Content="Sửa chữa &amp; Rà soát Audio" Height="34" HorizontalAlignment="Stretch"
+                                                       ToolTip="Chế độ thông minh: Rà soát các chương đã có MP3, giữ lại chương chuẩn, chỉ tạo tiếp các chương còn thiếu hoặc bị lỗi"
                                                        Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                        CommandParameter="{Binding}">
                                                 <ui:Button.Style>
                                                     <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                                <Setter Property="Content" Value="Đang tạo..."/>
+                                                                <Setter Property="Content" Value="Đang rà soát..."/>
                                                                 <Setter Property="IsEnabled" Value="False"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </ui:Button.Style>
                                             </ui:Button>
-                                            <Button Grid.Column="2" Width="34" Height="34"
-                                                    Style="{StaticResource GlassIconButton}"
-                                                    ToolTip="Nghe thử mẫu ~30s giọng đọc &amp; nhạc nền"
-                                                    Command="{Binding DataContext.GenerateSampleCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                    CommandParameter="{Binding}">
-                                                <ui:SymbolIcon Symbol="Play24" FontSize="15" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
-                                            </Button>
-                                            <Button Grid.Column="4" Width="34" Height="34"
-                                                    Style="{StaticResource GlassIconButton}"
-                                                    ToolTip="Mở thư mục Audiobook (MP3)"
-                                                    Command="{Binding DataContext.OpenAudioFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                    CommandParameter="{Binding}">
-                                                <ui:SymbolIcon Symbol="Folder24" FontSize="15"/>
-                                            </Button>
-                                        </Grid>
+                                        </StackPanel>
+
                                         <ui:Button Content="Hủy tạo" Icon="{ui:SymbolIcon Dismiss24}"
                                                    Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                    CommandParameter="{Binding}" Margin="0,6,0,0" HorizontalAlignment="Center" Padding="12,2">

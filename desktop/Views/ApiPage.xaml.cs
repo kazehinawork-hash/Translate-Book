@@ -38,7 +38,7 @@ public partial class ApiPage : Page
 
     private void TriggerFetchModels(bool forceNotify = false)
     {
-        var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? item.Content?.ToString() ?? "deepseek" : "deepseek";
+        var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? (item.Tag?.ToString() ?? item.Content?.ToString() ?? "gemini").ToLowerInvariant() : "gemini";
         var key = ApiKeyBox.Password;
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -111,7 +111,7 @@ public partial class ApiPage : Page
 
     private void TestApi_Click(object sender, RoutedEventArgs e)
     {
-        var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? item.Content?.ToString() ?? "deepseek" : "deepseek";
+        var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? (item.Tag?.ToString() ?? item.Content?.ToString() ?? "gemini").ToLowerInvariant() : "gemini";
 
         var cfg = Services.ConfigService.Load();
         if (!cfg.Providers.ContainsKey(provider))
@@ -142,80 +142,5 @@ public partial class ApiPage : Page
                     mw.ShowSnackbar(ok ? "Kiểm tra kết nối thành công!" : msg, !ok);
             });
         });
-    }
-
-    // ==================== 🧪 DEMO DỊCH THỬ (Luồng 2 - UI + API) ====================
-
-    private void DemoEnVi_Click(object sender, RoutedEventArgs e) => LoadDemoFromButton(sender as System.Windows.Controls.Button, "English", "Vietnamese");
-    private void DemoZhVi_Click(object sender, RoutedEventArgs e) => LoadDemoFromButton(sender as System.Windows.Controls.Button, "Chinese", "Vietnamese");
-    private void DemoViEn_Click(object sender, RoutedEventArgs e) => LoadDemoFromButton(sender as System.Windows.Controls.Button, "Vietnamese", "English");
-
-    /// <summary>Đổ text mẫu từ Tag của nút vào ô input, rồi gọi RunDemoTranslate.</summary>
-    private void LoadDemoFromButton(System.Windows.Controls.Button? btn, string sourceLang, string targetLang)
-    {
-        if (btn?.Tag is string tag)
-        {
-            var parts = tag.Split('|', 2);
-            if (parts.Length == 2) DemoSourceBox.Text = parts[1];
-        }
-        else
-        {
-            DemoSourceBox.Text = "Xin chào, hôm nay trời đẹp quá!";
-        }
-        _ = RunDemoTranslateAsync(sourceLang, targetLang);
-    }
-
-    private async Task RunDemoTranslateAsync(string sourceLang, string targetLang)
-    {
-        var text = DemoSourceBox.Text?.Trim() ?? "";
-        if (string.IsNullOrEmpty(text))
-        {
-            DemoResultBox.Text = "(Vui lòng nhập text nguồn trước)";
-            DemoStatsText.Text = "";
-            return;
-        }
-
-        var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? item.Content?.ToString() ?? "deepseek" : "deepseek";
-        var model = ModelBox.Text?.Trim() ?? "";
-
-        // Đảm bảo config được lưu trước khi gọi (để ApiTranslationService.TranslateAsync đọc được key mới nhất)
-        var cfg = Services.ConfigService.Load();
-        if (!cfg.Providers.ContainsKey(provider))
-            cfg.Providers[provider] = new ProviderConfig();
-        if (!string.IsNullOrEmpty(ApiKeyBox.Password))
-            cfg.Providers[provider].ApiKey = ApiKeyBox.Password;
-        if (!string.IsNullOrEmpty(model))
-            cfg.Providers[provider].Model = model;
-        cfg.Providers[provider].BaseUrl = BaseUrlBox.Text?.Trim() ?? "";
-        cfg.ActiveProvider = provider;
-        Services.ConfigService.Save(cfg);
-
-        DemoResultBox.Text = "⏳ Đang dịch...";
-        DemoStatsText.Text = $"Đang gọi {provider} ({model})...";
-        DemoStatsText.Foreground = Brushes.Yellow;
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        try
-        {
-            var service = new Services.ApiTranslationService();
-            var result = await service.TranslateAsync(
-                text, provider, glossary: "", context: "",
-                sourceLang: sourceLang, targetLang: targetLang,
-                trilingual: false);
-            sw.Stop();
-
-            DemoResultBox.Text = result.Text;
-            DemoStatsText.Foreground = Brushes.LightGreen;
-            DemoStatsText.Text = $"✅ {provider} / {result.Model} | {sw.ElapsedMilliseconds}ms" +
-                                 $" | Token: {result.TokensIn} in / {result.TokensOut} out" +
-                                 $" | {text.Length} ký tự gốc → {result.Text.Length} ký tự dịch";
-        }
-        catch (Exception ex)
-        {
-            sw.Stop();
-            DemoResultBox.Text = $"❌ Lỗi: {ex.Message}";
-            DemoStatsText.Foreground = Brushes.LightCoral;
-            DemoStatsText.Text = $"❌ {provider} / {model} | {sw.ElapsedMilliseconds}ms | {ex.GetType().Name}";
-        }
     }
 }
