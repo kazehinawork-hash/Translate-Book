@@ -55,7 +55,7 @@ public class ApiTranslationService
     public async Task<TranslationResult> TranslateAsync(
         string text, string providerName, string glossary = "", string context = "",
         string sourceLang = "English", string targetLang = "Vietnamese",
-        bool trilingual = false, Action<string>? onStatusLog = null, CancellationToken ct = default)
+        bool trilingual = false, string contextPreviousText = "", Action<string>? onStatusLog = null, CancellationToken ct = default)
     {
         var config = ConfigService.GetProvider(providerName)
             ?? throw new Exception($"Provider '{providerName}' chưa được cấu hình");
@@ -63,7 +63,7 @@ public class ApiTranslationService
         if (string.IsNullOrEmpty(config.ApiKey))
             throw new Exception("Chưa nhập API key");
 
-        var prompt = BuildPrompt(text, glossary, context, sourceLang, targetLang, trilingual);
+        var prompt = BuildPrompt(text, glossary, context, sourceLang, targetLang, trilingual, contextPreviousText);
 
         TranslationResult? rawResult = null;
         Exception? lastEx = null;
@@ -397,7 +397,7 @@ public class ApiTranslationService
     }
 
     private static string BuildPrompt(string text, string glossary, string context,
-        string sourceLang, string targetLang, bool trilingualMode)
+        string sourceLang, string targetLang, bool trilingualMode, string contextPreviousText = "")
     {
         var sb = new StringBuilder();
         sb.AppendLine("Bạn là một dịch giả văn học chuyên nghiệp hàng đầu.");
@@ -408,7 +408,14 @@ public class ApiTranslationService
         if (!string.IsNullOrEmpty(glossary))
             sb.AppendLine("## THUẬT NGỮ CỐ ĐỊNH (BẮT BUỘC DÙNG ĐÚNG):").AppendLine(glossary).AppendLine();
         if (!string.IsNullOrEmpty(context))
-            sb.AppendLine("## NGỮ CẢNH TRƯỚC:").AppendLine(context).AppendLine();
+            sb.AppendLine("## HỒ SƠ VĂN CHƯƠNG (QUY TẮC XƯNG HÔ & PHONG CÁCH TÁC GIẢ):").AppendLine(context).AppendLine();
+        if (!string.IsNullOrEmpty(contextPreviousText))
+        {
+            sb.AppendLine("## NGỮ CẢNH ĐOẠN TRƯỚC (BÁM SÁT MẠCH TRUYỆN & CẢM XÚC NHÂN VẬT):");
+            sb.AppendLine(contextPreviousText);
+            sb.AppendLine("*(Hãy dịch đoạn tiếp theo sao cho nối tiếp tự nhiên, mượt mà với ngữ cảnh trên)*");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## TIÊU CHUẨN VĂN CHƯƠNG LÁNG (LITERARY QUALITY — GIỮ HỒN NGUYÊN TÁC):");
         sb.AppendLine("1. Dịch CẢ CÂU, CẢ ĐOẠN — không dịch thô từng từ; câu từ phải tự nhiên, mượt mà như văn phong của một nhà văn Việt Nam thực thụ.");

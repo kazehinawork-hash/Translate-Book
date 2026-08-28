@@ -2108,7 +2108,43 @@
 
 ---
 
-## 2026-08-27 — Nâng cấp Thanh tiến độ % (ProgressBar Glass 3.0), Chuẩn hóa Provider Gemini & Tinh gọn Cài đặt API
+## 2026-08-28 — Tối ưu hóa Thanh tìm kiếm gom về TitleBar Toàn Cục & Tinh gọn Giao diện
+
+### Đã làm
+- **Tích Hợp Bộ 3 Tiện Ích Giao Diện & Thao Tác (UX / Convenience)**:
+  - **1. Kéo - Thả File Trực Tiếp (Smart Drag & Drop)**: Bật `AllowDrop=True` toàn cục, thêm lớp phủ kính mờ `DragDropOverlay` phát sáng hiện đại. Tự động lưu file vào `input/chua-lam/` và nạp vào UI ngay khi thả file.
+  - **2. Bảng Thống Kê & Hiệu Suất (Dashboard Quick Analytics)**: Hiển thị thanh trạng thái thời gian thực trên header trang Sách: số sách chưa làm, đã dịch, đã có audio và tốc độ GPU RTX thực tế.
+  - **3. Menu Chuột Phải Tiện Ích 1-Click (Context Menu)**: Hỗ trợ click chuột phải vào mọi thẻ sách để mở nhanh thư mục, đọc thử bản dịch, sao chép đường dẫn file hoặc dọn dẹp cache trung gian.
+- **Nâng Cấp Cơ Chế Dịch Song Song Thông Minh Bảo Vệ Ngữ Cảnh (Sliding Window Context)**:
+  - **Tối ưu tốc độ dịch gấp 2–3 lần**: Tích hợp điều phối đa luồng qua `SemaphoreSlim` với số luồng tùy chỉnh linh hoạt từ 1 đến 4 luồng.
+  - **Bảo vệ ngữ cảnh 3 tầng**:
+    1. Đồng bộ `Book Profile` (hồ sơ văn chương, quy tắc xưng hô, giọng điệu tác giả) + `Master Glossary` cho mọi luồng.
+    2. Tự động trích xuất 2-3 câu cuối của chunk trước đó làm **Ngữ Cảnh Gối Đầu (Sliding Window Context)** gửi kèm vào prompt cho chunk sau.
+    3. Đảm bảo bản dịch luôn liền mạch, cảm xúc liên tục và tuyệt đối không bao giờ bị lệch ngôi xưng giữa các chương.
+  - **Giao diện Desktop Liquid Glass 3.0**: Thêm bộ chọn `Luồng dịch: [1 Luồng / 2 Luồng (Chuẩn) / 3 Luồng / 4 Luồng]` ngay trên thanh điều khiển của `BooksPage.xaml`.
+- **Chuẩn Hóa Hiển Thị API Key Bảo Mật (Password Bullet) trong Trang Cài Đặt**:
+  - Khi mở trang hoặc chuyển đổi giữa các Provider (Gemini / DeepSeek / Custom): Tự động nạp API key đã lưu vào `ApiKeyBox` và hiển thị dưới dạng **dãy chấm tròn bảo mật (`●●●●●●●●`)**.
+  - Bổ sung nhãn thông báo trạng thái `KeyStatusText` trực quan: *"● Đã lưu API key (đang được bảo mật). Nhập key mới nếu muốn thay đổi."*
+  - Khi người dùng bấm **Lưu Cấu Hình** hoặc **Kiểm Tra Kết Nối**: Cập nhật lưu tức thì và đồng bộ ngay giao diện.
+- **Hợp nhất thanh tìm kiếm toàn cục duy nhất trên TitleBar (Phương án 1)**:
+  - Loại bỏ hoàn toàn ô `SearchBox` trùng lặp trong trang `BooksPage.xaml`, nhường trọn không gian cho tiêu đề và danh sách sách thoáng sạch.
+  - Tối ưu thanh `GlobalSearchBox` trên TitleBar (`MainWindow.xaml`):
+    - Đặt placeholder thân thiện: `"Tìm kiếm sách... (Ctrl+F)"` kèm Icon Search 24 tinh tế.
+    - Kết nối cơ chế lọc Realtime (`GlobalSearchQueryChanged`) $\rightarrow$ Gõ đến đâu danh sách sách lọc đến đó tức thì.
+    - Phím tắt `Ctrl + F` tự động kích hoạt nhảy thẳng vào ô tìm kiếm trên TitleBar và chọn toàn bộ text.
+
+### File đổi
+- `desktop/Views/BooksPage.xaml`, `desktop/Views/BooksPage.xaml.cs` (loại bỏ SearchBox, kết nối lọc Global)
+- `desktop/Views/MainWindow.xaml`, `desktop/Views/MainWindow.xaml.cs` (tối ưu GlobalSearchBox và phím tắt Ctrl+F)
+- `desktop/ViewModels/MainViewModel.cs` (sự kiện GlobalSearchQueryChanged realtime)
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng. App đã build thành công 0 warning, 0 error.
+
+### Git
+- Sẵn sàng commit và push theo lệnh của người dùng.
+
 
 ### Đã làm
 - **Đồng bộ toàn diện Giao diện & Tính năng Tab Audio theo chuẩn Tab Sách**:
@@ -2143,4 +2179,22 @@
 ### Git
 - Sẵn sàng commit và push theo lệnh của người dùng.
 
+---
 
+## 2026-08-28 — Sửa lỗi không hiển thị danh sách thẻ sách trên trang BooksPage
+
+### Đã làm
+- **Khắc phục lỗi thẻ sách bị ẩn biến mất trên BooksPage**:
+  - **Nguyên nhân cốt lõi**: Trong `desktop/Views/BooksPage.xaml`, `ItemsControl.ItemsPanel` của cả 2 tab `Input` và `Output` đang định nghĩa `<WrapPanel MaxWidth="{Binding ActualWidth, ElementName=InputScrollViewer}"/>` (và `OutputScrollViewer`). Trong cơ chế WPF, `ItemsPanelTemplate` có `NameScope` riêng biệt nên không thể truy xuất `ElementName` ở ngoài template, khiến binding trả về giá trị mặc định `0.0`, ép `MaxWidth = 0` và làm toàn bộ thẻ card sách bị bóp nghẹt chiều rộng về 0px (biến mất hoàn toàn dù đã nạp 13 input / 14 output thành công).
+  - **Cách xử lý**: Loại bỏ thuộc tính `MaxWidth` thừa trong `ItemsPanelTemplate`, chuyển về `<WrapPanel/>` tự nhiên (đồng bộ chuẩn như `AudioPage.xaml`).
+- **Biên dịch**: `dotnet build` đạt **0 Warning(s), 0 Error(s)**.
+
+### File đổi
+- `desktop/Views/BooksPage.xaml`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.

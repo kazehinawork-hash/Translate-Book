@@ -14,27 +14,52 @@
 
         <Grid Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Text="Danh sách sách" FontSize="24" FontWeight="Bold"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
-            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="SearchBox" Grid.Column="0" PlaceholderText="Tìm kiếm..."
-                                Icon="{ui:SymbolIcon Search24}" IconPlacement="Left"
-                                TextChanged="SearchBox_TextChanged" Margin="20,0,0,0" Height="36"
-                                Style="{StaticResource InteractiveTextBox}"/>
-                    <ui:Button Grid.Column="1" Width="36" Height="36"
-                               Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Làm mới" Cursor="Hand"
-                               Background="Transparent" BorderThickness="0" Margin="8,0,0,0"
-                               Command="{Binding RefreshBooksCommand}"/>
-                </Grid>
-            </StackPanel>
+
+            <!-- Dashboard Analytics Quick Bar -->
+            <Border Grid.Column="1" Margin="20,0,16,0" Padding="12,4" HorizontalAlignment="Left"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                    CornerRadius="10" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Sách chưa làm -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0" ToolTip="Số lượng sách trong input/chua-lam/">
+                        <ui:SymbolIcon Symbol="BookClock24" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,4,0"/>
+                        <TextBlock Text="Chưa làm: " FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{Binding PendingBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                    </StackPanel>
+                    <TextBlock Text="•" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,12,0"/>
+                    <!-- Sách đã dịch -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0" ToolTip="Tổng số sách đã dịch hoàn tất">
+                        <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,4,0"/>
+                        <TextBlock Text="Đã dịch: " FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{Binding TranslatedBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                    </StackPanel>
+                    <TextBlock Text="•" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,12,0"/>
+                    <!-- Sách có Audio -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0" ToolTip="Số sách đã có Audiobook hoàn tất">
+                        <ui:SymbolIcon Symbol="Headphones24" FontSize="14" Foreground="#e082ff" Margin="0,0,4,0"/>
+                        <TextBlock Text="Audio: " FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{Binding AudioBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="#e082ff"/>
+                    </StackPanel>
+                    <TextBlock Text="•" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,12,0"/>
+                    <!-- Tốc độ GPU TTS -->
+                    <StackPanel Orientation="Horizontal" ToolTip="Tốc độ xử lý của engine VieNeu-TTS v3 Turbo với GPU RTX">
+                        <ui:SymbolIcon Symbol="Flash24" FontSize="14" Foreground="#40c4ff" Margin="0,0,4,0"/>
+                        <TextBlock Text="{Binding GpuPerformanceText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#40c4ff"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <ui:Button Grid.Column="2" Width="36" Height="36"
+                       Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Làm mới danh sách sách" Cursor="Hand"
+                       Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                       Command="{Binding RefreshBooksCommand}"/>
         </Grid>
 
         <Grid Grid.Row="1">
@@ -43,20 +68,44 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Glass 3.0 tab headers container -->
-            <Border Grid.Row="0" Margin="0,0,0,12" Padding="4" HorizontalAlignment="Left"
-                    Background="{DynamicResource GlassElementBackground2Brush}"
-                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
-                    CornerRadius="14">
-                <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="TabInput" Content="Input (Chưa dịch)" IsChecked="True"
-                                 Click="TabInput_Click" GroupName="BookTabs" Margin="0,0,4,0"
-                                 Style="{StaticResource GlassTabHeader}"/>
-                    <RadioButton x:Name="TabOutput" Content="Output (Đã dịch)"
-                                 Click="TabOutput_Click" GroupName="BookTabs"
-                                 Style="{StaticResource GlassTabHeader}"/>
-                </StackPanel>
-            </Border>
+            <!-- Glass 3.0 tab headers + Concurrency Selector container -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
+                <Border DockPanel.Dock="Left" Padding="4"
+                        Background="{DynamicResource GlassElementBackground2Brush}"
+                        BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                        CornerRadius="14">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="TabInput" Content="Input (Chưa dịch)" IsChecked="True"
+                                     Click="TabInput_Click" GroupName="BookTabs" Margin="0,0,4,0"
+                                     Style="{StaticResource GlassTabHeader}"/>
+                        <RadioButton x:Name="TabOutput" Content="Output (Đã dịch)"
+                                     Click="TabOutput_Click" GroupName="BookTabs"
+                                     Style="{StaticResource GlassTabHeader}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Bộ điều chỉnh tốc độ dịch đa luồng thông minh -->
+                <Border DockPanel.Dock="Right" Padding="10,4"
+                        Background="{DynamicResource GlassElementBackground2Brush}"
+                        BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
+                        CornerRadius="14" VerticalAlignment="Center"
+                        ToolTip="Cơ chế Dịch Song Song Thông Minh: Tự động trích xuất Ngữ cảnh Gối đầu (Sliding Window Context) &amp; Hồ sơ văn chương để bản dịch luôn liền mạch 100%">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Flash24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,6,0"/>
+                        <TextBlock Text="Luồng dịch:" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox Width="150" Height="28" FontSize="11.5"
+                                  SelectedValuePath="Tag"
+                                  SelectedValue="{Binding TranslateConcurrency, Mode=TwoWay}"
+                                  Style="{StaticResource GlassComboBox}">
+                            <ComboBoxItem Content="1 Luồng (An toàn Free)" Tag="1"/>
+                            <ComboBoxItem Content="2 Luồng (Khuyên dùng)" Tag="2"/>
+                            <ComboBoxItem Content="3 Luồng (Nhanh)" Tag="3"/>
+                            <ComboBoxItem Content="4 Luồng (Key trả phí)" Tag="4"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+            </DockPanel>
 
             <!-- Input Book List Container with elegant rounded glass border -->
             <Border Grid.Row="1" x:Name="InputPanel" Visibility="Visible"
@@ -90,12 +139,33 @@
                         <ItemsControl x:Name="InputItemsControl" ItemsSource="{Binding InputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel MaxWidth="{Binding ActualWidth, ElementName=InputScrollViewer}"/>
+                                <WrapPanel/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
                                 <ui:Card Margin="6" Width="320" Padding="16" Style="{StaticResource InteractiveCard}">
+                                    <ui:Card.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Mở thư mục sách"
+                                                      Icon="{ui:SymbolIcon Folder24}"
+                                                      Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Đọc thử bản dịch (Preview)"
+                                                      Icon="{ui:SymbolIcon Eye24}"
+                                                      Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Sao chép đường dẫn file"
+                                                      Icon="{ui:SymbolIcon Copy24}"
+                                                      Command="{Binding DataContext.CopyBookPathCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Dọn dẹp cache trung gian"
+                                                      Icon="{ui:SymbolIcon Broom24}"
+                                                      Command="{Binding DataContext.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </ui:Card.ContextMenu>
                                     <StackPanel>
                                         <!-- Header: avatar + title + status -->
                                         <Border Style="{StaticResource BookCardHeader}">
@@ -276,12 +346,33 @@
                     <ItemsControl x:Name="OutputItemsControl" ItemsSource="{Binding OutputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel MaxWidth="{Binding ActualWidth, ElementName=OutputScrollViewer}"/>
+                                <WrapPanel/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
                                 <ui:Card Margin="6" Width="340" Style="{StaticResource InteractiveCard}">
+                                    <ui:Card.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Mở thư mục sách"
+                                                      Icon="{ui:SymbolIcon Folder24}"
+                                                      Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Đọc thử bản dịch (Preview)"
+                                                      Icon="{ui:SymbolIcon Eye24}"
+                                                      Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Sao chép đường dẫn thư mục"
+                                                      Icon="{ui:SymbolIcon Copy24}"
+                                                      Command="{Binding DataContext.CopyBookPathCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                            <MenuItem Header="Dọn dẹp cache trung gian"
+                                                      Icon="{ui:SymbolIcon Broom24}"
+                                                      Command="{Binding DataContext.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                      CommandParameter="{Binding}"/>
+                                        </ContextMenu>
+                                    </ui:Card.ContextMenu>
                                     <StackPanel>
                                         <!-- Header: cover/avatar + title + status badge -->
                                         <Border Style="{StaticResource BookCardHeader}">

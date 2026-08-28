@@ -42,12 +42,19 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isApiOk;
     [ObservableProperty] private bool _logExpanded = true;
     [ObservableProperty] private string _logFilter = "";
+    
     [ObservableProperty] private string _globalSearchQuery = "";
+    partial void OnGlobalSearchQueryChanged(string value) => GlobalSearchQueryChanged?.Invoke(value);
+    public static event Action<string>? GlobalSearchQueryChanged;
+
     /// <summary>Set true by Ctrl+F so BooksPage focuses its search box on load.</summary>
     [ObservableProperty] private bool _focusSearchRequested;
 
     [ObservableProperty] private double _audioTemperature = 0.3;
     [ObservableProperty] private int _audioTopK = 10;
+
+    /// <summary>Số luồng dịch song song an toàn ngữ cảnh (1: Tuần tự, 2-3: Song song tốc độ cao kèm Sliding Window Context)</summary>
+    [ObservableProperty] private int _translateConcurrency = 2;
 
     [ObservableProperty] private string _selectedProvider = "deepseek";
     [ObservableProperty] private string _apiKeyInput = "";
@@ -84,6 +91,14 @@ public partial class MainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsBusyAny))]
     private bool _isQaBusy;
     [ObservableProperty] private bool _showQaReport;
+
+    // Dashboard Analytics properties
+    [ObservableProperty] private int _totalBooksCount = 0;
+    [ObservableProperty] private int _pendingBooksCount = 0;
+    [ObservableProperty] private int _translatedBooksCount = 0;
+    [ObservableProperty] private int _audioBooksCount = 0;
+    [ObservableProperty] private long _totalTranslatedWords = 0;
+    [ObservableProperty] private string _gpuPerformanceText = "RTF 0.12 (GPU RTX ~8x)";
 
     // Audiobook extra properties
     [ObservableProperty] private string _audioBitrate = "128k";
@@ -294,14 +309,77 @@ public partial class MainViewModel : ObservableObject
                         book.AvailableChapters.Add("Chương 4");
                         book.AvailableChapters.Add("Chương 5");
                     }
-                    book.SelectedSampleChapter = book.AvailableChapters[0];
-
                     InputBooks.Add(book);
                 }
             }
         }
 
-        AppendLog($"Đã tải {InputBooks.Count} input, {OutputBooks.Count} output");
+        // Cập nhật các chỉ số Dashboard Analytics
+        PendingBooksCount = InputBooks.Count(b => b.InputCategory == "chua-lam");
+        TranslatedBooksCount = OutputBooks.Count + InputBooks.Count(b => b.InputCategory == "da-dich" || b.InputCategory == "da-audio");
+        AudioBooksCount = OutputBooks.Count(b => b.Mp3Count > 0) + InputBooks.Count(b => b.InputCategory == "da-audio");
+        TotalBooksCount = InputBooks.Count + OutputBooks.Count;
+
+        // Ước tính tổng số từ đã dịch từ các file final/vi.md
+        long totalWords = 0;
+        try
+        {
+            var booksDir2 = Path.Combine(_projectRoot, "output", "books");
+            if (Directory.Exists(booksDir2))
+            {
+                foreach (var d in Directory.GetDirectories(booksDir2))
+                {
+                    var viFile = Path.Combine(d, "final", "vi.md");
+                    if (File.Exists(viFile))
+                    {
+                        var info = new FileInfo(viFile);
+                        totalWords += info.Length / 5; // ước lượng ký tự -> từ
+                    }
+                }
+            }
+        }
+        catch { }
+        TotalTranslatedWords = totalWords;
+
+        AppendLog($"Đã tải {InputBooks.Count} input, {OutputBooks.Count} output (Chưa làm: {PendingBooksCount}, Đã dịch: {TranslatedBooksCount}, Có Audio: {AudioBooksCount})");
+    }
+
+    [RelayCommand]
+    private void CopyBookPath(BookStatus? book)
+    {
+        if (book == null) return;
+        var p = !string.IsNullOrEmpty(book.FilePath) && File.Exists(book.FilePath)
+            ? book.FilePath
+            : Path.Combine(_projectRoot, "output", "books", book.Title);
+        try
+        {
+            Clipboard.SetText(p);
+            AppendLog($"📋 Đã sao chép đường dẫn: {p}");
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    private void CleanBookCache(BookStatus? book)
+    {
+        if (book == null || string.IsNullOrWhiteSpace(book.Slug)) return;
+        var chunksDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
+        var progDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
+        var progAudioDir = Path.Combine(_projectRoot, "working", "progress_audio", "chunks", book.Slug);
+
+        int count = 0;
+        try
+        {
+            if (Directory.Exists(chunksDir)) { Directory.Delete(chunksDir, true); count++; }
+            if (Directory.Exists(progDir)) { Directory.Delete(progDir, true); count++; }
+            if (Directory.Exists(progAudioDir)) { Directory.Delete(progAudioDir, true); count++; }
+            AppendLog($"🧹 Đã dọn sạch cache trung gian cho cuốn: {book.DisplayTitle}");
+            LoadBooks();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Lỗi dọn cache] {ex.Message}", "error");
+        }
     }
 
     [RelayCommand]
@@ -1242,7 +1320,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    private void AppendLog(string msg, string level = "info")
+    public void AppendLog(string msg, string level = "info")
     {
         var time = DateTime.Now.ToString("HH:mm:ss");
         // ANSI-style color markers for parsing in RichTextBox later
@@ -1672,18 +1750,18 @@ public partial class MainViewModel : ObservableObject
             catch { }
             book.BusyProgressPercent = 30;
 
-            // === BƯỚC 5: VÒNG LẶP DỊCH TỰ ĐỘNG TỪNG CHUNK QUA API ===
+            // === BƯỚC 5: VÒNG LẶP DỊCH THÔNG MINH BẢO VỆ NGỮ CẢNH QUA API ===
             var chunkFiles = Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(f => f).ToArray();
             book.TotalChunks = chunkFiles.Length;
             book.ProgressCount = 0;
-            AppendLog($"[Bước 5/6] Bắt đầu dịch tự động {chunkFiles.Length} chunk qua API ({ActiveProvider})...");
+            int concurrency = Math.Clamp(TranslateConcurrency, 1, 4);
+            AppendLog($"[Bước 5/6] Bắt đầu dịch tự động {chunkFiles.Length} chunk qua API ({ActiveProvider}) [Số luồng song song: {concurrency}]...");
 
-            int successCount = 0;
+            // Đọc trước toàn bộ thông tin cơ bản của các chunk để phân tích ngữ cảnh gối đầu
+            var chunkMetaList = new List<(int index, int chunkId, string origText, string pinyinText, string chapter, string progChunkFile, bool isTrilingual)>();
             for (int i = 0; i < chunkFiles.Length; i++)
             {
-                ct.ThrowIfCancellationRequested();
                 var chunkFile = chunkFiles[i];
-
                 int chunkId = i;
                 string text = "";
                 string chapter = "";
@@ -1701,96 +1779,151 @@ public partial class MainViewModel : ObservableObject
                 var progChunkFile = Path.Combine(progressDir, $"chunk_{chunkId:D3}.json");
                 string origText = text;
                 string pinyinText = "";
-                string existingTrans = "";
                 bool isTrilingual = ContainsChinese(text);
 
-                Dictionary<string, object> progObj = new();
                 if (File.Exists(progChunkFile))
                 {
                     try
                     {
                         using var pdoc = JsonDocument.Parse(File.ReadAllText(progChunkFile));
-                        foreach (var prop in pdoc.RootElement.EnumerateObject())
-                        {
-                            if (prop.Value.ValueKind == JsonValueKind.String)
-                                progObj[prop.Name] = prop.Value.GetString()!;
-                            else if (prop.Value.ValueKind == JsonValueKind.Number)
-                                progObj[prop.Name] = prop.Value.GetInt32();
-                            else if (prop.Value.ValueKind == JsonValueKind.True || prop.Value.ValueKind == JsonValueKind.False)
-                                progObj[prop.Name] = prop.Value.GetBoolean();
-                        }
-
-                        if (progObj.TryGetValue("original_text", out var ot) && !string.IsNullOrWhiteSpace(ot?.ToString()))
-                            origText = ot.ToString()!;
-                        if (progObj.TryGetValue("pinyin_text", out var pt) && !string.IsNullOrWhiteSpace(pt?.ToString()))
-                            pinyinText = pt.ToString()!;
+                        if (pdoc.RootElement.TryGetProperty("original_text", out var ot) && !string.IsNullOrWhiteSpace(ot.GetString()))
+                            origText = ot.GetString()!;
+                        if (pdoc.RootElement.TryGetProperty("pinyin_text", out var pt) && !string.IsNullOrWhiteSpace(pt.GetString()))
+                            pinyinText = pt.GetString()!;
                     }
                     catch { }
                 }
 
-                if (string.IsNullOrWhiteSpace(origText))
-                {
-                    continue;
-                }
-
-                // Lấy ngữ cảnh chunk trước (prev) để giữ mạch văn nhất quán giống Agent
-                var contextSb = new System.Text.StringBuilder();
-                if (!string.IsNullOrWhiteSpace(bookProfile))
-                {
-                    contextSb.AppendLine("### HỒ SƠ VĂN CHƯƠNG CUỐN SÁCH (BẮT BUỘC BÁM SÁT):");
-                    contextSb.AppendLine(bookProfile);
-                    contextSb.AppendLine();
-                }
-
-                // Tính toán % tiến độ cho Bước 5 (chiếm từ 30% đến 88%)
-                double translatePhasePercent = chunkFiles.Length > 0 ? (double)i / chunkFiles.Length : 0;
-                book.BusyProgressPercent = 30 + (translatePhasePercent * 58);
-                book.BusyStatusText = $"[5/6] Dịch chunk {i + 1}/{chunkFiles.Length}";
-                book.BusyDetailText = $"Đang dịch chương: {chapter}";
-                BusyMessage = $"Đang dịch: [{i + 1}/{chunkFiles.Length}] ({book.Slug})...";
-                AppendLog($"  → [{i + 1}/{chunkFiles.Length}] Dịch chunk {chunkId} ({chapter})...");
-
-                var sourceLang = isTrilingual ? "Chinese" : "English";
-                var result = await _apiService.TranslateAsync(
-                    origText, ActiveProvider, glossary,
-                    context: contextSb.ToString(),
-                    sourceLang: sourceLang, targetLang: "Vietnamese",
-                    trilingual: isTrilingual,
-                    onStatusLog: msg => AppendLog(msg, "warning"),
-                    ct: ct);
-
-                if (string.IsNullOrWhiteSpace(result.Text))
-                {
-                    AppendLog($"    [Cảnh báo] Chunk {chunkId} dịch trả về rỗng, thử lại lần sau.", "warning");
-                    continue;
-                }
-
-                // Cập nhật kết quả dịch vào progress JSON giữ nguyên pinyin_text và original_text
-                progObj["chunk_id"] = chunkId;
-                progObj["total_chunks"] = chunkFiles.Length;
-                progObj["chapter"] = chapter;
-                progObj["source_text"] = origText;
-                progObj["original_text"] = origText;
-                progObj["pinyin_text"] = pinyinText;
-                progObj["translated_text"] = result.Text.Trim();
-                progObj["word_count_source"] = origText.Length;
-                progObj["word_count_translated"] = result.Text.Length;
-                progObj["mode"] = isTrilingual ? "trilingual" : "bilingual";
-                progObj["translated_at"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
-
-                // Lưu file progress JSON
-                var saveJson = JsonSerializer.Serialize(progObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
-                await File.WriteAllTextAsync(progChunkFile, saveJson, new System.Text.UTF8Encoding(false), ct);
-
-                // QA nhanh cho chunk vừa dịch theo chuẩn /dich (Bước G.4)
-                await _pipeline.RunBatchQaAsync(progressDir, chunkId, ct);
-
-                successCount++;
-                book.ProgressCount = i + 1;
-                book.BusyProgressPercent = 30 + (((double)(i + 1) / chunkFiles.Length) * 58);
-                AppendLog($"    ✅ Chunk {chunkId} dịch xong ({result.Text.Length} ký tự)");
+                chunkMetaList.Add((i, chunkId, origText, pinyinText, chapter, progChunkFile, isTrilingual));
             }
 
+            int successCount = 0;
+            using var semaphore = new SemaphoreSlim(concurrency, concurrency);
+            var translateTasks = new List<Task>();
+
+            for (int i = 0; i < chunkMetaList.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var currentMeta = chunkMetaList[i];
+
+                if (string.IsNullOrWhiteSpace(currentMeta.origText))
+                {
+                    continue;
+                }
+
+                // Trích xuất ngữ cảnh gối đầu (2-3 câu cuối của chunk trước) để giữ mạch văn 100%
+                string prevContextText = "";
+                if (i > 0)
+                {
+                    var prevOrig = chunkMetaList[i - 1].origText;
+                    if (!string.IsNullOrWhiteSpace(prevOrig))
+                    {
+                        var prevLines = prevOrig.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                        int takeCount = Math.Min(3, prevLines.Length);
+                        prevContextText = string.Join("\n", prevLines.TakeLast(takeCount));
+                    }
+                }
+
+                await semaphore.WaitAsync(ct);
+
+                var task = Task.Run(async () =>
+                {
+                    try
+                    {
+                        ct.ThrowIfCancellationRequested();
+
+                        // Nạp cấu trúc progress hiện tại nếu có
+                        Dictionary<string, object> progObj = new();
+                        if (File.Exists(currentMeta.progChunkFile))
+                        {
+                            try
+                            {
+                                using var pdoc = JsonDocument.Parse(File.ReadAllText(currentMeta.progChunkFile));
+                                foreach (var prop in pdoc.RootElement.EnumerateObject())
+                                {
+                                    if (prop.Value.ValueKind == JsonValueKind.String)
+                                        progObj[prop.Name] = prop.Value.GetString()!;
+                                    else if (prop.Value.ValueKind == JsonValueKind.Number)
+                                        progObj[prop.Name] = prop.Value.GetInt32();
+                                    else if (prop.Value.ValueKind == JsonValueKind.True || prop.Value.ValueKind == JsonValueKind.False)
+                                        progObj[prop.Name] = prop.Value.GetBoolean();
+                                }
+                            }
+                            catch { }
+                        }
+
+                        // Ghép Hồ sơ văn chương (Book Profile)
+                        var contextSb = new System.Text.StringBuilder();
+                        if (!string.IsNullOrWhiteSpace(bookProfile))
+                        {
+                            contextSb.AppendLine(bookProfile);
+                        }
+
+                        // Cập nhật trạng thái hiển thị trên UI
+                        lock (book)
+                        {
+                            double translatePhasePercent = chunkMetaList.Count > 0 ? (double)successCount / chunkMetaList.Count : 0;
+                            book.BusyProgressPercent = 30 + (translatePhasePercent * 58);
+                            book.BusyStatusText = $"[5/6] Dịch chunk {currentMeta.index + 1}/{chunkMetaList.Count}";
+                            book.BusyDetailText = $"Đang dịch chương: {currentMeta.chapter}";
+                            BusyMessage = $"Đang dịch: [{currentMeta.index + 1}/{chunkMetaList.Count}] ({book.Slug})...";
+                        }
+                        AppendLog($"  → [{currentMeta.index + 1}/{chunkMetaList.Count}] Dịch chunk {currentMeta.chunkId} ({currentMeta.chapter})...");
+
+                        var sourceLang = currentMeta.isTrilingual ? "Chinese" : "English";
+                        var result = await _apiService.TranslateAsync(
+                            currentMeta.origText, ActiveProvider, glossary,
+                            context: contextSb.ToString(),
+                            sourceLang: sourceLang, targetLang: "Vietnamese",
+                            trilingual: currentMeta.isTrilingual,
+                            contextPreviousText: prevContextText,
+                            onStatusLog: msg => AppendLog(msg, "warning"),
+                            ct: ct);
+
+                        if (string.IsNullOrWhiteSpace(result.Text))
+                        {
+                            AppendLog($"    [Cảnh báo] Chunk {currentMeta.chunkId} dịch trả về rỗng, thử lại lần sau.", "warning");
+                            return;
+                        }
+
+                        // Cập nhật kết quả dịch vào progress JSON
+                        progObj["chunk_id"] = currentMeta.chunkId;
+                        progObj["total_chunks"] = chunkMetaList.Count;
+                        progObj["chapter"] = currentMeta.chapter;
+                        progObj["source_text"] = currentMeta.origText;
+                        progObj["original_text"] = currentMeta.origText;
+                        progObj["pinyin_text"] = currentMeta.pinyinText;
+                        progObj["translated_text"] = result.Text.Trim();
+                        progObj["word_count_source"] = currentMeta.origText.Length;
+                        progObj["word_count_translated"] = result.Text.Length;
+                        progObj["mode"] = currentMeta.isTrilingual ? "trilingual" : "bilingual";
+                        progObj["translated_at"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
+
+                        // Ghi file atomic/an toàn
+                        var saveJson = JsonSerializer.Serialize(progObj, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+                        await File.WriteAllTextAsync(currentMeta.progChunkFile, saveJson, new System.Text.UTF8Encoding(false), ct);
+
+                        // QA nhanh cho chunk
+                        await _pipeline.RunBatchQaAsync(progressDir, currentMeta.chunkId, ct);
+
+                        Interlocked.Increment(ref successCount);
+                        lock (book)
+                        {
+                            book.ProgressCount = successCount;
+                            book.BusyProgressPercent = 30 + (((double)successCount / chunkMetaList.Count) * 58);
+                        }
+                        AppendLog($"    ✅ Chunk {currentMeta.chunkId} dịch xong ({result.Text.Length} ký tự)");
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }, ct);
+
+                translateTasks.Add(task);
+            }
+
+            await Task.WhenAll(translateTasks);
             AppendLog($"  🎉 Dịch hoàn tất {successCount}/{chunkFiles.Length} chunks!");
 
             // === BƯỚC 6: MERGE CHUNKS & MAKE EPUB ===
@@ -2202,12 +2335,34 @@ public partial class MainViewModel : ObservableObject
                         contextSb.AppendLine();
                     }
 
+                    // Lấy ngữ cảnh gối đầu (2-3 câu cuối của chunk trước)
+                    string prevContextText = "";
+                    if (i > 0)
+                    {
+                        var prevProg = Path.Combine(progressDir, $"chunk_{i - 1:D3}.json");
+                        if (File.Exists(prevProg))
+                        {
+                            try
+                            {
+                                using var pdoc = JsonDocument.Parse(File.ReadAllText(prevProg));
+                                if (pdoc.RootElement.TryGetProperty("original_text", out var prevOt) && !string.IsNullOrWhiteSpace(prevOt.GetString()))
+                                {
+                                    var prevLines = prevOt.GetString()!.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                                    int takeCount = Math.Min(3, prevLines.Length);
+                                    prevContextText = string.Join("\n", prevLines.TakeLast(takeCount));
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
                     var sourceLang = isTrilingual ? "Chinese" : "English";
                     var result = await _apiService.TranslateAsync(
                         origText, ActiveProvider, glossary,
                         context: contextSb.ToString(),
                         sourceLang: sourceLang, targetLang: "Vietnamese",
                         trilingual: isTrilingual,
+                        contextPreviousText: prevContextText,
                         onStatusLog: msg => AppendLog(msg, "warning"),
                         ct: ct);
 

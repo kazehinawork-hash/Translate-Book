@@ -14,37 +14,46 @@ public partial class BooksPage : Page
     public BooksPage()
     {
         InitializeComponent();
+        Unloaded += BooksPage_Unloaded;
+    }
+
+    private void BooksPage_Unloaded(object sender, RoutedEventArgs e)
+    {
+        ViewModels.MainViewModel.GlobalSearchQueryChanged -= OnGlobalSearchQueryChanged;
     }
 
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
-        if (DataContext == null)
-            DataContext = Window.GetWindow(this)?.DataContext;
+        if (DataContext == null || DataContext is not ViewModels.MainViewModel)
+        {
+            var win = Window.GetWindow(this);
+            if (win?.DataContext is ViewModels.MainViewModel winVm)
+                DataContext = winVm;
+            else if (Application.Current?.MainWindow?.DataContext is ViewModels.MainViewModel appVm)
+                DataContext = appVm;
+        }
+
+        ViewModels.MainViewModel.GlobalSearchQueryChanged -= OnGlobalSearchQueryChanged;
+        ViewModels.MainViewModel.GlobalSearchQueryChanged += OnGlobalSearchQueryChanged;
 
         if (DataContext is ViewModels.MainViewModel vm)
         {
-            // Apply the titlebar global search query when this page (re)loads.
-            if (!string.IsNullOrEmpty(vm.GlobalSearchQuery))
-                ApplyGlobalSearch(vm.GlobalSearchQuery);
-
-            // Ctrl+F: focus the search box.
-            if (vm.FocusSearchRequested)
+            if (vm.InputBooks.Count == 0 && vm.OutputBooks.Count == 0)
             {
-                vm.FocusSearchRequested = false;
-                Dispatcher.BeginInvoke(new Action(() => SearchBox.Focus()));
+                vm.LoadBooks();
             }
+            ApplySearchFilter(vm.GlobalSearchQuery ?? "");
         }
     }
 
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void OnGlobalSearchQueryChanged(string query)
     {
-        ApplySearchFilter(SearchBox.Text);
+        Dispatcher.Invoke(() => ApplySearchFilter(query));
     }
 
     /// <summary>Called from the titlebar global search: sets the local filter.</summary>
     public void ApplyGlobalSearch(string query)
     {
-        SearchBox.Text = query ?? "";
         ApplySearchFilter(query ?? "");
     }
 
@@ -56,14 +65,24 @@ public partial class BooksPage : Page
         {
             ICollectionView inputView = CollectionViewSource.GetDefaultView(InputItemsControl.ItemsSource);
             if (inputView != null)
-                inputView.Filter = item => Matches(item, searchText);
+            {
+                if (string.IsNullOrEmpty(searchText))
+                    inputView.Filter = null;
+                else
+                    inputView.Filter = item => Matches(item, searchText);
+            }
         }
 
         if (OutputItemsControl?.ItemsSource != null)
         {
             ICollectionView outputView = CollectionViewSource.GetDefaultView(OutputItemsControl.ItemsSource);
             if (outputView != null)
-                outputView.Filter = item => Matches(item, searchText);
+            {
+                if (string.IsNullOrEmpty(searchText))
+                    outputView.Filter = null;
+                else
+                    outputView.Filter = item => Matches(item, searchText);
+            }
         }
     }
 

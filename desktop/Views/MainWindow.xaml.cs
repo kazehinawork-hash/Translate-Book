@@ -34,14 +34,14 @@ namespace TranslateBook.Views;
 
         private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            // Ctrl+F: jump to the books list and focus its search box.
+            // Ctrl+F: focus ô GlobalSearchBox trên TitleBar và chọn toàn bộ text
             if (e.Key == System.Windows.Input.Key.F
                 && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
                 e.Handled = true;
                 NavigateToBooks();
-                if (DataContext is ViewModels.MainViewModel vm)
-                    vm.FocusSearchRequested = true;
+                GlobalSearchBox?.Focus();
+                GlobalSearchBox?.SelectAll();
             }
         }
 
@@ -234,5 +234,71 @@ namespace TranslateBook.Views;
                 ? new SymbolIcon { Symbol = SymbolRegular.ErrorCircle24 }
                 : new SymbolIcon { Symbol = SymbolRegular.Checkmark24 },
             TimeSpan.FromSeconds(3));
+    }
+
+    private void Window_DragEnter(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+            if (DragDropOverlay != null) DragDropOverlay.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+    }
+
+    private void Window_DragLeave(object sender, DragEventArgs e)
+    {
+        if (DragDropOverlay != null) DragDropOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (DragDropOverlay != null) DragDropOverlay.Visibility = Visibility.Collapsed;
+
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            var files = (string[]?)e.Data.GetData(DataFormats.FileDrop);
+            if (files == null || files.Length == 0) return;
+
+            var projectRoot = Services.ProjectHelper.FindProjectRoot();
+            if (string.IsNullOrEmpty(projectRoot)) return;
+
+            var chuaLamDir = System.IO.Path.Combine(projectRoot, "input", "chua-lam");
+            System.IO.Directory.CreateDirectory(chuaLamDir);
+
+            int copied = 0;
+            foreach (var f in files)
+            {
+                var ext = System.IO.Path.GetExtension(f).ToLowerInvariant();
+                if (ext is ".pdf" or ".epub" or ".docx" or ".txt")
+                {
+                    var dest = System.IO.Path.Combine(chuaLamDir, System.IO.Path.GetFileName(f));
+                    try
+                    {
+                        System.IO.File.Copy(f, dest, overwrite: true);
+                        copied++;
+                    }
+                    catch { }
+                }
+            }
+
+            if (copied > 0)
+            {
+                NavigateToBooks();
+                if (DataContext is ViewModels.MainViewModel vm)
+                {
+                    vm.LoadBooks();
+                    vm.AppendLog($"📥 Đã thêm {copied} file sách mới vào input/chua-lam/ thành công!");
+                }
+                ShowSnackbar($"Đã thêm {copied} sách mới vào danh sách!");
+            }
+            else
+            {
+                ShowSnackbar("Vui lòng thả file sách định dạng .epub, .pdf hoặc .docx", true);
+            }
+        }
     }
 }

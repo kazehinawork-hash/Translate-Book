@@ -13,20 +13,78 @@ public partial class ApiPage : Page
         InitializeComponent();
     }
 
+    private bool _isUpdatingKeyProgrammatically = false;
+
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
         if (DataContext == null)
             DataContext = Window.GetWindow(this)?.DataContext;
+
+        LoadCurrentProviderKey();
+    }
+
+    private void ProviderCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        LoadCurrentProviderKey();
+    }
+
+    private void LoadCurrentProviderKey()
+    {
+        var provider = ProviderCombo?.SelectedItem is ComboBoxItem item ? (item.Tag?.ToString() ?? item.Content?.ToString() ?? "gemini").ToLowerInvariant() : "gemini";
+        var cfg = Services.ConfigService.GetProvider(provider);
+        var key = cfg?.ApiKey ?? "";
+
+        _isUpdatingKeyProgrammatically = true;
+        try
+        {
+            if (ApiKeyBox != null)
+            {
+                ApiKeyBox.Password = key;
+            }
+            if (KeyStatusText != null)
+            {
+                if (!string.IsNullOrWhiteSpace(key))
+                {
+                    KeyStatusText.Text = "● Đã lưu API key (đang được bảo mật). Nhập key mới nếu muốn thay đổi.";
+                    KeyStatusText.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
+                }
+                else
+                {
+                    KeyStatusText.Text = "Chưa có API key. Vui lòng nhập mã truy cập của bạn.";
+                    KeyStatusText.Foreground = (Brush)FindResource("TextFillColorSecondaryBrush");
+                }
+            }
+        }
+        finally
+        {
+            _isUpdatingKeyProgrammatically = false;
+        }
     }
 
     private void ApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
     {
+        if (_isUpdatingKeyProgrammatically) return;
+
         if (DataContext is ViewModels.MainViewModel vm)
         {
             vm.ApiKeyInput = ApiKeyBox.Password;
             if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password) && ApiKeyBox.Password.Length > 10)
             {
                 TriggerFetchModels();
+            }
+        }
+
+        if (KeyStatusText != null)
+        {
+            if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password))
+            {
+                KeyStatusText.Text = "● Đã nhập API key. Bấm 'Lưu Cài Đặt' hoặc 'Kiểm Tra Kết Nối' để lưu.";
+                KeyStatusText.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
+            }
+            else
+            {
+                KeyStatusText.Text = "Chưa có API key. Vui lòng nhập mã truy cập của bạn.";
+                KeyStatusText.Foreground = (Brush)FindResource("TextFillColorSecondaryBrush");
             }
         }
     }
@@ -109,6 +167,35 @@ public partial class ApiPage : Page
         });
     }
 
+    private void SaveConfig_Click(object sender, RoutedEventArgs e)
+    {
+        var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? (item.Tag?.ToString() ?? item.Content?.ToString() ?? "gemini").ToLowerInvariant() : "gemini";
+
+        var cfg = Services.ConfigService.Load();
+        if (!cfg.Providers.ContainsKey(provider))
+            cfg.Providers[provider] = new ProviderConfig();
+
+        if (!string.IsNullOrEmpty(ApiKeyBox.Password))
+            cfg.Providers[provider].ApiKey = ApiKeyBox.Password;
+        cfg.Providers[provider].Model = ModelBox.Text?.Trim() ?? "";
+        cfg.Providers[provider].BaseUrl = BaseUrlBox.Text?.Trim() ?? "";
+        cfg.ActiveProvider = provider;
+        Services.ConfigService.Save(cfg);
+
+        if (DataContext is ViewModels.MainViewModel vm)
+        {
+            vm.ActiveProvider = provider;
+            vm.SelectedProvider = provider;
+        }
+
+        LoadCurrentProviderKey();
+
+        if (Window.GetWindow(this) is MainWindow mw)
+            mw.ShowSnackbar($"Đã lưu cấu hình API {provider.ToUpper()} thành công!", false);
+
+        TriggerFetchModels();
+    }
+
     private void TestApi_Click(object sender, RoutedEventArgs e)
     {
         var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? (item.Tag?.ToString() ?? item.Content?.ToString() ?? "gemini").ToLowerInvariant() : "gemini";
@@ -123,6 +210,14 @@ public partial class ApiPage : Page
         cfg.Providers[provider].BaseUrl = BaseUrlBox.Text?.Trim() ?? "";
         cfg.ActiveProvider = provider;
         Services.ConfigService.Save(cfg);
+
+        if (DataContext is ViewModels.MainViewModel vm)
+        {
+            vm.ActiveProvider = provider;
+            vm.SelectedProvider = provider;
+        }
+
+        LoadCurrentProviderKey();
 
         ApiStatus.Text = "Đang kiểm tra...";
         ApiStatus.Foreground = Brushes.Yellow;

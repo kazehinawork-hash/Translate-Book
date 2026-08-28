@@ -34,6 +34,48 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Sửa Lỗi Thẻ Sách Không Hiển Thị Trên Trang BooksPage (08-28, XONG)**:
+  - **Nguyên nhân**: Trong `BooksPage.xaml`, `WrapPanel` của `ItemsControl` (cả tab Input và Output) bị gán `MaxWidth="{Binding ActualWidth, ElementName=InputScrollViewer}"`. Do `ItemsPanelTemplate` có NameScope riêng biệt nên không thể tìm thấy `InputScrollViewer`, dẫn đến `MaxWidth` bị gán bằng 0 và làm toàn bộ thẻ sách bị co lại 0px, biến mất khỏi màn hình dù dữ liệu đã tải đầy đủ.
+  - **Khắc phục**: Loại bỏ binding `MaxWidth` thừa trong `ItemsPanelTemplate`, để `WrapPanel` tự động căn chỉnh và wrap theo chiều rộng của khung ScrollViewer như tab AudioPage.
+
+- **Sửa Lỗi Render Giao Diện Do XAML StaticResource ContextMenu (08-28, XONG)**:
+  - Loại bỏ các tham chiếu style tĩnh không tồn tại (`GlassContextMenu`, `GlassSeparator`) trong DataTemplate của thẻ sách.
+  - Khôi phục hoàn toàn quá trình kết xuất trực quan (visual tree rendering) của WPF cho toàn bộ danh sách thẻ sách ở cả 2 tab Input và Output.
+
+- **Sửa Lỗi Đồng Bộ Bộ Lọc Sách & DataContext Trang BooksPage (08-28, XONG)**:
+  - Sửa logic `ApplySearchFilter`: Khi chuỗi tìm kiếm rỗng thì gán `Filter = null` giúp toàn bộ danh sách Input & Output hiển thị đầy đủ ngay lập tức.
+  - Tự động fallback nạp `DataContext` từ `Application.Current.MainWindow` và tự kích hoạt `LoadBooks()` nếu danh sách bị rỗng khi chuyển trang.
+
+- **Tích Hợp Bộ 3 Tiện Ích Giao Diện & Thao Tác (UX / Convenience) (08-28, XONG)**:
+  - **1. Kéo - Thả File Trực Tiếp (Smart Drag & Drop)**:
+    - Kéo thả file `.pdf`, `.epub`, `.docx` từ Desktop vào App $\rightarrow$ Lớp phủ kính mờ phát sáng (DragDropOverlay) hiện ra; app tự động lưu file vào `input/chua-lam/` và nạp vào danh sách ngay lập tức.
+  - **2. Bảng Thống Kê & Hiệu Suất (Dashboard Quick Analytics)**:
+    - Thanh thống kê nhỏ gọn, sang trọng trên header: `Chưa làm (N)` • `Đã dịch (N)` • `Audio (N)` • `Tốc độ VieNeu-TTS RTF 0.12 (GPU RTX ~8x)`.
+  - **3. Menu Chuột Phải Tiện Ích 1-Click (Context Menu)**:
+    - Click chuột phải vào thẻ sách để: Mở thư mục sách (`OpenBookFolder`), Đọc thử bản dịch (`PreviewTranslated`), Sao chép đường dẫn file (`CopyBookPath`), Dọn dẹp cache trung gian (`CleanBookCache`).
+
+- **Nâng Cấp Cơ Chế Dịch Song Song Thông Minh Bảo Vệ Ngữ Cảnh & Chống Quá Tải API Free (08-28, XONG)**:
+  - **Cơ chế Chống Quá Tải API Free (Anti-Rate-Limit Auto Backoff)**:
+    - Nếu API trả về `429 Too Many Requests` hoặc `Quota exceeded`: Hệ thống **tự động ngủ 35 giây** để phục hồi hạn ngạch và retry tối đa 5 lần mà không làm crash app.
+    - Bộ chọn luồng hỗ trợ: `1 Luồng (An toàn Free)` (dành cho API Free hạn ngạch 15 RPM) và `2 Luồng (Khuyên dùng)`.
+  - **3 Tầng Bảo Vệ Ngữ Cảnh Tuyệt Đối**:
+    1. **Hiến pháp xưng hô toàn cuốn**: Nạp và áp đặt `Book Profile` (`working/profile/<slug>.md`) + `Master Glossary` cho mọi luồng dịch.
+    2. **Ngữ cảnh gối đầu (Sliding Window Context)**: Tự động trích xuất 2-3 câu cuối của chunk trước đó gửi kèm vào prompt của chunk hiện tại $\rightarrow$ AI luôn nắm trọn mạch truyện và cảm xúc nhân vật.
+    3. **Kiểm soát luồng an toàn (SemaphoreSlim)**: Thêm bộ chọn `TranslateConcurrency` trên thanh điều khiển của trang Sách `BooksPage.xaml`.
+
+- **Chuẩn Hóa Hiển Thị API Key Bảo Mật (Password Bullet) trong Trang Cài Đặt (08-28, XONG)**:
+
+- **Chuẩn Hóa Hiển Thị API Key Bảo Mật (Password Bullet) trong Trang Cài Đặt (08-28, XONG)**:
+  - Khi người dùng đã lưu API key: Tự động nạp và hiển thị dưới dạng **dãy chấm tròn to bảo mật (`●●●●●●●●`)** thay vì để trống.
+  - Tự động đồng bộ theo từng Provider (Gemini / DeepSeek / Custom) khi chuyển đổi Provider.
+  - Thêm dòng trạng thái trực quan: `● Đã lưu API key (đang được bảo mật)` phát sáng màu Accent tinh tế.
+
+- **Tối ưu hóa Thanh Tìm Kiếm Gom về TitleBar Toàn Cục (08-28, XONG)**:
+  - **Loại bỏ ô tìm kiếm trùng lặp**: Xóa bỏ ô SearchBox thừa bên trong trang Sách `BooksPage`, giữ không gian hiển thị danh sách sách cực kỳ thoáng đãng, sang trọng.
+  - **Hợp nhất thanh Global Search trên TitleBar**: 
+    - Nhập từ khóa tại thanh TitleBar `GlobalSearchBox` (`Tìm kiếm sách... (Ctrl+F)`) $\rightarrow$ Tự động lọc realtime toàn bộ sách Input và Output ngay khi gõ.
+    - Phím tắt `Ctrl + F` tự động kích hoạt nhảy thẳng vào ô tìm kiếm trên TitleBar.
+
 - **Đồng bộ Giao diện & Tính năng Tab Audio chuẩn Tab Sách (08-27, XONG)**:
   - **Cặp nút thao tác trực quan**:
     - **Nút 1 (Primary)**: **`🎧 Tạo Audio Toàn bộ`** — Tạo mới 100% toàn bộ Audiobook từ đầu (`force=true`, xóa cache và chạy toàn bộ các chương).

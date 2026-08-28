@@ -21,6 +21,7 @@
                 <ComboBox x:Name="ProviderCombo" Width="250" HorizontalAlignment="Left"
                           SelectedValuePath="Tag"
                           SelectedValue="{Binding SelectedProvider, Mode=TwoWay}" Margin="0,0,0,24"
+                          SelectionChanged="ProviderCombo_SelectionChanged"
                           ToolTip="Chọn nhà cung cấp API đang sử dụng"
                           Style="{StaticResource GlassComboBox}">
                     <ComboBoxItem Content="Gemini" Tag="gemini"/>
@@ -32,9 +33,9 @@
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
                 <ui:PasswordBox x:Name="ApiKeyBox" Width="400" HorizontalAlignment="Left"
                                 PasswordChanged="ApiKeyBox_PasswordChanged"
-                                PlaceholderText="Nhập API key mới hoặc để trống để giữ nguyên"
+                                PlaceholderText="Nhập API key mới..."
                                 ToolTip="API key được lưu cục bộ trong cấu hình của ứng dụng"/>
-                <TextBlock Text="Để trống nếu không muốn đổi mã cũ." FontSize="11"
+                <TextBlock x:Name="KeyStatusText" Text="Đang kiểm tra API key..." FontSize="11"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
 
                 <TextBlock Text="Mô hình (Model)" FontSize="13" FontWeight="SemiBold"
@@ -66,7 +67,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <ui:Button Appearance="Primary" Style="{StaticResource InteractiveButton}" Content="Lưu cấu hình" Height="36" Padding="18,0"
                                Icon="{ui:SymbolIcon Save24}"
-                               Command="{Binding SaveApiConfigCommand}"/>
+                               Click="SaveConfig_Click"/>
                     <ui:Button Style="{StaticResource InteractiveButton}" Content="Kiểm tra kết nối" Margin="12,0,0,0" Height="36" Padding="18,0"
                                Icon="{ui:SymbolIcon CheckmarkCircle24}"
                                Click="TestApi_Click"/>
