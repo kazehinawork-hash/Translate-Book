@@ -77,12 +77,13 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Hiển thị:" VerticalAlignment="Center" FontSize="11.5"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="CmbMode" Width="180" Height="30" FontSize="11.5"
+                    <ComboBox x:Name="CmbMode" Width="200" Height="30" FontSize="11.5"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbMode_SelectionChanged" ToolTip="Chọn chế độ hiển thị">
-                        <ComboBoxItem Content="Bản dịch (Việt)" IsSelected="True" Tag="vi"/>
-                        <ComboBoxItem Content="Song ngữ (Gốc + Việt)" Tag="bi"/>
+                        <ComboBoxItem Content="Bản dịch (Thuần Việt)" IsSelected="True" Tag="vi"/>
+                        <ComboBoxItem Content="Song song Đối chiếu (2 Cột)" Tag="split"/>
                         <ComboBoxItem Content="Tam ngữ (Gốc + Pinyin + Việt)" Tag="tri"/>
+                        <ComboBoxItem Content="Song ngữ (Từng đoạn)" Tag="bi"/>
                         <ComboBoxItem Content="Bản gốc" Tag="src"/>
                     </ComboBox>
                 </StackPanel>
@@ -92,6 +93,18 @@
         <Grid Grid.Row="2">
             <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="#1E1E1E"
                           NavigationCompleted="WebView_NavigationCompleted"/>
+
+            <!-- Loading Overlay khi chuyển chế độ hoặc nạp sách lớn -->
+            <Border x:Name="LoadingOverlay" Background="#99000000" Visibility="Collapsed"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48" Margin="0,0,0,14"/>
+                    <TextBlock x:Name="TxtLoadingStatus" Text="Đang xử lý và chuyển chế độ đọc..."
+                               FontSize="13.5" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </ui:FluentWindow>

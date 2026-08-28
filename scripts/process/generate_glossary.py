@@ -98,39 +98,27 @@ Khi trích thuật ngữ, áp dụng các quy tắc sau:
 """
 
 
-PROMPT_TEMPLATE = """Read the following text and extract ALL:
-1. Character names (nhân vật) — tên người, biệt danh, xưng hô riêng
-2. Place names (địa điểm) — thành phố, vùng đất, kiến trúc nổi tiếng
-3. Organization names (tổ chức) — công ty, bang hội, tổ chức chính trị
-4. Domain-specific terms (thuật ngữ chuyên ngành) — y học, pháp lý, kỹ thuật...
-5. Skills / Magic items / Artifacts / Cultivation levels (Chiêu thức, pháp bảo, vật phẩm, cảnh giới tu luyện)
-6. Brand/product names (thương hiệu/sản phẩm)
-7. Key concepts/catchphrases (khái niệm cốt lõi, cụm từ lặp lại xuyên suốt)
+PROMPT_TEMPLATE = """Bạn là một chuyên gia ngôn ngữ và biên tập viên dịch thuật sách cao cấp.
+Nhiệm vụ của bạn là đọc kỹ văn bản mẫu của cuốn sách dưới đây và trích xuất TOÀN BỘ BẢNG THUẬT NGỮ & NGỮ CẢNH CỐT LÕI phục vụ cho dịch thuật.
 
-Output as CSV format:
+HÃY TRÍCH XUẤT ĐẦY ĐỦ CÁC DANH MỤC SAU:
+1. Nhân vật (Character names & Nicknames): Tên nhân vật, biệt danh, vai trò (nhân vật chính, phụ, mẹ, chồng, sếp...).
+2. Hệ xưng hô & Quan hệ nhân vật (Pronouns & Relationship Context):
+   - Quan trọng: Cách nhân vật xưng hô với nhau (VD: "林总" → Sếp Lâm; "小李" → Tiểu Lý; "阿姨" → Dì/Bác).
+3. Địa danh & Không gian (Place names): Tên thành phố, công ty, trường học, địa điểm gắn liền với cốt truyện.
+4. Thuật ngữ chuyên ngành / Văn hóa / Pháp bảo / Cảnh giới (Domain & Core concepts):
+   - Từ ngữ chuyên môn (y học, tâm lý học, kinh tế học, tu tiên, chiêu thức...).
+5. Cụm từ triết lý / Châm ngôn chủ đạo của cuốn sách (Core catchphrases / Theme phrases).
+
+ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Đúng chuẩn CSV, KHÔNG giải thích thêm, KHÔNG dùng markdown block ```):
 source,target,notes
 
-CRITICAL RULES — PHÂN BIỆT THUẬT NGỮ vs TỪ PHỔ THÔNG:
-- THUẬT NGỮ = chỉ dùng cho đối tượng ĐẶC BIỆT này, không dùng chung trong giao tiếp hàng ngày
-  Ví dụ OK: "灵气" → Linh khí (chỉ năng lượng tu tiên), "筑基" → Trúc Cơ (cảnh giới tu luyện)
-- TỪ PHỔ THÔNG = từ mọi người dùng hàng ngày, KHÔNG cần glossary
-  Ví dụ NÊN LOẠI: "女人" → phụ nữ (ai cũng biết), "幸福" → hạnh phúc (từ cơ bản)
-- TRUNG GIAN = có thể giữ nếu xuất hiện dày đặc + có nghĩa ĐẶC BIỆT trong ngữ cảnh
-  Ví dụ: "风骨" → Phong cốt (khái niệm về cốt cách con người — mang sắc thái triết lý, không giống "phụ nữ")
+QUY TẮC CHẤT LƯỢNG VĂN CHƯƠNG — BÁM SÁT NGỮ CẢNH:
+- KHÔNG đưa các từ phổ thông hàng ngày không có nghĩa đặc thù (VD: 女人, 吃饭, 跑步, 很高兴).
+- CHỈ GIỮ từ có sắc thái biểu cảm, phong cách hoặc vai trò cốt truyện.
+- "notes" PHẢI ghi rõ vai trò/ngữ cảnh (VD: "nhân vật chính", "chồng cũ của nữ chính", "khái niệm triết lý sống", "chiêu thức").
 
-Mức độ lọc (tùy thể loại):
-- Tiên hiệp/kiếm hiệp: LỌC RẤT KỶ — chỉ giữ thuật ngữ tu luyện, chiêu thức, pháp bảo, cảnh giới, tên riêng
-- Văn học/giải trí: LỌC VỪA — giữ tên riêng + khái niệm cốt lõi, bỏ từ phổ thông
-- Kỹ thuật/pháp lý: LỌC NHẸ — gần như giữ tất cả thuật ngữ chuyên ngành
-
-Output CSV rules:
-- "source" = original term (English/Chinese)
-- "target" = suggested Vietnamese translation (leave blank if unsure)
-- "notes" = brief context (e.g., "main character", "fictional city", "artifact", "martial art")
-- Sort by frequency (most frequent first)
-- CRITICAL: OUTPUT ONLY THE RAW CSV TEXT. NO EXPLANATIONS, NO MARKDOWN BLOCKS (```), NO GREETINGS.
-
-TEXT:
+MẪU VĂN BẢN TRÍCH XUẤT TỪ CUỐN SÁCH:
 {text}
 """
 

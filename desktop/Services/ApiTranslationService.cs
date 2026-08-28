@@ -9,42 +9,103 @@ namespace TranslateBook.Services;
 
 public class ApiTranslationService
 {
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(100) };
+    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(300) };
+
+    public void CancelPendingRequests()
+    {
+        try
+        {
+            _http.CancelPendingRequests();
+        }
+        catch { }
+    }
 
     public record TranslationResult(string Text, string Model, string Provider,
         int TokensIn = 0, int TokensOut = 0);
 
     public static string LoadGlossary(string slug, string projectRoot)
     {
-        var masterPath = Path.Combine(projectRoot, "glossary", "master.csv");
-        if (!File.Exists(masterPath))
-            return "";
+        var glossaryDir = Path.Combine(projectRoot, "glossary");
+        if (!Directory.Exists(glossaryDir)) return "";
+
         try
         {
-            var lines = File.ReadAllLines(masterPath, Encoding.UTF8);
-            var sb = new StringBuilder();
-            bool isFirst = true;
-            foreach (var line in lines)
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                if (isFirst) { sb.AppendLine(line); isFirst = false; continue; }
+            var masterFiles = Directory.GetFiles(glossaryDir, "master*.csv").OrderBy(f => f).ToList();
+            if (masterFiles.Count == 0) return "";
 
-                // Nếu là dòng glossary chung hoặc thuộc đúng sách này
-                var parts = line.Split(',');
-                if (parts.Length >= 5)
+            var normSlug = System.Text.RegularExpressions.Regex.Replace((slug ?? "").ToLower().Trim(), @"[^a-z0-9]+", "-").Trim('-');
+            var allRows = new List<(string source, string target, string type, string note, string book, string author, string genre)>();
+
+            foreach (var mf in masterFiles)
+            {
+                var lines = File.ReadAllLines(mf, Encoding.UTF8);
+                bool isFirst = true;
+                foreach (var line in lines)
                 {
-                    var bookCol = parts[4].Trim();
-                    if (string.IsNullOrEmpty(bookCol) || bookCol.Equals(slug, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (isFirst) { isFirst = false; continue; } // Bỏ qua header
+
+                    var parts = line.Split(',');
+                    if (parts.Length >= 2)
                     {
-                        sb.AppendLine(line);
+                        var src = parts[0].Trim();
+                        var tgt = parts[1].Trim();
+                        var type = parts.Length > 2 ? parts[2].Trim() : "";
+                        var note = parts.Length > 3 ? parts[3].Trim() : "";
+                        var book = parts.Length > 4 ? System.Text.RegularExpressions.Regex.Replace(parts[4].ToLower().Trim(), @"[^a-z0-9]+", "-").Trim('-') : "";
+                        var author = parts.Length > 5 ? System.Text.RegularExpressions.Regex.Replace(parts[5].ToLower().Trim(), @"[^a-z0-9]+", "-").Trim('-') : "";
+                        var genre = parts.Length > 6 ? System.Text.RegularExpressions.Regex.Replace(parts[6].ToLower().Trim(), @"[^a-z0-9]+", "-").Trim('-') : "";
+
+                        if (!string.IsNullOrEmpty(src) && !string.IsNullOrEmpty(tgt))
+                        {
+                            allRows.Add((src, tgt, type, note, book, author, genre));
+                        }
                     }
                 }
-                else
+            }
+
+            // Tìm tác giả & thể loại của cuốn sách này từ các mục đã gán
+            string authorOfBook = allRows.FirstOrDefault(r => r.book == normSlug && !string.IsNullOrEmpty(r.author)).author ?? "";
+            string genreOfBook = allRows.FirstOrDefault(r => r.book == normSlug && !string.IsNullOrEmpty(r.genre)).genre ?? "";
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Thuật ngữ gốc (Source) -> Bản dịch chuẩn (Target):");
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Ưu tiên 1: Thuật ngữ riêng của cuốn sách
+            foreach (var r in allRows.Where(r => r.book == normSlug))
+            {
+                if (seen.Add(r.source))
                 {
-                    sb.AppendLine(line);
+                    var noteStr = !string.IsNullOrEmpty(r.note) ? $" ({r.note})" : "";
+                    sb.AppendLine($"• {r.source} => {r.target}{noteStr}");
                 }
             }
-            return sb.ToString();
+
+            // Ưu tiên 2: Thuật ngữ cùng tác giả / thể loại
+            foreach (var r in allRows)
+            {
+                bool matchAuthor = !string.IsNullOrEmpty(authorOfBook) && r.author == authorOfBook;
+                bool matchGenre = !string.IsNullOrEmpty(genreOfBook) && r.genre == genreOfBook;
+                if ((matchAuthor || matchGenre) && seen.Add(r.source))
+                {
+                    var noteStr = !string.IsNullOrEmpty(r.note) ? $" ({r.note})" : "";
+                    sb.AppendLine($"• {r.source} => {r.target}{noteStr}");
+                }
+            }
+
+            // Ưu tiên 3: Thuật ngữ dùng chung toàn hệ thống (book, author, genre đều rỗng)
+            foreach (var r in allRows.Where(r => string.IsNullOrEmpty(r.book) && string.IsNullOrEmpty(r.author) && string.IsNullOrEmpty(r.genre)))
+            {
+                if (seen.Add(r.source))
+                {
+                    var noteStr = !string.IsNullOrEmpty(r.note) ? $" ({r.note})" : "";
+                    sb.AppendLine($"• {r.source} => {r.target}{noteStr}");
+                }
+            }
+
+            return seen.Count > 0 ? sb.ToString() : "";
         }
         catch
         {
@@ -74,7 +135,7 @@ public class ApiTranslationService
                 rawResult = providerName switch
                 {
                     "gemini" => await TranslateGeminiAsync(config, prompt, ct, trilingual),
-                    "deepseek" or "custom" => await TranslateOpenAICompatAsync(config, prompt, ct, trilingual),
+                    _ when providerName == "deepseek" || providerName.StartsWith("custom") => await TranslateOpenAICompatAsync(config, prompt, ct, trilingual),
                     _ => throw new Exception($"Provider '{providerName}' không hỗ trợ")
                 };
                 break;
@@ -84,15 +145,25 @@ public class ApiTranslationService
                 lastEx = ex;
                 var errMsg = ex.InnerException?.Message ?? ex.Message;
                 bool isRateLimit = errMsg.Contains("429") || errMsg.Contains("RESOURCE_EXHAUSTED") || errMsg.Contains("Quota exceeded", StringComparison.OrdinalIgnoreCase);
+                bool isUpstreamUnavailable = errMsg.Contains("503") || errMsg.Contains("502") || errMsg.Contains("504") || errMsg.Contains("temporarily unavailable", StringComparison.OrdinalIgnoreCase);
+                bool isTimeout = ex is TaskCanceledException || ex is TimeoutException || errMsg.Contains("canceled", StringComparison.OrdinalIgnoreCase) || errMsg.Contains("timeout", StringComparison.OrdinalIgnoreCase);
 
                 if (isRateLimit && attempt < 5)
                 {
-                    onStatusLog?.Invoke($"⏳ [Chạm giới hạn API] Đang tự động chờ 35 giây để phục hồi hạn mức (Lần thử {attempt}/5)...");
-                    await Task.Delay(35000, ct);
+                    onStatusLog?.Invoke($"⏳ [API Rate Limit/429] Server báo quá tải hạn mức ({errMsg}). Đang tự động chờ 25 giây (Lần thử {attempt}/5)...");
+                    await Task.Delay(25000, ct);
                 }
-                else if (attempt < 3)
+                else if ((isUpstreamUnavailable || isTimeout) && attempt < 5)
                 {
-                    await Task.Delay(2500, ct);
+                    int waitSec = attempt * 8; // 8s, 16s, 24s, 32s
+                    string reason = isTimeout ? "Timeout chờ phản hồi quá lâu" : errMsg;
+                    onStatusLog?.Invoke($"⏳ [Server bận: {reason}] Đang thử lại sau {waitSec}s (Lần thử {attempt}/5)...");
+                    await Task.Delay(waitSec * 1000, ct);
+                }
+                else if (attempt < 4)
+                {
+                    onStatusLog?.Invoke($"⏳ [Tạm dừng kết nối: {errMsg}] Thử lại lần {attempt + 1}/5...");
+                    await Task.Delay(3000, ct);
                 }
                 else
                 {
@@ -187,28 +258,127 @@ public class ApiTranslationService
                     }
                 }
             }
-            else // deepseek, openai, custom
+            else // deepseek, openai, custom (OpenCode, CommandCode, OpenRouter, OneAPI...)
             {
-                var rootUrl = string.IsNullOrWhiteSpace(baseUrl)
-                    ? (providerName == "deepseek" ? "https://api.deepseek.com/v1" : "https://api.openai.com/v1")
-                    : baseUrl.TrimEnd('/');
-                var url = $"{rootUrl}/models";
+                var inputBase = (baseUrl ?? "").Trim().TrimEnd('/');
 
-                using var req = new HttpRequestMessage(HttpMethod.Get, url);
-                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                var resp = await _http.SendAsync(req, ct);
-                if (resp.IsSuccessStatusCode)
+                // Chuẩn bị các URL khả dĩ để quét thực tế từ server
+                var candidateUrls = new List<string>();
+
+                if (!string.IsNullOrEmpty(inputBase))
                 {
-                    var json = await resp.Content.ReadAsStringAsync(ct);
-                    using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("data", out var dataArr))
+                    if (inputBase.EndsWith("/models", StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (var m in dataArr.EnumerateArray())
+                        candidateUrls.Add(inputBase);
+                    }
+                    else
+                    {
+                        candidateUrls.Add($"{inputBase}/models");
+                        if (!inputBase.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
                         {
-                            var id = m.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
-                            if (!string.IsNullOrEmpty(id)) list.Add(id);
+                            candidateUrls.Add($"{inputBase}/v1/models");
+                            candidateUrls.Add($"{inputBase}/provider/v1/models");
                         }
                     }
+                }
+                else
+                {
+                    if (providerName == "deepseek")
+                    {
+                        candidateUrls.Add("https://api.deepseek.com/v1/models");
+                    }
+                    else // custom (tự động thử CommandCode, OpenRouter, OpenAI...)
+                    {
+                        candidateUrls.Add("https://api.commandcode.ai/provider/v1/models");
+                        candidateUrls.Add("https://openrouter.ai/api/v1/models");
+                        candidateUrls.Add("https://api.openai.com/v1/models");
+                    }
+                }
+
+                foreach (var url in candidateUrls)
+                {
+                    try
+                    {
+                        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                        req.Headers.Add("User-Agent", "TranslateBook/1.0");
+
+                        var resp = await _http.SendAsync(req, ct);
+                        if (resp.IsSuccessStatusCode)
+                        {
+                            var json = await resp.Content.ReadAsStringAsync(ct);
+                            using var doc = JsonDocument.Parse(json);
+
+                            // Hàm phụ trích xuất model ID linh hoạt từ bất kỳ object nào
+                            void ExtractModelId(JsonElement elem)
+                            {
+                                if (elem.ValueKind == JsonValueKind.String)
+                                {
+                                    var s = elem.GetString();
+                                    if (!string.IsNullOrEmpty(s) && !list.Contains(s)) list.Add(s);
+                                }
+                                else if (elem.ValueKind == JsonValueKind.Object)
+                                {
+                                    string[] idProps = { "id", "name", "model", "model_name", "display_name", "slug" };
+                                    foreach (var p in idProps)
+                                    {
+                                        if (elem.TryGetProperty(p, out var val) && val.ValueKind == JsonValueKind.String)
+                                        {
+                                            var s = val.GetString();
+                                            if (!string.IsNullOrEmpty(s) && !list.Contains(s))
+                                            {
+                                                list.Add(s);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 1. Chuẩn OpenAI: { "data": [ ... ] }
+                            if (doc.RootElement.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var m in dataArr.EnumerateArray()) ExtractModelId(m);
+                            }
+                            // 2. Chuẩn { "models": [ ... ] }
+                            else if (doc.RootElement.TryGetProperty("models", out var mArr) && mArr.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var m in mArr.EnumerateArray()) ExtractModelId(m);
+                            }
+                            // 3. Mảng gốc: [ ... ]
+                            else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                            {
+                                foreach (var m in doc.RootElement.EnumerateArray()) ExtractModelId(m);
+                            }
+                            // 4. Object chứa dict các model: { "deepseek-chat": { ... }, "gpt-4o": { ... } }
+                            else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                            {
+                                foreach (var prop in doc.RootElement.EnumerateObject())
+                                {
+                                    if (prop.Value.ValueKind == JsonValueKind.Object || prop.Value.ValueKind == JsonValueKind.Array)
+                                    {
+                                        if (!prop.Name.Equals("error", StringComparison.OrdinalIgnoreCase) &&
+                                            !prop.Name.Equals("status", StringComparison.OrdinalIgnoreCase) &&
+                                            !prop.Name.Equals("success", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            if (prop.Value.ValueKind == JsonValueKind.Array)
+                                            {
+                                                foreach (var sub in prop.Value.EnumerateArray()) ExtractModelId(sub);
+                                            }
+                                            else
+                                            {
+                                                if (!list.Contains(prop.Name)) list.Add(prop.Name);
+                                                ExtractModelId(prop.Value);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (list.Count > 0) break; // Đã quét được danh sách thực tế từ server
+                        }
+                    }
+                    catch { }
                 }
             }
         }
@@ -337,11 +507,25 @@ public class ApiTranslationService
     private async Task<TranslationResult> TranslateOpenAICompatAsync(
         ProviderConfig config, string prompt, CancellationToken ct, bool trilingualMode = false)
     {
-        var baseUrl = string.IsNullOrEmpty(config.BaseUrl)
-            ? "https://api.deepseek.com/v1"
-            : config.BaseUrl.TrimEnd('/');
-
-        var url = $"{baseUrl}/chat/completions";
+        var inputBase = (config.BaseUrl ?? "").Trim().TrimEnd('/');
+        string url;
+        if (!string.IsNullOrEmpty(inputBase))
+        {
+            if (inputBase.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+                url = inputBase;
+            else if (inputBase.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) || inputBase.EndsWith("/provider/v1", StringComparison.OrdinalIgnoreCase))
+                url = $"{inputBase}/chat/completions";
+            else
+                url = $"{inputBase}/v1/chat/completions";
+        }
+        else
+        {
+            var key = (config.ApiKey ?? "").Trim();
+            if (key.StartsWith("user_") || key.StartsWith("cmd_"))
+                url = "https://api.commandcode.ai/provider/v1/chat/completions";
+            else
+                url = "https://api.deepseek.com/v1/chat/completions";
+        }
 
         var systemPrompt = trilingualMode
             ? "Bạn là một dịch giả chuyên nghiệp. Dịch từng dòng, giữ nguyên số dòng."
@@ -419,15 +603,15 @@ public class ApiTranslationService
 
         sb.AppendLine("## TIÊU CHUẨN VĂN CHƯƠNG LÁNG (LITERARY QUALITY — GIỮ HỒN NGUYÊN TÁC):");
         sb.AppendLine("1. Dịch CẢ CÂU, CẢ ĐOẠN — không dịch thô từng từ; câu từ phải tự nhiên, mượt mà như văn phong của một nhà văn Việt Nam thực thụ.");
-        sb.AppendLine("2. GIỮ TRỌN HỒN NGUYÊN TÁC: Tuyệt đối không thêm/bớt ý, không đổi logic, giữ nguyên giọng điệu (trữ tình, châm biếm, sâu lắng, triết lý) và thái độ tác giả.");
+        sb.AppendLine("2. GIỮ TRỌN HỒN NGUYÊN TÁC & VĂN HÓA: Tuyệt đối không thêm/bớt ý, không đổi logic; dịch chuẩn xác các danh từ văn hóa/đời sống (Ví dụ: 旗袍 bắt buộc dịch là 'sườn xám', không dịch thành 'áo dài Thượng Hải'; 汉服 là 'Hán phục'; 坐月子 là 'ở cữ').");
         sb.AppendLine("3. Nhịp điệu & âm thanh: Ưu tiên câu có nhịp điệu uyển chuyển, tránh lặp từ vô cớ; tỉnh lược đại từ thừa để văn phong thanh thoát.");
         sb.AppendLine("4. Khẩu ngữ & hội thoại: Lời thoại sống động như người Việt giao tiếp ngoài đời thực, xưng hô nhất quán theo ngữ cảnh.");
         sb.AppendLine("5. Thuần Việt: Ưu tiên từ ngữ thuần Việt giàu hình tượng; tránh lạm dụng từ Hán-Việt tối nghĩa hay cụm từ dịch máy (như 'một cách', 'những điều', 'được bởi').");
         sb.AppendLine();
         sb.AppendLine("### VÍ DỤ ĐỐI CHIẾU CHUẨN (Bản Cứng vs Bản Láng Nhà Văn):");
-        sb.AppendLine("• Câu gốc: “她心里很难过，但是她强忍着没有让泪水流下来。”");
-        sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Trong lòng cô ấy rất khó chịu, nhưng cô ấy cố nén lại không để nước mắt chảy xuống.'");
-        sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Lòng cô quặn thắt, nhưng cô nén hết vào trong, không để một giọt nước mắt rơi xuống.'");
+        sb.AppendLine("• Câu gốc: “她穿上一件修身的旗袍，心里很难过，但是她强忍着没有让泪水流下来。”");
+        sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Cô ấy mặc vào một chiếc áo dài Thượng Hải vừa người, trong lòng rất khó chịu, nhưng cố nén nước mắt...'");
+        sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Khoác lên mình chiếc sườn xám ôm dáng, lòng cô quặn thắt, nhưng vẫn nén hết vào trong, không để một giọt nước mắt rơi xuống.'");
         sb.AppendLine("• Câu gốc: “他不停地工作，一直工作到很晚。”");
         sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Anh ấy không ngừng làm việc, một mực làm việc đến rất muộn.'");
         sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Anh miệt mài làm đến tận khuya.'");

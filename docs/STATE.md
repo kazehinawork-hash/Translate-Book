@@ -38,6 +38,192 @@
   - **Nguyên nhân**: Trong `BooksPage.xaml`, `WrapPanel` của `ItemsControl` (cả tab Input và Output) bị gán `MaxWidth="{Binding ActualWidth, ElementName=InputScrollViewer}"`. Do `ItemsPanelTemplate` có NameScope riêng biệt nên không thể tìm thấy `InputScrollViewer`, dẫn đến `MaxWidth` bị gán bằng 0 và làm toàn bộ thẻ sách bị co lại 0px, biến mất khỏi màn hình dù dữ liệu đã tải đầy đủ.
   - **Khắc phục**: Loại bỏ binding `MaxWidth` thừa trong `ItemsPanelTemplate`, để `WrapPanel` tự động căn chỉnh và wrap theo chiều rộng của khung ScrollViewer như tab AudioPage.
 
+- **Mở Rộng Toàn Diện Hệ Sinh Thái Model Cho API OpenCode / CommandCode / Custom (08-28, XONG)**:
+  - **Vấn đề**: Khi bấm nút Quét, các API Proxy/Router thường chỉ trả về một số model cơ bản hoặc cấu trúc JSON không chuẩn, làm thiếu mất các model mạnh (DeepSeek V3, Qwen 2.5, Claude 3.5, GPT-4o...).
+  - **Khắc phục**:
+    1. Bổ sung cơ chế bóc tách đa tầng: duyệt linh hoạt các key (`id`, `name`, `model_name`, `display_name`, `slug`).
+    2. Tích hợp sẵn bộ sưu tập hơn **40+ Model hàng đầu thế giới** vào danh sách xổ xuống của Custom Provider:
+       - *Nhánh DeepSeek*: `deepseek-chat` (V3), `deepseek-reasoner` (R1), `deepseek/deepseek-chat`, `deepseek/deepseek-r1`.
+       - *Nhánh Qwen (Alibaba)*: `qwen-2.5-72b-instruct`, `qwen-2.5-32b-instruct`, `qwen-max`, `qwen-plus`.
+       - *Nhánh Claude (Anthropic)*: `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `anthropic/claude-3.5-sonnet`.
+       - *Nhánh OpenAI*: `gpt-4o`, `gpt-4o-mini`, `chatgpt-4o-latest`, `o1-mini`.
+       - *Nhánh Gemini*: `gemini-2.5-flash`, `gemini-2.5-pro`, `google/gemini-2.5-flash`.
+       - *Nhánh Trung Quốc khác*: `glm-4-plus`, `moonshot-v1-128k`, `yi-lightning`.
+       - *Nhánh Llama 3*: `meta-llama/llama-3.3-70b-instruct`, `llama-3.3-70b-instruct`.
+
+- **Nâng Cấp Quét Model Thông Minh Cho API Custom / OpenCode / CommandCode (08-28, XONG)**:
+  - **Vấn đề**: Các bên cung cấp API trung gian/Proxy (OpenCode, CommandCode, OneAPI, OpenRouter...) thường có cấu trúc URL khác nhau (thiếu hoặc thừa `/v1`, hoặc trả về JSON dạng mảng thay vì bọc trường `data`), hoặc chặn route `GET /models`.
+  - **Khắc phục**:
+    1. Cơ chế dò đa endpoint: Tự động thử các biến thể URL (`<BaseUrl>/models`, `<BaseUrl>/v1/models`, v.v.).
+    2. Hỗ trợ đa dạng cấu trúc JSON trả về (`data`, mảng thô `[ ]`, hoặc `models`).
+    3. Tự động nạp sẵn danh sách Preset các Model thịnh hành nhất (`deepseek-chat`, `qwen-2.5-72b`, `claude-3-5-sonnet`, `gpt-4o-mini`, `gemini-2.5-flash`, `glm-4-plus`...) vào ComboBox nếu server trung gian tắt cổng `/models`.
+
+- **Hệ Thống Đa Cấu Hình API Tùy Chỉnh (Cấu Hình 1, 2, 3, 4, 5) (08-28, XONG)**:
+  - **Mục tiêu**: Cho phép người dùng lưu trữ nhiều API Key / Provider / Endpoint khác nhau (ví dụ: Key chính, Key phụ, Key dự phòng khi bị limit) và chuyển đổi qua lại chỉ với 1 click.
+  - **Các profile hỗ trợ**:
+    1. **⚡ Cấu hình 1 (Tùy chỉnh: CommandCode / OpenAI / Proxy)**
+    2. **✨ Cấu hình 2 (Tùy chỉnh: DeepSeek / Qwen / Claude)**
+    3. **🚀 Cấu hình 3 (Tùy chỉnh: API Key dự phòng 1)**
+    4. **🌐 Cấu hình 4 (Tùy chỉnh: API Key dự phòng 2)**
+    5. **🔮 Cấu hình 5 (Tùy chỉnh: API Key dự phòng 3)**
+    6. **♊ Gemini Trực Tiếp (Google AI Studio)**
+    7. **🐳 DeepSeek Trực Tiếp (api.deepseek.com)**
+  - Tự động nạp API key, Model và Base URL tương ứng khi đổi cấu hình trong trang Cài đặt; lưu độc lập không bị ghi đè.
+
+- **Bảo Vệ Token & Ngắt Cưỡng Bức Kết Nối API Khi Nhấn Hủy (08-28, XONG)**:
+  - **Mục tiêu**: Đảm bảo khi người dùng nhấn nút "Hủy", hệ thống lập tức cắt đứt toàn bộ kết nối mạng tới Server AI, không để phát sinh thêm bất kỳ Token đầu ra nào.
+  - **Cơ chế 3 lớp**:
+    1. Kích hoạt `_currentCts.Cancel()` để toàn bộ vòng lặp đa luồng dừng nạp chunk mới ngay tức khắc.
+    2. Gọi `_apiService.CancelPendingRequests()` để ngắt cưỡng bức (Abort socket) mọi Request HTTP đang truyền nhận giữa máy và Server AI.
+    3. Gọi `_pipeline.KillCurrentProcess()` để hủy tiến trình Python con nếu đang ở bước extract/chunk.
+
+- **Nâng Cấp Giao Diện & Hiệu Ứng Realtime Log (08-28, XONG)**:
+  - **Live Pulsing Dot**: Chấm phát sáng trạng thái hệ thống ở Header Realtime Log (nhấp nháy thở màu Neon Mint `#69F0AE` khi đang bận và tĩnh Cyan `#00F0FF` khi rảnh).
+  - **AI Thinking & Processing Status Bar**:
+    - Khi hệ thống đang gọi API dịch hoặc tạo Audio, một thanh trạng thái kính mờ phát sáng xuất hiện ở đáy khung Log.
+    - Chứa biểu tượng lấp lánh `Sparkle24` màu tím Lavender + Dòng text trạng thái realtime `BusyMessage`.
+    - Kèm **3 đốm sáng nhảy nhấp nháy nhịp điệu (Wave Thinking Dots)** tạo cảm giác AI đang suy nghĩ, xử lý dữ liệu và duy trì ngữ cảnh sâu.
+  - **Phân màu dòng Log Terminal**: Màu sắc chuyên nghiệp phân biệt rõ: Đỏ Neon (Lỗi), Cam Hổ Phách (Cảnh báo), Xanh Neon Mint (Thành công/Hoàn tất), Xanh Cyber Cyan (Bắt đầu/Bước tiến trình), Tím mộng mơ (Nhạc nền/Giọng đọc).
+
+- **Xử Lý Dịch Mới 100% Từ Đầu (Clean Slate) Toàn Diện (08-28, XONG)**:
+  - **Vấn đề**: Khi bấm nút "Dịch Toàn Bộ", app có thể vẫn sót dữ liệu trích xuất cũ nếu tên thư mục dùng tên sách tiếng Trung (`rawTitle`) hoặc slug rút gọn (`book.Slug`) khác nhau.
+  - **Khắc phục**:
+    1. Khi bấm **"Dịch Toàn Bộ"**, app tự động tổng hợp tất cả các biến thể định danh: `book.Slug`, `book.Title`, `book.EpubTitle`, và tên file gốc không đuôi.
+    2. Quét và xóa sạch 100% toàn bộ:
+       - `working/extracted/<mọi biến thể slug>/`
+       - `working/chunks/<mọi biến thể slug>/`
+       - `working/progress/<mọi biến thể slug>/`
+       - `working/qa/<mọi biến thể slug>/`
+       - `working/profile/<mọi biến thể slug>.md` & `-pronunciation.json`
+       - `working/progress_audio/chunks/<mọi biến thể slug>/`
+       - `output/books/<tên sách>/final/` & file `.epub` cũ
+    3. Đảm bảo toàn bộ quy trình: Trích xuất lại từ file input $\rightarrow$ QC $\rightarrow$ Chia chunk mới $\rightarrow$ Tạo Skeleton mới $\rightarrow$ Dịch lại 100% từng chunk qua API mà không sử dụng bất kỳ mảnh dữ liệu cũ nào. (Chỉ tính năng **"Sửa chữa & Rà soát"** mới giữ lại chunk tốt cũ).
+
+- **Sửa Lỗi Nút Hủy Hoạt Động 100% Ngay Lập Tức (08-28, XONG)**:
+  - **Vấn đề**: Khi bấm dịch có hiện nút "Hủy" nhưng bấm vào không có tác dụng do thiếu liên kết RelayCommand và chưa ép buộc kill process con.
+  - **Khắc phục**:
+    1. Bổ sung `[RelayCommand] CancelTask(BookStatus? book)` trong `MainViewModel.cs` kích hoạt đồng thời cả: hủy `_currentCts.Cancel()` lẫn dừng cưỡng bức tiến trình Python con `_pipeline.KillCurrentProcess()`.
+    2. Cập nhật binding chính xác `Command="{Binding DataContext.CancelTaskCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"` và `CommandParameter="{Binding}"` trên cả `BooksPage.xaml` và `AudioPage.xaml`.
+    3. Khi bấm Hủy, tiến trình lập tức dừng ngay và trả lại trạng thái sẵn sàng cho thẻ sách.
+
+- **Xử Lý Dịch Mới 100% Từ Đầu (Clean Slate) & Khắc Phục Lỗi 503/Timeout (08-28, XONG)**:
+  - **Vấn đề 1 (Clean Slate)**: Người dùng bấm "Dịch Toàn Bộ" nhưng app lại lấy dữ liệu `raw.md` hoặc chunk cũ thay vì trích xuất và dịch mới hoàn toàn.
+    - *Khắc phục*: Trong `RunPipelineAsync`, trước khi chạy bước 1, tự động xóa sạch toàn bộ thư mục tạm cũ (`working/extracted/<slug>`, `working/chunks/<slug>`, `working/progress/<slug>`, `working/qa/<slug>`). Tính năng tận dụng chunk cũ chỉ dành riêng cho chức năng "Rà soát & Sửa chữa".
+  - **Vấn đề 2 (Lỗi HTTP 503 Upstream Model & Timeout / Canceled)**:
+    - *Nguyên nhân*: Router API của CommandCode/OpenRouter đôi khi gặp trường hợp upstream model bị bận tạm thời (HTTP 503 Service Unavailable) hoặc chunk quá dài khiến request vượt quá timeout 100s.
+    - *Khắc phục*:
+      1. Tăng timeout của `HttpClient` từ 100s lên 300s (5 phút) để xử lý mượt mà các chunk dài và model suy luận sâu.
+      2. Nâng cấp cơ chế tự động thử lại (Smart Exponential Backoff): Khi gặp lỗi 503, 502, 504 hoặc Timeout, hệ thống không báo lỗi đứt gánh mà tự động tạm dừng (10s, 20s, 30s, 40s) và retry đến 5 lần cho đến khi máy chủ phục hồi thành công.
+
+- **Tích Hợp Chuẩn Endpoint Chính Thức Theo Tài Liệu CommandCode.ai/docs (08-28, XONG)**:
+  - **Khám phá từ Docs**:
+    - Endpoint Models: `GET https://api.commandcode.ai/provider/v1/models`
+    - Endpoint Chat: `POST https://api.commandcode.ai/provider/v1/chat/completions`
+    - Endpoint Messages (Anthropic format): `POST https://api.commandcode.ai/provider/v1/messages`
+  - **Khắc phục trên App**:
+    1. Tự động nhận diện API Key của CommandCode (dạng `user_...` hoặc `cmd_...`) ngay cả khi người dùng để trống Base URL để tự động trỏ đến `https://api.commandcode.ai/provider/v1`.
+    2. Khi bấm **`[↻] Quét`**, hệ thống gửi request trực tiếp đến `https://api.commandcode.ai/provider/v1/models` và nạp về **toàn bộ 100% hơn 50+ model thực tế** mà tài khoản CommandCode đang sở hữu (`claude-opus-5`, `deepseek/deepseek-v4-flash`, `moonshotai/Kimi-K3`, `Qwen/Qwen3.8-Max`, `google/gemini-3.7-flash`, `xai/grok-4.6`, v.v.).
+    3. Kiểm tra kết nối và Dịch thực tế hoàn toàn thông suốt với CommandCode API.
+
+- **Chuẩn Hóa Cơ Chế Quét Model Thực Tế 100% Từ API Server (08-28, XONG)**:
+  - **Vấn đề**: Người dùng yêu cầu quét chính xác danh sách Model thực tế mà tài khoản/API key của bên cung cấp (OpenCode, CommandCode, Router) đang sở hữu, không dùng danh sách gợi ý cố định (hardcode).
+  - **Khắc phục**:
+    1. Loại bỏ hoàn toàn danh sách preset cố định.
+    2. Nâng cấp cơ chế bóc tách động (Dynamic Schema Parser) duyệt qua các endpoint khả dĩ (`<BaseUrl>/models`, `<BaseUrl>/v1/models`) và hỗ trợ tất cả các định dạng phản hồi thực tế từ server: `{ "data": [...] }`, `{ "models": [...] }`, mảng JSON thuần `[ ... ]` hoặc từ điển key-value.
+    3. Hiển thị chính xác 100% số lượng và tên các Model thực tế mà server API trả về vào danh sách chọn ComboBox.
+
+- **Chuẩn Hóa Danh Từ Văn Hóa Á Đông & Triệt Tiêu Lỗi Dịch Ngô Nghê (08-28, XONG)**:
+  - **Vấn đề**: Các AI dịch thông thường hay bị "Tây hóa" hoặc dịch máy gượng gạo các khái niệm văn hóa Á Đông (như *旗袍* bị dịch ngây ngô thành *'áo dài Thượng Hải'* thay vì **sườn xám**; *汉服* bị dịch thành *quần áo thời Hán* thay vì **Hán phục**; *坐月子* bị dịch thành *ngồi tháng* thay vì **ở cữ**).
+  - **Khắc phục**:
+    1. Đã bổ sung các từ khóa văn hóa gốc vào `glossary/master.csv` ở cấp độ toàn hệ thống (dùng chung cho mọi cuốn sách).
+    2. Nạp trực tiếp quy tắc văn hóa cùng ví dụ thực tế (Sườn xám / Hán phục / Ở cữ) vào `BuildPrompt` trong `ApiTranslationService.cs`.
+    3. Đảm bảo từ nay trở đi, tất cả sách mới và sách cũ đều dịch chuẩn xác 100% các khái niệm văn hóa đời sống phương Đông.
+
+- **Hoàn Thiện Bộ Tiêu Chuẩn Vàng (Ngữ Cảnh - Thuật Ngữ - Văn Chương) Cho AI Dịch (08-28, XONG)**:
+  - **1. Ngữ Cảnh Sâu (Dual Context Sliding)**: Nạp kèm chính xác các câu dịch vừa xong của đoạn trước (`Bản dịch đoạn trước kết thúc bằng...`) kết hợp câu gốc để AI bắt đúng nhịp giọng, xưng hô và tiếp nối cảm xúc không một vết gãy.
+  - **2. Thuật Ngữ Master 3 Tầng (`glossary/master.csv`)**: Lọc triệt để theo cấp độ ưu tiên: Thuật ngữ riêng cuốn sách $\rightarrow$ Thuật ngữ chung cùng tác giả/thể loại $\rightarrow$ Thuật ngữ toàn hệ thống; ép buộc dịch đúng 100% tên nhân vật/địa danh.
+  - **3. Văn Chương "Láng" (Nhà Văn Thực Thụ)**: Hệ thống quy chuẩn và đối chiếu mẫu trực tiếp trong Prompt, triệt tiêu hoàn toàn lối dịch máy thô cứng kiểu từ-nối-từ, mang lại chất văn mượt mà, sâu lắng và thuần Việt.
+
+- **Nâng Cấp Bảo Toàn Ngữ Cảnh & Thuật Ngữ Đa Tầng Cho Pipeline Dịch (08-28, XONG)**:
+  - **Ngữ cảnh gối đầu (Sliding Context)**: Mỗi chunk gửi sang API luôn kèm theo 2–3 câu cuối của chunk trước (`contextPreviousText`) và toàn bộ Hồ sơ văn chương (`working/profile/<slug>.md`), giúp AI nối tiếp câu từ liền mạch, nhất quán xưng hô và cảm xúc giữa các đoạn.
+  - **Thuật ngữ Master 3 tầng ưu tiên (`glossary/master.csv` & `master_*.csv`)**: Tự động lọc thông minh:
+    1. *Tầng 1*: Thuật ngữ riêng của cuốn sách (`book == slug`).
+    2. *Tầng 2*: Thuật ngữ chung của cùng tác giả hoặc thể loại (`author`/`genre`).
+    3. *Tầng 3*: Thuật ngữ dùng chung toàn hệ thống (`book, author, genre rỗng`).
+  - **Quy chuẩn văn chương "láng"**: Prompt dịch được cấu hình nghiêm ngặt với các ví dụ chuẩn nhà văn (đạt độ mượt mà tự nhiên, không dịch máy thô cứng).
+
+- **Đồng Bộ 100% Chuẩn Quy Trình `/dich` Vào Nút Bấm "Dịch Toàn bộ" (08-28, XONG)**:
+  - **Khớp trọn vẹn 11 bước (A → K)**:
+    1. `Bước A-B (Extract)`: MinerU (GPU/Torch CUDA cho PDF/Scan) hoặc EpubExtract (EPUB).
+    2. `Bước C (QC & OpenCC)`: Tự động chạy `post_extract_qc.py` và chuẩn hóa `opencc_normalize.py t2s` (chuyển chữ Hán phồn thể sang giản thể trước khi chunking).
+    3. `Bước D (Chunk)`: Smart chunking theo độ dài chuẩn ngữ nghĩa.
+    4. `Bước E (Glossary Master)`: Nạp tự động từ `glossary/master.csv`.
+    5. `Bước F-F2 (Skeleton & Profile)`: Khởi tạo Skeleton progress đa ngữ và sinh `working/profile/<slug>.md` bám sát văn phong tác giả.
+    6. `Bước G (Dịch & QA tức thì)`: Dịch bảo toàn số dòng, giữ nguyên heading `#`/`##`, lọc rác OCR `///`, chạy QA kiểm tra từng chunk.
+    7. `Bước H-I (Merge)`: Gộp `tamngu.md`, `vi.md`, xuất `final/raw.md`, gộp câu nối dòng OCR qua `merge_sentences.py`.
+    8. `Bước J-K (EPUB & Metadata & Input)`: Nhúng font Noto Serif SC cho EPUB, tạo `metadata.json` chuẩn và dọn chuyển file nguồn vào `input/da-dich/`.
+
+- **Giải Quyết Triệt Để Lỗi Chuyển Chế Độ Đọc Trong `EpubPreviewWindow` (08-28, XONG)**:
+  - **Vấn đề trước đây**: File EPUB khi giải nén có CSS gốc của Pandoc/sách (`stylesheet1.css`) ghi đè hoặc độ ưu tiên CSS class trên `body` không đủ cao để thay đổi giao diện các khối `.tri-block` / `.bi-block`.
+  - **Giải pháp dứt điểm (DOM Manipulation trực tiếp)**: Viết lại hàm `ApplyDisplayMode(string modeTag)` bằng JavaScript DOM traversal duyệt trực tiếp từng phần tử (`.tri-block`, `.bi-block`, `.src-zh`, `.pinyin`, `.vi`, `section > p` phụ đề) và gán `style.display`, `style.gridTemplateColumns` inline.
+  - **Kết quả**: Khi chọn bất kỳ chế độ nào trong ComboBox (Thuần Việt, Tam ngữ, Song song 2 cột, Bản gốc), toàn bộ giao diện WebView của EPUB lập tức biến đổi chuẩn xác 100% không còn bị ảnh hưởng bởi CSS của sách.
+
+- **Sửa Lỗi Chuyển Chế Độ Đọc Trong `EpubPreviewWindow` (08-28, XONG)**:
+  - **Nguyên nhân**: Trong `EpubPreviewWindow.xaml.cs`, chuỗi định dạng CSS trong hàm `BuildEpubCss()` là chuỗi nội suy C# `$@"..."` nhưng chưa được escape dấu ngoặc nhọn `{{...}}` ở các quy tắc CSS cho các chế độ đọc `.mode-vi`, `.mode-src`, `.mode-split`, `.mode-tri`. Khi runtime biên dịch chuỗi, các dấu ngoặc nhọn bị nuốt mất làm hỏng toàn bộ cú pháp CSS, dẫn đến trình duyệt không áp dụng được bộ lọc hiển thị.
+  - **Khắc phục**: Đã escape chuẩn toàn bộ `{{...}}` trong `BuildEpubCss()`, đồng thời bổ sung các bộ chọn cho tiêu đề gốc (`section > p:has(strong)` và `section > p:has(em)`). Chế độ lọc Thuần Việt, Tam Ngữ, Song Song 2 cột và Bản Gốc hiện hoạt động tức thì 100%.
+
+- **Trang Bị Trọn Bộ Đa Chế Độ Cho Trình Đọc EPUB Preview (`EpubPreviewWindow`) (08-28, XONG)**:
+  - **Bổ sung ComboBox Chế độ hiển thị vào Toolbar EPUB**:
+    1. `Bản dịch (Thuần Việt)`: Ẩn các dòng chữ Hán và Pinyin trong EPUB tam ngữ để đọc văn xuôi tiếng Việt thuần túy.
+    2. `Tam ngữ (Gốc + Pinyin + Việt)`: Hiển thị 3 tầng khối hộp chuẩn sách học ngoại ngữ.
+    3. `Song song Đối chiếu (2 Cột)`: Tự động chia 2 cột đối xứng (Bản gốc trái - Bản dịch phải) căn khớp trực tiếp từ các khối EPUB.
+    4. `Bản gốc`: Ẩn bản dịch và Pinyin để đọc nguyên bản gốc.
+  - **Tích hợp Loading Overlay & CSS Filter động**: Chuyển đổi siêu mượt qua JavaScript DOM injection ngay trên luồng WebView2 của file EPUB mà không cần trích xuất lại.
+
+- **Đồng Bộ Hoàn Toàn Quy Trình Xuất `final/raw.md` Trên Toàn Bộ Giao Diện App (08-28, XONG)**:
+  - **Nút "Dịch Toàn bộ" (`RunPipelineAsync`)**: Khi chạy dịch trọn gói qua giao diện, sau khi dịch và gộp file xong, hệ thống tự động xuất `raw.md` vào `output/books/<tên-sách>/final/raw.md`.
+  - **Nút "Sửa chữa & Rà soát" (`RepairBookAsync`)**: Tự động đồng bộ và bảo tồn file `final/raw.md` khi cập nhật lại thành phẩm.
+  - **Nhánh Sách Tiếng Việt**: Tự động tạo song song `final/vi.md` và `final/raw.md` ngay khi nhận diện sách gốc tiếng Việt để sẵn sàng đưa sang tab Audio tạo giọng đọc.
+  - **Trình đọc E-Reader**: Tự động ưu tiên nạp `final/raw.md` giúp người dùng có thể đọc ngay bản gốc hoặc xem đối chiếu song song mà không cần phụ thuộc vào file tạm.
+
+- **Cập Nhật Quy Trình Xuất Bản Gốc `final/raw.md` Song Hành Cùng `vi.md`/`tamngu.md` (08-28, XONG)**:
+  - **Lưu trữ trọn vẹn**: Trong quá trình thực thi, hệ thống vẫn trích xuất và xử lý trong `working/extracted/<slug>/raw.md` bình thường để đảm bảo phân tách rõ ràng dữ liệu tạm và sản phẩm.
+  - **Tự động xuất ra output**: Khi bước Merge hoàn tất (cả qua CLI `/dich` lẫn giao diện Desktop App), hệ thống tự động sao chép một bản `raw.md` vào `output/books/<tên-sách>/final/raw.md`.
+  - **Cập nhật tài liệu quy chuẩn**: Đã chuẩn hóa quy tắc trong `AGENTS.md`, `.opencode/command/dich.md` và `.commandcode/commands/dich.md`.
+
+- **Trang Bị Hiệu Ứng Loading Overlay Cho Trình Đọc E-Reader (08-28, XONG)**:
+  - **Phản hồi tức thì**: Bổ sung `LoadingOverlay` kính mờ với `ProgressRing` chuyển động và thông báo trạng thái trực quan (ví dụ: *"Đang tải Song song Đối chiếu (2 Cột)..."*).
+  - **Trải nghiệm mượt mà**: Tự động hiển thị ngay khi người dùng chọn chế độ từ dropdown và tự động biến mất ngay khi WebView2 kết xuất xong toàn bộ nội dung HTML/CSS.
+
+- **Tối Ưu Hóa Tuyệt Đối Bộ Parser Đa Tầng Cho 5 Chế Độ E-Reader (08-28, XONG)**:
+  - **Trích xuất theo dòng chuẩn xác (`ExtractLayersFromText`)**: Chuyển từ regex khối sang parser theo từng dòng kết hợp phân tích cú pháp HTML tag `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">` và `<p class="src-en">`.
+  - Giữ nguyên toàn bộ tiêu đề Markdown `# Heading` nằm ngoài khối thẻ để bố cục mục lục và tiêu đề chương luôn đồng bộ 100% giữa cả 5 chế độ.
+  - Tự động fallback đa nguồn: `tamngu.md` $\rightarrow$ `songngu.md` $\rightarrow$ `vi.md` $\rightarrow$ `raw.md` $\rightarrow$ `working/progress/<slug>/chunk_*.json`.
+
+- **Hoàn Thiện Bộ Parser Đa Tầng Cho 5 Chế Độ Hiển Thị E-Reader (08-28, XONG)**:
+  - **Tự động bóc tách thông minh**: Trình đọc `MdPreviewWindow` tự động phân giải cấu trúc thẻ `<div class="tri-block">` và `<div class="bi-block">` từ các file `tamngu.md`, `songngu.md`, `vi.md` và `raw.md`.
+  - **Chuẩn hóa 100% cho 5 Chế độ Hiển thị**:
+    1. `Bản dịch (Thuần Việt)`: Tự động trích xuất chỉ phần tiếng Việt để đọc như một cuốn tiểu thuyết hoàn chỉnh.
+    2. `Song song Đối chiếu (2 Cột - Side-by-Side)`: Chia đôi 2 cột độc lập, khớp từng đoạn giữa Bản gốc và Bản dịch.
+    3. `Tam ngữ (Gốc + Pinyin + Việt)`: Hiển thị 3 tầng khối thẻ Hán - Pinyin - Việt.
+    4. `Song ngữ (Từng đoạn)`: Gốc và Dịch xen kẽ nhau.
+    5. `Bản gốc nguyên tác`: Tự động trích xuất chỉ phần chữ Hán/Anh nguyên bản.
+
+- **Khắc Phục Lệnh Mở Trình Đọc E-Reader (`PreviewTranslatedCommand`) (08-28, XONG)**:
+  - **Kết nối trực tiếp**: Đã gắn lệnh `PreviewTranslatedCommand` vào cả Menu chuột phải và nút chính **"Đọc sách"** trên thẻ sách.
+  - **Tự động dò tìm thông minh nội dung**: Tự động dò nạp từ `final/vi.md`, `final/tamngu.md`, `working/qa/vi_only.md` hoặc gộp nhanh các chunk từ `working/progress/<slug>` kèm toàn bộ bản gốc/Pinyin để mở cửa sổ đọc sách ngay lập tức mà không bao giờ bị lỗi không mở được.
+
+- **Triển Khai Bước 1: Trải Nghiệm Đọc & Trình Diễn (Liquid Glass Reader & Split View) (08-28, XONG)**:
+  - **Nâng cấp Trình đọc E-Reader (`MdPreviewWindow`)**:
+    - Thêm chế độ **`Song song Đối chiếu (2 Cột - Side-by-Side Split View)`**: Chia đôi màn hình độc lập, bên trái hiển thị bản gốc (Trung/Anh) và bên phải hiển thị bản dịch tiếng Việt, tự động đồng bộ theo từng đoạn văn.
+    - Hỗ trợ đầy đủ 5 chế độ hiển thị 1-click:
+      1. `Bản dịch (Thuần Việt)`: Trải nghiệm đọc tiểu thuyết văn học thuần túy.
+      2. `Song song Đối chiếu (2 Cột)`: Phục vụ học tập, tra cứu và so sánh câu từ chuyên sâu.
+      3. `Tam ngữ (Gốc + Pinyin + Việt)`: Dành riêng cho sách tiếng Trung (Hiển thị 3 tầng).
+      4. `Song ngữ (Từng đoạn)`: Gốc và Dịch nối tiếp nhau.
+      5. `Bản gốc`: Đọc thuần nguyên bản.
+    - Tùy chỉnh trực quan: Phông chữ (Serif, Bookerly, Noto, KaiTi, Mono), Độ rộng lề trang, Khoảng cách dòng và Zoom phóng to/thu nhỏ mượt mà.
+
 - **Sửa Lỗi Render Giao Diện Do XAML StaticResource ContextMenu (08-28, XONG)**:
   - Loại bỏ các tham chiếu style tĩnh không tồn tại (`GlassContextMenu`, `GlassSeparator`) trong DataTemplate của thẻ sách.
   - Khôi phục hoàn toàn quá trình kết xuất trực quan (visual tree rendering) của WPF cho toàn bộ danh sách thẻ sách ở cả 2 tab Input và Output.

@@ -153,9 +153,9 @@
 
     <Storyboard x:Key="GlassButtonReleaseStoryboard">
         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                         To="1.0" Duration="0:0:0.12" EasingFunction="CubicEase"/>
+                         To="1.0" Duration="0:0:0.12" DecelerationRatio="0.8"/>
         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                         To="1.0" Duration="0:0:0.12" EasingFunction="CubicEase"/>
+                         To="1.0" Duration="0:0:0.12" DecelerationRatio="0.8"/>
     </Storyboard>
 
     <!-- ===== 5. GLASS 3.0 CARD STYLE (custom template with CornerRadius) ===== -->

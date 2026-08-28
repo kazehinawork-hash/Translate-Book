@@ -142,51 +142,97 @@
                                     </Style.Triggers>
                                 </Style>
                             </Grid.Style>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                             <Grid.RowDefinitions>
+                                 <RowDefinition Height="Auto"/>
+                                 <RowDefinition Height="*"/>
+                                 <RowDefinition Height="Auto"/>
+                             </Grid.RowDefinitions>
 
-                            <!-- Panel header: toggle + title + filter + clear + copy -->
-                            <Border Grid.Row="0" Background="{DynamicResource GlassElementBackground2Brush}" Padding="8,6"
-                                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Width="26" Height="26" Cursor="Hand"
-                                            Style="{StaticResource GlassIconButton}"
-                                            ToolTip="Thu Realtime Log (Ctrl+/)"
-                                            Command="{Binding ToggleLogCommand}">
-                                        <ui:SymbolIcon Symbol="ChevronRight24" FontSize="14"/>
-                                    </Button>
-                                    <TextBlock Grid.Column="1" Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
-                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                                    <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="8,0,6,0" Height="26"
-                                                PlaceholderText="Lọc..." Style="{StaticResource InteractiveTextBox}" FontSize="11"
-                                                Text="{Binding LogFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                TextChanged="LogFilterBox_TextChanged"/>
-                                    <Button Grid.Column="3" Content="Xóa" FontSize="11" Padding="8,3" Height="26" Cursor="Hand"
-                                            Style="{StaticResource GlassPlainButton}" Margin="0,0,4,0"
-                                            Click="ClearLogButton_Click"/>
-                                    <Button Grid.Column="4" Width="26" Height="26" Cursor="Hand"
-                                            Style="{StaticResource GlassIconButton}"
-                                            ToolTip="Sao chép toàn bộ log" Click="CopyLogButton_Click">
-                                        <ui:SymbolIcon Symbol="Copy24" FontSize="14"/>
-                                    </Button>
-                                </Grid>
-                            </Border>
+                             <!-- Panel header: toggle + title + live status + filter + clear + copy -->
+                             <Border Grid.Row="0" Background="{DynamicResource GlassElementBackground2Brush}" Padding="8,6"
+                                     BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1">
+                                 <Grid>
+                                     <Grid.ColumnDefinitions>
+                                         <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="*"/>
+                                         <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="Auto"/>
+                                     </Grid.ColumnDefinitions>
+                                     <Button Grid.Column="0" Width="26" Height="26" Cursor="Hand"
+                                             Style="{StaticResource GlassIconButton}"
+                                             ToolTip="Thu Realtime Log (Ctrl+/)"
+                                             Command="{Binding ToggleLogCommand}">
+                                         <ui:SymbolIcon Symbol="ChevronRight24" FontSize="14"/>
+                                     </Button>
+                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                                         <!-- Live Glowing Dot -->
+                                         <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,6,0"
+                                                 Background="#00F0FF"/>
+                                         <TextBlock Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                     </StackPanel>
 
-                            <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
-                                          VerticalScrollBarVisibility="Auto">
-                                <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
-                                             FontFamily="Consolas" FontSize="11"
-                                             TextChanged="LogTextBox_TextChanged"/>
-                            </ScrollViewer>
+                                     <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="8,0,6,0" Height="26"
+                                                 PlaceholderText="Lọc log..." Style="{StaticResource InteractiveTextBox}" FontSize="11"
+                                                 Text="{Binding LogFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextChanged="LogFilterBox_TextChanged"/>
+                                     <Button Grid.Column="3" Content="Xóa" FontSize="11" Padding="8,3" Height="26" Cursor="Hand"
+                                             Style="{StaticResource GlassPlainButton}" Margin="0,0,4,0"
+                                             Click="ClearLogButton_Click"/>
+                                     <Button Grid.Column="4" Width="26" Height="26" Cursor="Hand"
+                                             Style="{StaticResource GlassIconButton}"
+                                             ToolTip="Sao chép toàn bộ log" Click="CopyLogButton_Click">
+                                         <ui:SymbolIcon Symbol="Copy24" FontSize="14"/>
+                                     </Button>
+                                 </Grid>
+                             </Border>
+
+                             <!-- Khu vực hiển thị dòng Log Console -->
+                             <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
+                                           VerticalScrollBarVisibility="Auto">
+                                 <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
+                                              FontFamily="Consolas" FontSize="11"
+                                              TextChanged="LogTextBox_TextChanged"/>
+                             </ScrollViewer>
+
+                             <!-- AI Thinking & Processing Live Status Bar (Hiệu ứng AI đang suy nghĩ) -->
+                             <Border Grid.Row="2" Background="#141824" Padding="10,8"
+                                     BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,1,0,0">
+                                 <Border.Style>
+                                     <Style TargetType="Border">
+                                         <Setter Property="Visibility" Value="Collapsed"/>
+                                         <Style.Triggers>
+                                             <DataTrigger Binding="{Binding IsBusyAny}" Value="True">
+                                                 <Setter Property="Visibility" Value="Visible"/>
+                                             </DataTrigger>
+                                         </Style.Triggers>
+                                     </Style>
+                                 </Border.Style>
+                                 <Grid>
+                                     <Grid.ColumnDefinitions>
+                                         <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="*"/>
+                                         <ColumnDefinition Width="Auto"/>
+                                     </Grid.ColumnDefinitions>
+                                     
+                                     <!-- Thinking Sparkle Icon -->
+                                     <ui:SymbolIcon Grid.Column="0" Symbol="Sparkle24" FontSize="15"
+                                                    Foreground="#B388FF" Margin="0,0,8,0" VerticalAlignment="Center"/>
+
+                                     <!-- Thinking Title / Busy Status -->
+                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                         <TextBlock Text="{Binding BusyMessage, TargetNullValue='AI đang suy nghĩ và dịch thuật ngữ...'}"
+                                                    FontSize="11" FontWeight="SemiBold"
+                                                    Foreground="#E0E6ED" TextTrimming="CharacterEllipsis"/>
+                                     </StackPanel>
+
+                                     <!-- Wave Pulse Progress -->
+                                     <ProgressBar Grid.Column="2" Width="60" Height="4" IsIndeterminate="True"
+                                                  Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                  Background="#203040" VerticalAlignment="Center"/>
+                                 </Grid>
+                             </Border>
                         </Grid>
 
                         <!-- Collapsed View Button -->

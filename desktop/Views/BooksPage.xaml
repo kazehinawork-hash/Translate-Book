@@ -296,7 +296,8 @@
                                         </Grid>
                                         <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}" Margin="0,6,0,0"
                                                    HorizontalAlignment="Center" Padding="12,2"
-                                                   Command="{Binding DataContext.CancelCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
+                                                   Command="{Binding DataContext.CancelTaskCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                   CommandParameter="{Binding}">
                                             <ui:Button.Style>
                                                 <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -501,10 +502,10 @@
                                                 <ColumnDefinition Width="8"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Appearance="Primary" Content="Đọc thử" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
+                                            <ui:Button Grid.Column="0" Appearance="Primary" Content="Đọc sách" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
                                                        HorizontalAlignment="Stretch"
-                                                       ToolTip="Xem trước sách đã dịch (kèm nghe audiobook nếu có)"
-                                                       Command="{Binding DataContext.OpenEpubPreviewCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                       ToolTip="Mở Trình đọc E-Reader (hỗ trợ Thuần Việt, Song song 2 cột, Tam ngữ)"
+                                                       Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                        CommandParameter="{Binding}"/>
                                             <ui:Button Grid.Column="2" Content="" Icon="{ui:SymbolIcon Folder24}"
                                                        ToolTip="Mở thư mục sách trong Windows Explorer" Width="38"

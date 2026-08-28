@@ -18,15 +18,19 @@
             <StackPanel>
                 <TextBlock Text="Nhà cung cấp (Provider)" FontSize="13" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
-                <ComboBox x:Name="ProviderCombo" Width="250" HorizontalAlignment="Left"
+                <ComboBox x:Name="ProviderCombo" Width="360" HorizontalAlignment="Left"
                           SelectedValuePath="Tag"
                           SelectedValue="{Binding SelectedProvider, Mode=TwoWay}" Margin="0,0,0,24"
                           SelectionChanged="ProviderCombo_SelectionChanged"
-                          ToolTip="Chọn nhà cung cấp API đang sử dụng"
+                          ToolTip="Chọn cấu hình API đang sử dụng để dịch"
                           Style="{StaticResource GlassComboBox}">
-                    <ComboBoxItem Content="Gemini" Tag="gemini"/>
-                    <ComboBoxItem Content="DeepSeek" Tag="deepseek"/>
-                    <ComboBoxItem Content="Custom (OpenAI, Claude, Qwen...)" Tag="custom"/>
+                    <ComboBoxItem Content="⚡ Cấu hình 1 (Tùy chỉnh: CommandCode / OpenAI / Proxy)" Tag="custom_1"/>
+                    <ComboBoxItem Content="✨ Cấu hình 2 (Tùy chỉnh: OpenCode Zen / opencode.ai)" Tag="custom_2"/>
+                    <ComboBoxItem Content="🚀 Cấu hình 3 (Tùy chỉnh: DeepSeek / Qwen / Claude)" Tag="custom_3"/>
+                    <ComboBoxItem Content="🌐 Cấu hình 4 (Tùy chỉnh: API Key dự phòng 1)" Tag="custom_4"/>
+                    <ComboBoxItem Content="🔮 Cấu hình 5 (Tùy chỉnh: API Key dự phòng 2)" Tag="custom_5"/>
+                    <ComboBoxItem Content="♊ Gemini Trực Tiếp (Google AI Studio)" Tag="gemini"/>
+                    <ComboBoxItem Content="🐳 DeepSeek Trực Tiếp (api.deepseek.com)" Tag="deepseek"/>
                 </ComboBox>
 
                 <TextBlock Text="Mã truy cập (API Key)" FontSize="13" FontWeight="SemiBold"

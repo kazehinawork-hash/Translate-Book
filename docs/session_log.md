@@ -2111,6 +2111,10 @@
 ## 2026-08-28 — Tối ưu hóa Thanh tìm kiếm gom về TitleBar Toàn Cục & Tinh gọn Giao diện
 
 ### Đã làm
+- **Triển Khai Bước 1: Trải Nghiệm Đọc & Trình Diễn (Liquid Glass Reader & Side-by-Side Split View)**:
+  - Nâng cấp toàn diện Trình đọc E-Reader (`MdPreviewWindow`): Bổ sung chế độ **Song song Đối chiếu (2 Cột - Side-by-Side Split View)** với thiết kế lưới chuẩn xác, căn khớp từng đoạn văn giữa bản gốc (Trung/Anh) và bản dịch tiếng Việt.
+  - Hỗ trợ trọn bộ 5 chế độ đọc linh hoạt: *Thuần Việt*, *Song song (2 Cột)*, *Tam ngữ 3 tầng (Gốc + Pinyin + Dịch)*, *Song ngữ từng đoạn* và *Bản gốc*.
+  - Tích hợp thanh công cụ đọc sách cao cấp: Lựa chọn 6 họ font chữ (Segoe UI, Serif, Bookerly Kindle, Noto Serif SC, Cổ điển KaiTi, Consolas Mono), căn chỉnh lề (650px - 1000px - Fullscreen), khoảng cách dòng (1.5x - 2.2x) và zoom tỷ lệ trang.
 - **Tích Hợp Bộ 3 Tiện Ích Giao Diện & Thao Tác (UX / Convenience)**:
   - **1. Kéo - Thả File Trực Tiếp (Smart Drag & Drop)**: Bật `AllowDrop=True` toàn cục, thêm lớp phủ kính mờ `DragDropOverlay` phát sáng hiện đại. Tự động lưu file vào `input/chua-lam/` và nạp vào UI ngay khi thả file.
   - **2. Bảng Thống Kê & Hiệu Suất (Dashboard Quick Analytics)**: Hiển thị thanh trạng thái thời gian thực trên header trang Sách: số sách chưa làm, đã dịch, đã có audio và tốc độ GPU RTX thực tế.
@@ -2198,3 +2202,67 @@
 
 ### Git
 - Chưa commit — chờ người dùng duyệt.
+
+---
+
+## 2026-08-28 — Tích hợp CommandCode API 100% Model thực tế, Clean Slate dịch mới & Sửa nút Hủy
+
+### Đã làm
+- **Quét thực tế 100% Model từ CommandCode & Router API**:
+  - Gỡ bỏ danh sách model hardcode, chuyển sang truy vấn trực tiếp `/v1/models` (`https://api.commandcode.ai/provider/v1/models`).
+  - Hỗ trợ toàn diện 50+ model thực tế của CommandCode (`deepseek/deepseek-v4-flash`, `moonshotai/Kimi-K3`, `Qwen/Qwen3.8-Max`, `claude-opus-5`, `google/gemini-3.7-flash`...).
+- **Xử lý Dịch mới 100% từ đầu (Clean Slate)**:
+  - Khi bấm "Dịch Toàn Bộ", app tự động xóa sạch toàn bộ các bản trích xuất, chunks, progress, QA, profile và thành phẩm cũ theo mọi biến thể slug/title trước khi chạy.
+  - Đảm bảo trích xuất lại từ file gốc và dịch mới 100% từng chunk qua API.
+- **Khắc phục lỗi HTTP 503 Upstream Unavailable & Timeout**:
+  - Tăng `HttpClient.Timeout` lên 300s.
+  - Tích hợp Exponential Backoff tự động retry 5 lần khi gặp 503/502/504 hoặc Timeout.
+- **Sửa nút Hủy (Cancel Button)**:
+  - Sửa binding XAML và triển khai `CancelTaskCommand` kích hoạt đồng thời `_currentCts.Cancel()` và dừng tiến trình Python con `_pipeline.KillCurrentProcess()`.
+- **Biên dịch**: `dotnet build` thành công **0 Warning, 0 Error**.
+
+### File đổi
+- `desktop/Services/ApiTranslationService.cs`
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/AudioPage.xaml`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Đã commit.
+
+---
+
+## 2026-08-28 — Hiệu ứng AI Thinking Realtime Log, Bảo toàn Token khi Hủy & Đa cấu hình API (Cấu hình 1-5 & OpenCode)
+
+### Đã làm
+- **Hiệu ứng AI Thinking & Live Pulse cho Realtime Log**:
+  - Tích hợp đốm sáng Live Pulse trạng thái ở Header (xanh lơ tĩnh khi rảnh, nhấp nháy phát sáng Neon Mint khi đang bận).
+  - Thêm thanh trạng thái AI Thinking ở đáy khung Log với icon Sparkle tím Lavender, thông báo tiến trình chi tiết và thanh sóng năng lượng.
+  - Phân màu Terminal sống động cho từng dòng log (Đỏ, Cam, Xanh Mint, Cyber Cyan, Tím mộng mơ).
+- **Gia cố nút Hủy bảo toàn 100% Token**:
+  - Cơ chế 3 lớp: Ngắt `CancellationToken`, gọi `HttpClient.CancelPendingRequests()` để cắt đứt ngay lập tức kết nối socket mạng tới Server AI tránh sinh thêm Token, và `KillCurrentProcess()` dừng tiến trình Python con.
+- **Hệ thống Đa Cấu Hình API (Cấu hình 1 - 5 & OpenCode Zen)**:
+  - Cho phép lưu trữ và chuyển đổi tức thì giữa 5 Slot cấu hình tùy chỉnh riêng biệt + 2 Provider trực tiếp (Gemini, DeepSeek).
+  - Tích hợp sẵn mẫu cấu hình cho OpenCode Zen (`https://opencode.ai/zen/v1`).
+  - Lưu trữ độc lập trong `config.json`, không lo bị mất hay ghi đè key khi đổi nhà cung cấp.
+- **Biên dịch**: `dotnet build` thành công **0 Warning, 0 Error**.
+
+### File đổi
+- `desktop/Models/ApiConfig.cs`
+- `desktop/Services/ApiTranslationService.cs`
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Views/MainWindow.xaml`
+- `desktop/Views/ApiPage.xaml`
+- `desktop/Themes/LiquidGlass.xaml`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chuẩn bị commit và push lên GitHub theo lệnh người dùng.
+

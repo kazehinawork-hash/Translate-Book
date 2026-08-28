@@ -67,14 +67,10 @@ namespace TranslateBook.Views
                 if (core == null)
                     throw new InvalidOperationException("Không thể khởi tạo WebView2.");
 
-                // Đọc bản dịch Việt từ file .md preview
-                if (File.Exists(_mdFilePath))
-                {
-                    _rawViText = File.ReadAllText(_mdFilePath);
-                }
+                // Đọc toàn bộ nội dung từ các file và nạp đầy đủ dữ liệu
+                LoadAllBookLayers();
 
-                // Source/pinyin sẽ được MainViewModel.SetSourceContent() gọi SAU khi window mở.
-                // Mặc định render bản Việt trước.
+                // Render chế độ mặc định (Bản dịch thuần Việt)
                 RenderMode("vi");
             }
             catch (Exception ex)
@@ -84,17 +80,232 @@ namespace TranslateBook.Views
             }
         }
 
+        private void LoadAllBookLayers()
+        {
+            var projectRoot = Services.ProjectHelper.FindProjectRoot();
+
+            // 1. Nếu có file ban đầu, nạp và bóc tách
+            if (File.Exists(_mdFilePath))
+            {
+                var content = File.ReadAllText(_mdFilePath);
+                ExtractLayersFromText(content);
+            }
+
+            // 2. Tìm thêm từ output/books/<title>/final/ hoặc output/books/<slug>/final/
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                string[] bookDirs = {
+                    Path.Combine(projectRoot, "output", "books", _bookTitle, "final"),
+                    Path.Combine(projectRoot, "output", "books", _bookSlug, "final")
+                };
+
+                foreach (var fDir in bookDirs)
+                {
+                    if (!Directory.Exists(fDir)) continue;
+
+                    var tamnguPath = Path.Combine(fDir, "tamngu.md");
+                    var songnguPath = Path.Combine(fDir, "songngu.md");
+                    var viPath = Path.Combine(fDir, "vi.md");
+
+                    if (File.Exists(tamnguPath) && (string.IsNullOrEmpty(_rawSrcText) || string.IsNullOrEmpty(_rawPinyinText)))
+                    {
+                        ExtractLayersFromText(File.ReadAllText(tamnguPath));
+                    }
+                    if (File.Exists(songnguPath) && string.IsNullOrEmpty(_rawSrcText))
+                    {
+                        ExtractLayersFromText(File.ReadAllText(songnguPath));
+                    }
+                    if (File.Exists(viPath) && string.IsNullOrEmpty(_rawViText))
+                    {
+                        _rawViText = CleanHtmlBlocks(File.ReadAllText(viPath));
+                    }
+                }
+
+                // 3. Tìm từ working/extracted/<slug>/raw.md nếu thiếu bản gốc
+                if (string.IsNullOrEmpty(_rawSrcText) && !string.IsNullOrEmpty(_bookSlug))
+                {
+                    var rawPath = Path.Combine(projectRoot, "working", "extracted", _bookSlug, "raw.md");
+                    if (File.Exists(rawPath))
+                    {
+                        _rawSrcText = File.ReadAllText(rawPath);
+                    }
+                }
+
+                // 4. Tìm từ working/progress/<slug>/ nếu vẫn chưa có
+                if ((string.IsNullOrEmpty(_rawViText) || string.IsNullOrEmpty(_rawSrcText)) && !string.IsNullOrEmpty(_bookSlug))
+                {
+                    var progDir = Path.Combine(projectRoot, "working", "progress", _bookSlug);
+                    if (Directory.Exists(progDir))
+                    {
+                        try
+                        {
+                            var pFiles = Directory.GetFiles(progDir, "chunk_*.json").OrderBy(x => x).ToList();
+                            var sList = new List<string>();
+                            var pList = new List<string>();
+                            var vList = new List<string>();
+                            foreach (var pf in pFiles)
+                            {
+                                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(pf));
+                                if (doc.RootElement.TryGetProperty("original_text", out var ot) && !string.IsNullOrEmpty(ot.GetString()))
+                                    sList.Add(ot.GetString()!);
+                                else if (doc.RootElement.TryGetProperty("source_text", out var st) && !string.IsNullOrEmpty(st.GetString()))
+                                    sList.Add(st.GetString()!);
+
+                                if (doc.RootElement.TryGetProperty("pinyin_text", out var pt) && !string.IsNullOrEmpty(pt.GetString()))
+                                    pList.Add(pt.GetString()!);
+
+                                if (doc.RootElement.TryGetProperty("translated_text", out var tt) && !string.IsNullOrEmpty(tt.GetString()))
+                                    vList.Add(tt.GetString()!);
+                            }
+                            if (string.IsNullOrEmpty(_rawSrcText) && sList.Count > 0) _rawSrcText = string.Join("\n\n", sList);
+                            if (string.IsNullOrEmpty(_rawPinyinText) && pList.Count > 0) _rawPinyinText = string.Join("\n\n", pList);
+                            if (string.IsNullOrEmpty(_rawViText) && vList.Count > 0) _rawViText = string.Join("\n\n", vList);
+                        }
+                        catch { }
+                    }
+                }
+            }
+        }
+
+        private void ExtractLayersFromText(string content)
+        {
+            if (string.IsNullOrWhiteSpace(content)) return;
+
+            // Kiểm tra xem có chứa tri-block tam ngữ không
+            if (content.Contains("tri-block"))
+            {
+                var srcLines = new StringBuilder();
+                var pinLines = new StringBuilder();
+                var viLines = new StringBuilder();
+
+                // Lấy tất cả các đoạn văn bản kể cả heading nằm ngoài tri-block
+                var lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                bool insideTri = false;
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("<div class=\"tri-block\"") || trimmed.StartsWith("<div class='tri-block'"))
+                    {
+                        insideTri = true;
+                        continue;
+                    }
+                    if (trimmed.StartsWith("</div>"))
+                    {
+                        insideTri = false;
+                        continue;
+                    }
+
+                    if (insideTri)
+                    {
+                        var mSrc = Regex.Match(trimmed, @"<p class=""src-zh"">(.*?)</p>");
+                        if (!mSrc.Success) mSrc = Regex.Match(trimmed, @"<p class='src-zh'>(.*?)</p>");
+                        if (mSrc.Success) srcLines.AppendLine(mSrc.Groups[1].Value);
+
+                        var mPin = Regex.Match(trimmed, @"<p class=""pinyin"">(.*?)</p>");
+                        if (!mPin.Success) mPin = Regex.Match(trimmed, @"<p class='pinyin'>(.*?)</p>");
+                        if (mPin.Success) pinLines.AppendLine(mPin.Groups[1].Value);
+
+                        var mVi = Regex.Match(trimmed, @"<p class=""vi"">(.*?)</p>");
+                        if (!mVi.Success) mVi = Regex.Match(trimmed, @"<p class='vi'>(.*?)</p>");
+                        if (mVi.Success) viLines.AppendLine(mVi.Groups[1].Value);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(trimmed) && !trimmed.StartsWith("<"))
+                    {
+                        // Dòng markdown thông thường (như # Heading)
+                        srcLines.AppendLine(trimmed);
+                        pinLines.AppendLine(trimmed);
+                        viLines.AppendLine(trimmed);
+                    }
+                }
+
+                if (srcLines.Length > 0) _rawSrcText = srcLines.ToString();
+                if (pinLines.Length > 0) _rawPinyinText = pinLines.ToString();
+                if (viLines.Length > 0) _rawViText = viLines.ToString();
+                return;
+            }
+
+            // Kiểm tra xem có chứa bi-block song ngữ không
+            if (content.Contains("bi-block"))
+            {
+                var srcLines = new StringBuilder();
+                var viLines = new StringBuilder();
+
+                var lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                bool insideBi = false;
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("<div class=\"bi-block\"") || trimmed.StartsWith("<div class='bi-block'"))
+                    {
+                        insideBi = true;
+                        continue;
+                    }
+                    if (trimmed.StartsWith("</div>"))
+                    {
+                        insideBi = false;
+                        continue;
+                    }
+
+                    if (insideBi)
+                    {
+                        var mSrc = Regex.Match(trimmed, @"<p class=""src-.*?"">(.*?)</p>");
+                        if (!mSrc.Success) mSrc = Regex.Match(trimmed, @"<p class='src-.*?'>(.*?)</p>");
+                        if (mSrc.Success) srcLines.AppendLine(mSrc.Groups[1].Value);
+
+                        var mVi = Regex.Match(trimmed, @"<p class=""vi"">(.*?)</p>");
+                        if (!mVi.Success) mVi = Regex.Match(trimmed, @"<p class='vi'>(.*?)</p>");
+                        if (mVi.Success) viLines.AppendLine(mVi.Groups[1].Value);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(trimmed) && !trimmed.StartsWith("<"))
+                    {
+                        srcLines.AppendLine(trimmed);
+                        viLines.AppendLine(trimmed);
+                    }
+                }
+
+                if (srcLines.Length > 0) _rawSrcText = srcLines.ToString();
+                if (viLines.Length > 0) _rawViText = viLines.ToString();
+                return;
+            }
+
+            // Nếu là markdown thông thường
+            if (string.IsNullOrEmpty(_rawViText))
+                _rawViText = content;
+        }
+
+        private static string CleanHtmlBlocks(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            // Xoá các thẻ bọc thừa nếu có
+            return Regex.Replace(text, @"</?(div|p)[^>]*>", "");
+        }
+
         /// <summary>Được MainViewModel gọi để bổ sung source/pinyin từ progress JSON.</summary>
         public void SetSourceContent(string srcText, string pinyinText)
         {
-            _rawSrcText = srcText ?? "";
-            _rawPinyinText = pinyinText ?? "";
+            if (!string.IsNullOrEmpty(srcText)) _rawSrcText = srcText;
+            if (!string.IsNullOrEmpty(pinyinText)) _rawPinyinText = pinyinText;
         }
 
-        private void CmbMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void CmbMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (WebView?.CoreWebView2 == null) return;
-            var tag = (CmbMode.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "vi";
+            var item = CmbMode.SelectedItem as ComboBoxItem;
+            var tag = item?.Tag?.ToString() ?? "vi";
+            var modeName = item?.Content?.ToString() ?? "chế độ";
+
+            // Bật hiệu ứng loading overlay
+            if (LoadingOverlay != null)
+            {
+                if (TxtLoadingStatus != null)
+                    TxtLoadingStatus.Text = $"Đang tải {modeName}...";
+                LoadingOverlay.Visibility = Visibility.Visible;
+            }
+
+            // Chờ 1 tick UI để hiệu ứng loading hiển thị trước khi tính toán HTML
+            await Task.Yield();
             RenderMode(tag);
         }
 
@@ -104,26 +315,34 @@ namespace TranslateBook.Views
             switch (mode)
             {
                 case "src":
-                    html = BuildHtml(!string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText, "Bản gốc");
+                    html = BuildHtml(!string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText, "Bản gốc nguyên tác");
+                    break;
+                case "split":
+                    html = BuildSplitViewHtml(
+                        !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText,
+                        !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText);
                     break;
                 case "bi":
-                    if (!string.IsNullOrEmpty(_rawSrcText))
-                        html = BuildBilingualHtml(_rawSrcText, _rawViText);
-                    else
-                        html = BuildHtml(_rawViText, "Bản dịch (chưa có bản gốc để so sánh)");
+                    html = BuildBilingualHtml(
+                        !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText,
+                        !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText);
                     break;
                 case "tri":
-                    if (!string.IsNullOrEmpty(_rawSrcText) && !string.IsNullOrEmpty(_rawPinyinText))
-                        html = BuildTrilingualHtml(_rawSrcText, _rawPinyinText, _rawViText);
-                    else
-                        html = BuildHtml(_rawViText, "Bản dịch (chưa đủ dữ liệu tam ngữ)");
+                    html = BuildTrilingualHtml(
+                        !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText,
+                        !string.IsNullOrEmpty(_rawPinyinText) ? _rawPinyinText : "",
+                        !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText);
                     break;
                 case "vi":
                 default:
-                    html = BuildHtml(_rawViText, "Bản dịch");
+                    html = BuildHtml(!string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText, "Bản dịch (Thuần Việt)");
                     break;
             }
-            WebView.CoreWebView2.NavigateToString(html);
+
+            if (WebView?.CoreWebView2 != null)
+            {
+                WebView.CoreWebView2.NavigateToString(html);
+            }
         }
 
         // === HTML Render ===
@@ -251,11 +470,98 @@ namespace TranslateBook.Views
                     color: var(--fg-secondary-color);
                     font-style: italic;
                 }}
+                /* Split View (Song song 2 Cột) */
+                .split-wrapper {{
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 24px;
+                    width: 100%;
+                    max-width: 100% !important;
+                }}
+                .split-col {{
+                    padding: 16px;
+                    background: rgba(128,128,128,0.03);
+                    border-radius: 8px;
+                    border: 1px solid rgba(128,128,128,0.12);
+                }}
+                .split-col-header {{
+                    font-size: 0.9em;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    color: var(--link-color);
+                    margin-bottom: 12px;
+                    padding-bottom: 6px;
+                    border-bottom: 1px solid rgba(128,128,128,0.2);
+                }}
+                .split-row {{
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 20px;
+                    margin-bottom: 16px;
+                    padding-bottom: 14px;
+                    border-bottom: 1px dashed rgba(128,128,128,0.15);
+                }}
+                .split-row:last-child {{
+                    border-bottom: none;
+                }}
+                .split-cell-src {{
+                    color: var(--fg-secondary-color);
+                }}
+                .split-cell-vi {{
+                    color: var(--fg-color);
+                }}
                 ::-webkit-scrollbar {{ width: 8px; }}
                 ::-webkit-scrollbar-track {{ background: rgba(128,128,128,0.1); border-radius: 4px; }}
                 ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.3); border-radius: 4px; }}
                 ::-webkit-scrollbar-thumb:hover {{ background: rgba(128,128,128,0.5); }}
             ";
+        }
+
+        private string BuildSplitViewHtml(string srcMd, string viMd)
+        {
+            string css = BuildEpubCss();
+            var body = new StringBuilder();
+            body.AppendLine($"<div class='book-title'>📖 {EscapeHtml(_bookTitle)} — Song song Đối chiếu (Side-by-Side)</div>");
+
+            var srcBlocks = SplitIntoBlocks(srcMd);
+            var viBlocks = SplitIntoBlocks(viMd);
+
+            body.AppendLine("<div class='split-container'>");
+            body.AppendLine("  <div class='split-row' style='font-weight: bold; border-bottom: 2px solid var(--link-color); padding-bottom: 8px;'>");
+            body.AppendLine("    <div class='split-col-header'>📄 BẢN GỐC (NGUỒN)</div>");
+            body.AppendLine("    <div class='split-col-header'>✨ BẢN DỊCH (VIỆT)</div>");
+            body.AppendLine("  </div>");
+
+            int n = Math.Max(srcBlocks.Count, viBlocks.Count);
+            for (int i = 0; i < n; i++)
+            {
+                string s = i < srcBlocks.Count ? srcBlocks[i] : "";
+                string v = i < viBlocks.Count ? viBlocks[i] : "";
+                if (string.IsNullOrWhiteSpace(s) && string.IsNullOrWhiteSpace(v)) continue;
+
+                body.AppendLine("  <div class='split-row'>");
+                body.AppendLine("    <div class='split-cell-src'>");
+                body.AppendLine(MarkdownToHtml(s));
+                body.AppendLine("    </div>");
+                body.AppendLine("    <div class='split-cell-vi'>");
+                body.AppendLine(MarkdownToHtml(v));
+                body.AppendLine("    </div>");
+                body.AppendLine("  </div>");
+            }
+            body.AppendLine("</div>");
+
+            return $@"<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Preview Side-by-Side</title>
+<style>{css}</style>
+</head>
+<body style='max-width: 95%;'>
+{body}
+</body>
+</html>";
         }
 
         private string BuildHtml(string markdown, string modeLabel)
@@ -570,6 +876,12 @@ namespace TranslateBook.Views
             {
                 ReapplyThemeColors();
                 ApplyTypographySettings();
+            }
+
+            // Tắt hiệu ứng loading overlay khi trình duyệt đã render xong
+            if (LoadingOverlay != null)
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
             }
         }
 

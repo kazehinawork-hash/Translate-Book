@@ -324,6 +324,134 @@ namespace TranslateBook.Views
                     outline: 2px solid #ffeb3b;
                     box-shadow: 0 0 10px rgba(255, 152, 0, 0.8);
                 }}
+
+                /* Tam ngữ & Song ngữ Block */
+                .tri-block {{
+                    margin-bottom: 1.5em;
+                    padding: 0.6em 0.8em;
+                    border-left: 3px solid var(--link-color);
+                    background: rgba(128,128,128,0.04);
+                    border-radius: 0 4px 4px 0;
+                }}
+                .tri-block .src-zh {{
+                    color: var(--fg-color);
+                    margin: 0 0 0.2em 0;
+                    font-weight: 500;
+                }}
+                .tri-block .pinyin {{
+                    color: #6cc76c;
+                    font-size: 0.88em;
+                    font-style: italic;
+                    margin: 0 0 0.4em 0;
+                }}
+                .tri-block .vi {{
+                    color: var(--fg-color);
+                    margin: 0;
+                }}
+
+                .bi-block {{
+                    margin-bottom: 1.5em;
+                    padding: 0.6em 0.8em;
+                    border-left: 3px solid var(--link-color);
+                    background: rgba(128,128,128,0.04);
+                    border-radius: 0 4px 4px 0;
+                }}
+                .bi-block .src, .bi-block .src-en {{
+                    color: var(--fg-secondary-color);
+                    margin: 0 0 0.4em 0;
+                }}
+                .bi-block .vi {{
+                    color: var(--fg-color);
+                    margin: 0;
+                }}
+
+                /* Các class lọc chế độ hiển thị (Display Modes) */
+                /* 1. Chế độ Thuần Việt: Ẩn chữ Hán gốc và Pinyin */
+                body.mode-vi .tri-block .src-zh,
+                body.mode-vi .tri-block .pinyin,
+                body.mode-vi .bi-block .src,
+                body.mode-vi .bi-block .src-en,
+                body.mode-vi section > p:has(strong):not(.vi),
+                body.mode-vi section > p:has(em):not(.vi),
+                body.mode-vi .ep-src,
+                body.mode-vi .ep-pinyin {{
+                    display: none !important;
+                }}
+                body.mode-vi .tri-block,
+                body.mode-vi .bi-block {{
+                    border-left: none !important;
+                    background: transparent !important;
+                    padding: 0 !important;
+                    margin-bottom: 0.8em !important;
+                }}
+
+                /* 2. Chế độ Bản Gốc: Ẩn tiếng Việt và Pinyin */
+                body.mode-src .tri-block .pinyin,
+                body.mode-src .tri-block .vi,
+                body.mode-src .bi-block .vi,
+                body.mode-src section > h1,
+                body.mode-src section > h2,
+                body.mode-src .ep-vi,
+                body.mode-src .ep-pinyin {{
+                    display: none !important;
+                }}
+                body.mode-src section > p:has(strong),
+                body.mode-src .ep-src {{
+                    display: block !important;
+                    font-size: calc(var(--font-size) * 1.5) !important;
+                    font-weight: bold !important;
+                    color: var(--fg-color) !important;
+                    margin: 1.2em 0 0.5em 0 !important;
+                }}
+                body.mode-src .tri-block,
+                body.mode-src .bi-block {{
+                    border-left: none !important;
+                    background: transparent !important;
+                    padding: 0 !important;
+                    margin-bottom: 0.8em !important;
+                }}
+
+                /* 3. Chế độ Song Song (Side-by-Side 2 Cột) */
+                body.mode-split .tri-block,
+                body.mode-split .bi-block {{
+                    display: grid !important;
+                    grid-template-columns: 1fr 1fr !important;
+                    gap: 20px !important;
+                    border-left: none !important;
+                    border-bottom: 1px dashed rgba(128,128,128,0.15) !important;
+                    background: transparent !important;
+                    padding: 8px 0 !important;
+                    margin-bottom: 8px !important;
+                }}
+                body.mode-split .tri-block .src-zh,
+                body.mode-split .bi-block .src,
+                body.mode-split .bi-block .src-en {{
+                    grid-column: 1 !important;
+                    color: var(--fg-secondary-color) !important;
+                    margin: 0 !important;
+                    display: block !important;
+                }}
+                body.mode-split .tri-block .pinyin {{
+                    display: none !important;
+                }}
+                body.mode-split .tri-block .vi,
+                body.mode-split .bi-block .vi {{
+                    grid-column: 2 !important;
+                    color: var(--fg-color) !important;
+                    margin: 0 !important;
+                    display: block !important;
+                }}
+
+                /* 4. Chế độ Tam Ngữ: Hiển thị đầy đủ 3 tầng */
+                body.mode-tri .tri-block .src-zh,
+                body.mode-tri .tri-block .pinyin,
+                body.mode-tri .tri-block .vi,
+                body.mode-tri .bi-block .src,
+                body.mode-tri .bi-block .src-en,
+                body.mode-tri .bi-block .vi {{
+                    display: block !important;
+                }}
+
                 ::-webkit-scrollbar {{ width: 8px; }}
                 ::-webkit-scrollbar-track {{ background: rgba(128,128,128,0.1); border-radius: 4px; }}
                 ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.3); border-radius: 4px; }}
@@ -730,6 +858,9 @@ namespace TranslateBook.Views
                 ReapplyThemeColors();
                 // Apply typography settings from Toolbar
                 ApplyTypographySettings();
+                // Apply current display mode
+                var tag = (CmbMode?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "vi";
+                ApplyDisplayMode(tag);
                 // Inject keyboard navigation script and scroll observer
                 InjectKeyboardNavScript();
                 // Restore previous reading position
@@ -767,6 +898,146 @@ namespace TranslateBook.Views
         private void CmbLineHeight_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             ApplyTypographySettings();
+        }
+
+        private async void CmbMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var item = CmbMode?.SelectedItem as ComboBoxItem;
+            var tag = item?.Tag?.ToString() ?? "vi";
+            var modeName = item?.Content?.ToString() ?? "chế độ";
+
+            if (LoadingOverlay != null)
+            {
+                if (TxtLoadingStatus != null)
+                    TxtLoadingStatus.Text = $"Đang chuyển sang {modeName}...";
+                LoadingOverlay.Visibility = Visibility.Visible;
+            }
+
+            await Task.Yield();
+            ApplyDisplayMode(tag);
+
+            if (LoadingOverlay != null)
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void ApplyDisplayMode(string modeTag)
+        {
+            if (WebView?.CoreWebView2 == null) return;
+            string js = $@"
+                (function() {{
+                    var mode = '{modeTag}';
+                    var triBlocks = document.querySelectorAll('.tri-block');
+                    var biBlocks = document.querySelectorAll('.bi-block');
+
+                    // Reset all
+                    triBlocks.forEach(function(el) {{
+                        el.style.display = '';
+                        el.style.gridTemplateColumns = '';
+                        el.style.gap = '';
+                        el.style.borderLeft = '';
+                        el.style.borderBottom = '';
+                        el.style.background = '';
+                        el.style.padding = '';
+                        el.style.margin = '';
+
+                        var src = el.querySelector('.src-zh');
+                        var pin = el.querySelector('.pinyin');
+                        var vi = el.querySelector('.vi');
+
+                        if (src) {{ src.style.display = ''; src.style.gridColumn = ''; src.style.color = ''; src.style.margin = ''; }}
+                        if (pin) {{ pin.style.display = ''; }}
+                        if (vi) {{ vi.style.display = ''; vi.style.gridColumn = ''; vi.style.color = ''; vi.style.margin = ''; }}
+
+                        if (mode === 'vi') {{
+                            if (src) src.style.display = 'none';
+                            if (pin) pin.style.display = 'none';
+                            el.style.borderLeft = 'none';
+                            el.style.background = 'transparent';
+                            el.style.padding = '0';
+                            el.style.marginBottom = '0.8em';
+                        }} else if (mode === 'src') {{
+                            if (pin) pin.style.display = 'none';
+                            if (vi) vi.style.display = 'none';
+                            el.style.borderLeft = 'none';
+                            el.style.background = 'transparent';
+                            el.style.padding = '0';
+                            el.style.marginBottom = '0.8em';
+                        }} else if (mode === 'split') {{
+                            el.style.display = 'grid';
+                            el.style.gridTemplateColumns = '1fr 1fr';
+                            el.style.gap = '20px';
+                            el.style.borderLeft = 'none';
+                            el.style.borderBottom = '1px dashed rgba(128,128,128,0.2)';
+                            el.style.background = 'transparent';
+                            el.style.padding = '8px 0';
+                            el.style.marginBottom = '8px';
+
+                            if (src) {{ src.style.gridColumn = '1'; src.style.color = 'var(--fg-secondary-color)'; src.style.margin = '0'; }}
+                            if (pin) {{ pin.style.display = 'none'; }}
+                            if (vi) {{ vi.style.gridColumn = '2'; vi.style.color = 'var(--fg-color)'; vi.style.margin = '0'; }}
+                        }}
+                    }});
+
+                    biBlocks.forEach(function(el) {{
+                        el.style.display = '';
+                        el.style.gridTemplateColumns = '';
+                        el.style.gap = '';
+                        el.style.borderLeft = '';
+                        el.style.borderBottom = '';
+                        el.style.background = '';
+                        el.style.padding = '';
+
+                        var src = el.querySelector('.src, .src-en');
+                        var vi = el.querySelector('.vi');
+
+                        if (src) {{ src.style.display = ''; src.style.gridColumn = ''; src.style.color = ''; }}
+                        if (vi) {{ vi.style.display = ''; vi.style.gridColumn = ''; vi.style.color = ''; }}
+
+                        if (mode === 'vi') {{
+                            if (src) src.style.display = 'none';
+                            el.style.borderLeft = 'none';
+                            el.style.background = 'transparent';
+                            el.style.padding = '0';
+                            el.style.marginBottom = '0.8em';
+                        }} else if (mode === 'src') {{
+                            if (vi) vi.style.display = 'none';
+                            el.style.borderLeft = 'none';
+                            el.style.background = 'transparent';
+                            el.style.padding = '0';
+                            el.style.marginBottom = '0.8em';
+                        }} else if (mode === 'split') {{
+                            el.style.display = 'grid';
+                            el.style.gridTemplateColumns = '1fr 1fr';
+                            el.style.gap = '20px';
+                            el.style.borderLeft = 'none';
+                            el.style.borderBottom = '1px dashed rgba(128,128,128,0.2)';
+                            el.style.background = 'transparent';
+                            el.style.padding = '8px 0';
+                            el.style.marginBottom = '8px';
+
+                            if (src) {{ src.style.gridColumn = '1'; src.style.color = 'var(--fg-secondary-color)'; src.style.margin = '0'; }}
+                            if (vi) {{ vi.style.gridColumn = '2'; vi.style.color = 'var(--fg-color)'; vi.style.margin = '0'; }}
+                        }}
+                    }});
+
+                    // Ẩn/Hiện phụ đề heading (chữ Hán/pinyin dưới tiêu đề chương)
+                    var subHeadings = document.querySelectorAll('section > p');
+                    subHeadings.forEach(function(p) {{
+                        var isBold = p.querySelector('strong');
+                        var isItalic = p.querySelector('em');
+                        if (isBold || isItalic) {{
+                            if (mode === 'vi') {{
+                                p.style.display = 'none';
+                            }} else if (mode === 'src' || mode === 'tri' || mode === 'split') {{
+                                p.style.display = '';
+                            }}
+                        }}
+                    }});
+                }})();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
         }
 
         private void ReapplyThemeColors()

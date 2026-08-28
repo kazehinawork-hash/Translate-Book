@@ -57,7 +57,7 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 6. **Skeleton trilingual**: `scripts/translate/init_trilingual_skeleton.py --chunks-dir ... --progress-dir ...` → progress JSON `{chunk_id, total_chunks, chapter, source_text, translated_text, word_count_source, word_count_translated, mode:'trilingual', original_text, pinyin_text}`
 7. **Dịch**: subagent dịch `original_text` dòng-đối-dòng sang `translated_text` (số dòng BẰNG nhau), giữ heading `#`/`##`, giữ nguyên dòng `![...]` ảnh, bỏ `///` OCR dư, dùng glossary, `translated_at="2026-07-31T00:00:00"`, ghi `json.dumps(ensure_ascii=False, indent=2)` utf-8. (KHÔNG dùng Local AI — chất lượng kém, đã bỏ.)
 8. **QA**: tạo `working/qa/<slug>/vi_only.md` (nối `translated_text`) → `scripts/qa/glossary_qa.py` (kiểm tra Hán sót <5%, thuật ngữ, mojibake, dòng lặp)
-9. **Merge**: `scripts/output/merge_chunks.py --format trilingual --force` → `output/books/<tên-sách-gốc>/final/tamngu.md` (thư mục output = tên file input, có `metadata.json`; chi tiết xem `.opencode/command/dich.md`)
+9. **Merge**: `scripts/output/merge_chunks.py --format trilingual --force` → `output/books/<tên-sách-gốc>/final/tamngu.md` (thư mục output = tên file input, có `metadata.json`; chi tiết xem `.opencode/command/dich.md`). Đồng thời sao chép `working/extracted/<slug>/raw.md` vào `output/books/<tên-sách-gốc>/final/raw.md` để lưu trữ trọn vẹn bản gốc cùng với `vi.md`/`tamngu.md`.
 10. **EPUB**: `scripts/output/make_epub.py` (cần pandoc) → **chỉ 1 file `<tên-sách-input>.epub` ở gốc** thư mục output; **KHÔNG tạo** `final/*.epub`/`trilingual.epub`. Sách ZH **bắt buộc nhúng font** Noto Serif SC (tránh Calibre hiện `?`). Chi tiết + checklist bắt buộc xem `.opencode/command/dich.md` mục J/K.
 11. **Audiobook** (sách ZH): Clone giọng từ audiobook mẫu → VieNeu-TTS v3 Turbo → tạo audio từ `output/books/<tên-sách-gốc>/final/vi.md` (bản dịch thuần Việt)
 12. **Cập nhật input/ (BẮT BUỘC)**: `python scripts\manage_input.py` — di chuyển file nguồn vào `input\da-dich\` (đã dịch) hoặc `input\da-audio\` (đã dịch + audio) để người dùng biết trạng thái.
@@ -92,6 +92,7 @@ Dự án dịch sách tiếng Anh/Trung → tiếng Việt. AI (chat) là engine
 - `output/books/<slug>/audiobook/ch01.mp3` — audio chapter (MP3 128kbps, ~10MB/chapter, kèm metadata title/album)
 - `output/books/<slug>/final/vi.md` — bản dịch thuần Việt (từ bước 9 Merge)
 - `output/books/<slug>/final/tamngu.md` — bản tam ngữ
+- `output/books/<slug>/final/raw.md` — bản gốc nguyên tác (sao chép từ working/extracted/<slug>/raw.md)
 - `output/books/<slug>/<tên-sách-input>.epub` — **1 file EPUB duy nhất ở gốc** (tên theo file input, sách ZH nhúng font Noto Serif SC). KHÔNG tạo `final/*.epub` / `trilingual.epub`.
 - `output/books/<slug>/images/` — ảnh từ EPUB
 - Progress: `working/progress_audio/<slug>.json`

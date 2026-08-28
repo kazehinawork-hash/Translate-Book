@@ -74,6 +74,16 @@
                         <ComboBoxItem Content="Vừa (1.8x)" IsSelected="True" Tag="1.8"/>
                         <ComboBoxItem Content="Thoáng (2.2x)" Tag="2.2"/>
                     </ComboBox>
+
+                    <!-- Mode Selector -->
+                    <ComboBox x:Name="CmbMode" Width="180" Height="30" Margin="0,0,6,0" FontSize="11.5"
+                              Style="{StaticResource GlassComboBox}"
+                              SelectionChanged="CmbMode_SelectionChanged" ToolTip="Chọn chế độ hiển thị">
+                        <ComboBoxItem Content="Bản dịch (Thuần Việt)" IsSelected="True" Tag="vi"/>
+                        <ComboBoxItem Content="Tam ngữ (Gốc + Pinyin + Việt)" Tag="tri"/>
+                        <ComboBoxItem Content="Song song Đối chiếu (2 Cột)" Tag="split"/>
+                        <ComboBoxItem Content="Bản gốc" Tag="src"/>
+                    </ComboBox>
                 </StackPanel>
 
                 <!-- Right section: Search & Progress -->
@@ -122,6 +132,18 @@
 
             <Grid Grid.Column="2">
                 <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="#1E1E1E" NavigationCompleted="WebView_NavigationCompleted" WebMessageReceived="WebView_WebMessageReceived"/>
+
+                <!-- Loading Overlay khi chuyển chế độ đọc -->
+                <Border x:Name="LoadingOverlay" Background="#99000000" Visibility="Collapsed"
+                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48" Margin="0,0,0,14"/>
+                        <TextBlock x:Name="TxtLoadingStatus" Text="Đang xử lý và chuyển chế độ..."
+                                   FontSize="13.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
 

@@ -189,6 +189,18 @@ public class PythonPipelineService
         }
     }
 
+    public async Task<bool> RunPostExtractQcAsync(string rawMdPath, string reportPath, string lang = "zh", CancellationToken ct = default)
+    {
+        var args = $"--input \"{rawMdPath}\" --report \"{reportPath}\" --lang {lang}";
+        return await RunScriptAsync("process/post_extract_qc.py", args, ct);
+    }
+
+    public async Task<bool> RunOpenccAsync(string inputRaw, string outputRaw, string config = "t2s", CancellationToken ct = default)
+    {
+        var args = $"--input \"{inputRaw}\" --output \"{outputRaw}\" --config {config}";
+        return await RunScriptAsync("process/opencc_normalize.py", args, ct);
+    }
+
     public async Task<bool> RunChunkAsync(string rawMdPath, string outputDir,
         CancellationToken ct = default)
     {
