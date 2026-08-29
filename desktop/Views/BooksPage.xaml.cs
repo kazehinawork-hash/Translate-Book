@@ -169,6 +169,74 @@ public partial class BooksPage : Page
         }
     }
 
+    private void ContextMenuPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        var book = fe.DataContext as Models.BookStatus;
+        if (book == null && fe.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement pt)
+        {
+            book = pt.DataContext as Models.BookStatus;
+        }
+        if (book == null) return;
+
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            vm.PreviewTranslatedCommand.Execute(book);
+        }
+    }
+
+    private void ContextMenuOpenFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        var book = fe.DataContext as Models.BookStatus;
+        if (book == null && fe.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement pt)
+        {
+            book = pt.DataContext as Models.BookStatus;
+        }
+        if (book == null) return;
+
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            vm.OpenBookFolderCommand.Execute(book);
+        }
+    }
+
+    private void ContextMenuCopyPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        var book = fe.DataContext as Models.BookStatus;
+        if (book == null && fe.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement pt)
+        {
+            book = pt.DataContext as Models.BookStatus;
+        }
+        if (book == null) return;
+
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            vm.CopyBookPathCommand.Execute(book);
+        }
+    }
+
+    private void ContextMenuCleanCache_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        var book = fe.DataContext as Models.BookStatus;
+        if (book == null && fe.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement pt)
+        {
+            book = pt.DataContext as Models.BookStatus;
+        }
+        if (book == null) return;
+
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            vm.CleanBookCacheCommand.Execute(book);
+        }
+    }
+
     /// <summary>Fades the target panel in with a slight upward slide.</summary>
     private static void AnimatePanelIn(UIElement panel)
     {

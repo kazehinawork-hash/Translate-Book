@@ -34,6 +34,20 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Sửa Lỗi Hiển Thị Đa Chế Độ Trong Trình Đọc E-Reader Preview (08-29, XONG)**:
+  - **Nguyên nhân**: Khi mở sách, hệ thống nạp `vi.md` gộp thuần Việt vào `_rawViText`. Trong file `tamngu.md`, các đoạn văn bản được cấu trúc bằng thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">` (không có thẻ bao `<div class="tri-block">`), dẫn đến regex cũ bị bỏ qua và không bóc tách được các tầng tiếng Trung / Pinyin. Khi người dùng chuyển sang chế độ "Bản gốc", "Song song", "Tam ngữ", hệ thống fallback dùng `_rawViText` cho tất cả các cột khiến mọi chế độ đều ra tiếng Việt.
+  - **Khắc phục**:
+    1. Cải tiến `ExtractLayersFromText` với regex nhận diện trực tiếp các thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">` độc lập, bóc tách chính xác từng tầng chữ Hán, Pinyin và Tiếng Việt.
+    2. Trong `LoadAllBookLayers`: Tự động nạp độc lập `raw.md` (bản gốc), `tamngu.md` (tam ngữ + pinyin), `vi.md` (thuần Việt), và `progress` chunks JSON.
+    3. Cải tiến `SplitIntoBlocks`: Tách theo đoạn văn bản tự nhiên (`\n\n`) thay vì chỉ theo heading `#`, giúp chế độ Song song đối chiếu (2 Cột), Tam ngữ và Song ngữ hiển thị đúng từng cặp đoạn thẳng hàng.
+
+- **Sửa Lỗi Click Chuột Phải Vào Thẻ Sách Bấm 'Đọc Thử' Không Hoạt Động (08-29, XONG)**:
+  - **Nguyên nhân**: Trong WPF, `ContextMenu` hiển thị trên một Visual Tree riêng biệt (Popup Window), nên binding kiểu `RelativeSource AncestorType=Page` không tìm thấy `Page` hay `MainViewModel`, làm cho Command không được kích hoạt khi người dùng click vào menu chuột phải. Ngoài ra, nếu sách ở tab Input chưa từng dịch chunk nào, hệ thống không báo gì khiến người dùng tưởng nút bị đơ.
+  - **Khắc phục**:
+    1. Gán `Tag="{Binding DataContext, ElementName=BooksPageRoot}"` vào Card và sửa binding ContextMenu sang `PlacementTarget.Tag.PreviewTranslatedCommand`.
+    2. Bổ sung sự kiện `Click` handler trực tiếp trong code-behind `BooksPage.xaml.cs` (`ContextMenuPreview_Click`, `ContextMenuOpenFolder_Click`...) làm cơ chế bảo hiểm kép.
+    3. Nâng cấp `PreviewTranslated`: Tự động tìm kiếm file xem trước ở mọi vị trí (`output/books/.../final/vi.md`, `working/qa/.../vi_only.md`, `output/samples/..._preview.md`, `working/extracted/.../raw.md`), và hiển thị Snackbar thông báo nếu sách chưa được dịch.
+
 - **Sửa Lỗi Thẻ Sách Không Hiển Thị Trên Trang BooksPage (08-28, XONG)**:
   - **Nguyên nhân**: Trong `BooksPage.xaml`, `WrapPanel` của `ItemsControl` (cả tab Input và Output) bị gán `MaxWidth="{Binding ActualWidth, ElementName=InputScrollViewer}"`. Do `ItemsPanelTemplate` có NameScope riêng biệt nên không thể tìm thấy `InputScrollViewer`, dẫn đến `MaxWidth` bị gán bằng 0 và làm toàn bộ thẻ sách bị co lại 0px, biến mất khỏi màn hình dù dữ liệu đã tải đầy đủ.
   - **Khắc phục**: Loại bỏ binding `MaxWidth` thừa trong `ItemsPanelTemplate`, để `WrapPanel` tự động căn chỉnh và wrap theo chiều rộng của khung ScrollViewer như tab AudioPage.

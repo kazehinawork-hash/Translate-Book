@@ -397,21 +397,35 @@ public partial class MainViewModel : ObservableObject
         // 1. final/vi.md hoặc final/tamngu.md
         // 2. working/qa/<slug>/vi_only.md
         // 3. working/extracted/<slug>/raw.md
-        // 4. file preview mẫu gần nhất
+        // 4. output/samples/<slug>_preview.md
+        // 5. file preview mẫu gần nhất
         string mdPath = "";
-        string candidateDir = Path.Combine(_projectRoot, "output", "books", book.Title, "final");
-        if (!Directory.Exists(candidateDir))
-            candidateDir = Path.Combine(_projectRoot, "output", "books", book.Slug, "final");
+        var possibleDirs = new List<string>
+        {
+            Path.Combine(_projectRoot, "output", "books", book.Title, "final"),
+            Path.Combine(_projectRoot, "output", "books", book.Slug, "final"),
+            Path.Combine(_projectRoot, "output", "books", Path.GetFileNameWithoutExtension(book.FilePath ?? ""), "final")
+        };
 
-        var viMd = Path.Combine(candidateDir, "vi.md");
-        var tamnguMd = Path.Combine(candidateDir, "tamngu.md");
-        var qaViMd = Path.Combine(_projectRoot, "working", "qa", book.Slug, "vi_only.md");
-        var rawMd = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
+        foreach (var dir in possibleDirs)
+        {
+            if (string.IsNullOrWhiteSpace(dir)) continue;
+            var viMd = Path.Combine(dir, "vi.md");
+            var tamnguMd = Path.Combine(dir, "tamngu.md");
+            if (File.Exists(viMd)) { mdPath = viMd; break; }
+            if (File.Exists(tamnguMd)) { mdPath = tamnguMd; break; }
+        }
 
-        if (File.Exists(viMd)) mdPath = viMd;
-        else if (File.Exists(tamnguMd)) mdPath = tamnguMd;
-        else if (File.Exists(qaViMd)) mdPath = qaViMd;
-        else if (File.Exists(rawMd)) mdPath = rawMd;
+        if (string.IsNullOrEmpty(mdPath))
+        {
+            var qaViMd = Path.Combine(_projectRoot, "working", "qa", book.Slug, "vi_only.md");
+            var rawMd = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
+            var samplePreviewMd = Path.Combine(_projectRoot, "output", "samples", $"{book.Slug}_preview.md");
+
+            if (File.Exists(qaViMd)) mdPath = qaViMd;
+            else if (File.Exists(samplePreviewMd)) mdPath = samplePreviewMd;
+            else if (File.Exists(rawMd)) mdPath = rawMd;
+        }
 
         // Tìm dữ liệu source/pinyin từ progress chunks để hỗ trợ Split-View và Tam ngữ
         string srcText = "";
@@ -454,9 +468,25 @@ public partial class MainViewModel : ObservableObject
             catch { }
         }
 
+        // Nếu sách chưa dịch chunk nào nhưng có file gốc EPUB/raw.md, mở raw.md hoặc thông báo rõ ràng
         if (string.IsNullOrEmpty(mdPath) || !File.Exists(mdPath))
         {
-            AppendLog($"[Thông báo] Chưa có nội dung bản dịch nào cho cuốn '{book.DisplayTitle}'. Hãy bấm 'Dịch thử chương' hoặc 'Dịch toàn bộ' trước.", "warning");
+            var rawExtract = Path.Combine(_projectRoot, "working", "extracted", book.Slug, "raw.md");
+            if (File.Exists(rawExtract))
+            {
+                mdPath = rawExtract;
+            }
+        }
+
+        if (string.IsNullOrEmpty(mdPath) || !File.Exists(mdPath))
+        {
+            var msg = $"Chưa có bản dịch cho cuốn '{book.DisplayTitle}'. Hãy bấm 'Dịch test' hoặc 'Dịch Toàn bộ' trước.";
+            AppendLog($"[Thông báo] {msg}", "warning");
+            app.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw)
+                    mw.ShowSnackbar(msg, isError: true);
+            });
             return;
         }
 

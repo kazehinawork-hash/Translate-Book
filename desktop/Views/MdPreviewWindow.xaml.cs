@@ -91,29 +91,30 @@ namespace TranslateBook.Views
                 ExtractLayersFromText(content);
             }
 
-            // 2. Tìm thêm từ output/books/<title>/final/ hoặc output/books/<slug>/final/
+            // 2. Tìm kiếm thêm dữ liệu đa ngữ từ output/books/<title>/final/ hoặc output/books/<slug>/final/
             if (!string.IsNullOrEmpty(projectRoot))
             {
-                string[] bookDirs = {
+                var candidateDirs = new List<string>
+                {
                     Path.Combine(projectRoot, "output", "books", _bookTitle, "final"),
                     Path.Combine(projectRoot, "output", "books", _bookSlug, "final")
                 };
 
-                foreach (var fDir in bookDirs)
+                foreach (var fDir in candidateDirs)
                 {
                     if (!Directory.Exists(fDir)) continue;
 
                     var tamnguPath = Path.Combine(fDir, "tamngu.md");
-                    var songnguPath = Path.Combine(fDir, "songngu.md");
+                    var rawFinalPath = Path.Combine(fDir, "raw.md");
                     var viPath = Path.Combine(fDir, "vi.md");
 
                     if (File.Exists(tamnguPath) && (string.IsNullOrEmpty(_rawSrcText) || string.IsNullOrEmpty(_rawPinyinText)))
                     {
                         ExtractLayersFromText(File.ReadAllText(tamnguPath));
                     }
-                    if (File.Exists(songnguPath) && string.IsNullOrEmpty(_rawSrcText))
+                    if (File.Exists(rawFinalPath) && string.IsNullOrEmpty(_rawSrcText))
                     {
-                        ExtractLayersFromText(File.ReadAllText(songnguPath));
+                        _rawSrcText = File.ReadAllText(rawFinalPath);
                     }
                     if (File.Exists(viPath) && string.IsNullOrEmpty(_rawViText))
                     {
@@ -131,8 +132,8 @@ namespace TranslateBook.Views
                     }
                 }
 
-                // 4. Tìm từ working/progress/<slug>/ nếu vẫn chưa có
-                if ((string.IsNullOrEmpty(_rawViText) || string.IsNullOrEmpty(_rawSrcText)) && !string.IsNullOrEmpty(_bookSlug))
+                // 4. Tìm từ working/progress/<slug>/ nếu vẫn chưa có đủ
+                if ((string.IsNullOrEmpty(_rawViText) || string.IsNullOrEmpty(_rawSrcText) || string.IsNullOrEmpty(_rawPinyinText)) && !string.IsNullOrEmpty(_bookSlug))
                 {
                     var progDir = Path.Combine(projectRoot, "working", "progress", _bookSlug);
                     if (Directory.Exists(progDir))
@@ -171,48 +172,40 @@ namespace TranslateBook.Views
         {
             if (string.IsNullOrWhiteSpace(content)) return;
 
-            // Kiểm tra xem có chứa tri-block tam ngữ không
-            if (content.Contains("tri-block"))
+            // Kiểm tra xem có chứa các đoạn p tag tam ngữ/song ngữ (<p class="src-zh"> hoặc tri-block hoặc bi-block)
+            if (content.Contains("src-zh") || content.Contains("pinyin") || content.Contains("tri-block") || content.Contains("bi-block"))
             {
                 var srcLines = new StringBuilder();
                 var pinLines = new StringBuilder();
                 var viLines = new StringBuilder();
 
-                // Lấy tất cả các đoạn văn bản kể cả heading nằm ngoài tri-block
                 var lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                bool insideTri = false;
 
                 foreach (var line in lines)
                 {
                     var trimmed = line.Trim();
-                    if (trimmed.StartsWith("<div class=\"tri-block\"") || trimmed.StartsWith("<div class='tri-block'"))
-                    {
-                        insideTri = true;
-                        continue;
-                    }
-                    if (trimmed.StartsWith("</div>"))
-                    {
-                        insideTri = false;
-                        continue;
-                    }
+                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                    if (trimmed.StartsWith("<div") || trimmed.StartsWith("</div>")) continue;
 
-                    if (insideTri)
+                    var mSrc = Regex.Match(trimmed, @"<p class=[""']src-.*?[""']>(.*?)</p>", RegexOptions.Singleline);
+                    var mPin = Regex.Match(trimmed, @"<p class=[""']pinyin[""']>(.*?)</p>", RegexOptions.Singleline);
+                    var mVi = Regex.Match(trimmed, @"<p class=[""']vi[""']>(.*?)</p>", RegexOptions.Singleline);
+
+                    if (mSrc.Success)
                     {
-                        var mSrc = Regex.Match(trimmed, @"<p class=""src-zh"">(.*?)</p>");
-                        if (!mSrc.Success) mSrc = Regex.Match(trimmed, @"<p class='src-zh'>(.*?)</p>");
-                        if (mSrc.Success) srcLines.AppendLine(mSrc.Groups[1].Value);
-
-                        var mPin = Regex.Match(trimmed, @"<p class=""pinyin"">(.*?)</p>");
-                        if (!mPin.Success) mPin = Regex.Match(trimmed, @"<p class='pinyin'>(.*?)</p>");
-                        if (mPin.Success) pinLines.AppendLine(mPin.Groups[1].Value);
-
-                        var mVi = Regex.Match(trimmed, @"<p class=""vi"">(.*?)</p>");
-                        if (!mVi.Success) mVi = Regex.Match(trimmed, @"<p class='vi'>(.*?)</p>");
-                        if (mVi.Success) viLines.AppendLine(mVi.Groups[1].Value);
+                        srcLines.AppendLine(mSrc.Groups[1].Value);
                     }
-                    else if (!string.IsNullOrWhiteSpace(trimmed) && !trimmed.StartsWith("<"))
+                    else if (mPin.Success)
                     {
-                        // Dòng markdown thông thường (như # Heading)
+                        pinLines.AppendLine(mPin.Groups[1].Value);
+                    }
+                    else if (mVi.Success)
+                    {
+                        viLines.AppendLine(mVi.Groups[1].Value);
+                    }
+                    else if (!trimmed.StartsWith("<"))
+                    {
+                        // Dòng tiêu đề hoặc ảnh markdown thông thường (# Tiêu đề, ![](ảnh))
                         srcLines.AppendLine(trimmed);
                         pinLines.AppendLine(trimmed);
                         viLines.AppendLine(trimmed);
@@ -225,52 +218,7 @@ namespace TranslateBook.Views
                 return;
             }
 
-            // Kiểm tra xem có chứa bi-block song ngữ không
-            if (content.Contains("bi-block"))
-            {
-                var srcLines = new StringBuilder();
-                var viLines = new StringBuilder();
-
-                var lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                bool insideBi = false;
-
-                foreach (var line in lines)
-                {
-                    var trimmed = line.Trim();
-                    if (trimmed.StartsWith("<div class=\"bi-block\"") || trimmed.StartsWith("<div class='bi-block'"))
-                    {
-                        insideBi = true;
-                        continue;
-                    }
-                    if (trimmed.StartsWith("</div>"))
-                    {
-                        insideBi = false;
-                        continue;
-                    }
-
-                    if (insideBi)
-                    {
-                        var mSrc = Regex.Match(trimmed, @"<p class=""src-.*?"">(.*?)</p>");
-                        if (!mSrc.Success) mSrc = Regex.Match(trimmed, @"<p class='src-.*?'>(.*?)</p>");
-                        if (mSrc.Success) srcLines.AppendLine(mSrc.Groups[1].Value);
-
-                        var mVi = Regex.Match(trimmed, @"<p class=""vi"">(.*?)</p>");
-                        if (!mVi.Success) mVi = Regex.Match(trimmed, @"<p class='vi'>(.*?)</p>");
-                        if (mVi.Success) viLines.AppendLine(mVi.Groups[1].Value);
-                    }
-                    else if (!string.IsNullOrWhiteSpace(trimmed) && !trimmed.StartsWith("<"))
-                    {
-                        srcLines.AppendLine(trimmed);
-                        viLines.AppendLine(trimmed);
-                    }
-                }
-
-                if (srcLines.Length > 0) _rawSrcText = srcLines.ToString();
-                if (viLines.Length > 0) _rawViText = viLines.ToString();
-                return;
-            }
-
-            // Nếu là markdown thông thường
+            // Nếu là markdown thông thường (vi.md hoặc raw.md)
             if (string.IsNullOrEmpty(_rawViText))
                 _rawViText = content;
         }
@@ -691,26 +639,39 @@ namespace TranslateBook.Views
 </html>";
         }
 
-        /// <summary>Tách markdown thành các block theo heading (paragraph-level).</summary>
+        /// <summary>Tách markdown thành các block theo đoạn văn bản tự nhiên (heading hoặc paragraph).</summary>
         private static System.Collections.Generic.List<string> SplitIntoBlocks(string md)
         {
             var result = new System.Collections.Generic.List<string>();
             if (string.IsNullOrWhiteSpace(md)) return result;
 
-            var lines = md.Split('\n');
-            var current = new StringBuilder();
-            foreach (var line in lines)
+            // Chuẩn hóa xuống dòng
+            var text = md.Replace("\r\n", "\n").Replace("\r", "\n");
+            var rawParagraphs = text.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var p in rawParagraphs)
             {
-                var trimmed = line.TrimEnd();
-                // Heading mới → flush block cũ
-                if (Regex.IsMatch(trimmed, @"^#{1,6}\s") && current.Length > 0)
+                var trimmed = p.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+                // Nếu trong 1 paragraph có chứa nhiều dòng riêng lẻ bắt đầu bằng # (Heading)
+                var lines = trimmed.Split('\n');
+                var current = new StringBuilder();
+                foreach (var line in lines)
+                {
+                    var lTrim = line.TrimEnd();
+                    if (Regex.IsMatch(lTrim, @"^#{1,6}\s") && current.Length > 0)
+                    {
+                        result.Add(current.ToString().Trim());
+                        current.Clear();
+                    }
+                    current.AppendLine(lTrim);
+                }
+                if (current.Length > 0)
                 {
                     result.Add(current.ToString().Trim());
-                    current.Clear();
                 }
-                current.AppendLine(trimmed);
             }
-            if (current.Length > 0) result.Add(current.ToString().Trim());
 
             return result;
         }

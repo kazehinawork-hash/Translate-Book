@@ -2264,5 +2264,31 @@
 - Không còn việc tồn đọng.
 
 ### Git
-- Chuẩn bị commit và push lên GitHub theo lệnh người dùng.
+- Đã push lên GitHub (commit 54a48af).
 
+---
+
+## 2026-08-29 — Sửa lỗi click chuột phải & Khắc phục hiển thị đa chế độ (Bản gốc, Song song, Tam ngữ) trong Trình đọc E-Reader
+
+### Đã làm
+- **Khắc phục triệt để lỗi menu chuột phải (ContextMenu)**:
+  - Sửa lỗi mất ngữ cảnh DataContext của WPF ContextMenu: Bổ sung `Tag="{Binding DataContext, ElementName=BooksPageRoot}"` trên các `Card` và trỏ Command qua `PlacementTarget.Tag`.
+  - Tích hợp thêm sự kiện `Click` handler dự phòng (`ContextMenuPreview_Click`, `ContextMenuOpenFolder_Click`...) trong `BooksPage.xaml.cs`.
+- **Khắc phục triệt để lỗi hiển thị đa chế độ trong Trình đọc E-Reader Preview**:
+  - *Nguyên nhân*: Khi mở bản dịch, file `vi.md` được nạp vào, còn file `tamngu.md` định dạng `<p class="src-zh">...` (không có thẻ bao `<div class="tri-block">`) làm regex cũ không tách được chữ Hán và Pinyin, dẫn tới hệ thống fallback dùng text tiếng Việt cho toàn bộ các chế độ.
+  - *Khắc phục*: Cải tiến `ExtractLayersFromText` bóc tách độc lập từng thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">`. Tự động nạp độc lập `raw.md` (bản gốc), `tamngu.md` (tam ngữ), và `vi.md` (thuần Việt).
+  - *Khắc phục phân đoạn*: Viết lại `SplitIntoBlocks` để phân tách từng đoạn văn bản tự nhiên (`\n\n`) thay vì chỉ theo heading `#`, giúp chế độ Song song đối chiếu (2 Cột), Tam ngữ và Song ngữ hiển thị chuẩn xác từng cặp đoạn.
+- **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
+
+### File đổi
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/BooksPage.xaml.cs`
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Views/MdPreviewWindow.xaml.cs`
+- `docs/STATE.md`, `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.

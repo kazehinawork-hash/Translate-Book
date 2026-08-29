@@ -1,4 +1,5 @@
 <Page x:Class="TranslateBook.Views.BooksPage"
+        x:Name="BooksPageRoot"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -144,26 +145,31 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
-                                <ui:Card Margin="6" Width="320" Padding="16" Style="{StaticResource InteractiveCard}">
+                                <ui:Card Margin="6" Width="320" Padding="16" Style="{StaticResource InteractiveCard}"
+                                         Tag="{Binding DataContext, ElementName=BooksPageRoot}">
                                     <ui:Card.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem Header="Mở thư mục sách"
                                                       Icon="{ui:SymbolIcon Folder24}"
-                                                      Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuOpenFolder_Click"/>
                                             <MenuItem Header="Đọc thử bản dịch (Preview)"
                                                       Icon="{ui:SymbolIcon Eye24}"
-                                                      Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuPreview_Click"/>
                                             <Separator/>
                                             <MenuItem Header="Sao chép đường dẫn file"
                                                       Icon="{ui:SymbolIcon Copy24}"
-                                                      Command="{Binding DataContext.CopyBookPathCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.CopyBookPathCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuCopyPath_Click"/>
                                             <MenuItem Header="Dọn dẹp cache trung gian"
                                                       Icon="{ui:SymbolIcon Broom24}"
-                                                      Command="{Binding DataContext.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuCleanCache_Click"/>
                                         </ContextMenu>
                                     </ui:Card.ContextMenu>
                                     <StackPanel>
@@ -352,26 +358,31 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:BookStatus}">
-                                <ui:Card Margin="6" Width="340" Style="{StaticResource InteractiveCard}">
+                                <ui:Card Margin="6" Width="340" Style="{StaticResource InteractiveCard}"
+                                         Tag="{Binding DataContext, ElementName=BooksPageRoot}">
                                     <ui:Card.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem Header="Mở thư mục sách"
                                                       Icon="{ui:SymbolIcon Folder24}"
-                                                      Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuOpenFolder_Click"/>
                                             <MenuItem Header="Đọc thử bản dịch (Preview)"
                                                       Icon="{ui:SymbolIcon Eye24}"
-                                                      Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuPreview_Click"/>
                                             <Separator/>
                                             <MenuItem Header="Sao chép đường dẫn thư mục"
                                                       Icon="{ui:SymbolIcon Copy24}"
-                                                      Command="{Binding DataContext.CopyBookPathCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.CopyBookPathCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuCopyPath_Click"/>
                                             <MenuItem Header="Dọn dẹp cache trung gian"
                                                       Icon="{ui:SymbolIcon Broom24}"
-                                                      Command="{Binding DataContext.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                      CommandParameter="{Binding}"/>
+                                                      Command="{Binding Path=PlacementTarget.Tag.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuCleanCache_Click"/>
                                         </ContextMenu>
                                     </ui:Card.ContextMenu>
                                     <StackPanel>
