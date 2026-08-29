@@ -53,12 +53,12 @@
 
     <!-- Book card header (Glass 3.0: fully rounded inner capsule) -->
     <Style x:Key="BookCardHeader" TargetType="Border">
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Padding" Value="10,8"/>
         <Setter Property="Margin" Value="0,0,0,10"/>
         <Setter Property="Background" Value="{DynamicResource GlassElementBackground2Brush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource GlassElementBorderBrush}"/>
-        <Setter Property="BorderThickness" Value="0.3,0.3,0.3,1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
     <!-- TreeViewItem toggle chevron -->

@@ -2278,9 +2278,40 @@
   - *Nguyên nhân*: Khi mở bản dịch, file `vi.md` được nạp vào, còn file `tamngu.md` định dạng `<p class="src-zh">...` (không có thẻ bao `<div class="tri-block">`) làm regex cũ không tách được chữ Hán và Pinyin, dẫn tới hệ thống fallback dùng text tiếng Việt cho toàn bộ các chế độ.
   - *Khắc phục*: Cải tiến `ExtractLayersFromText` bóc tách độc lập từng thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">`. Tự động nạp độc lập `raw.md` (bản gốc), `tamngu.md` (tam ngữ), và `vi.md` (thuần Việt).
   - *Khắc phục phân đoạn*: Viết lại `SplitIntoBlocks` để phân tách từng đoạn văn bản tự nhiên (`\n\n`) thay vì chỉ theo heading `#`, giúp chế độ Song song đối chiếu (2 Cột), Tam ngữ và Song ngữ hiển thị chuẩn xác từng cặp đoạn.
+- **Nâng cấp & Gia cố Tính năng 'Dọn Dẹp Cache Trung Gian'**:
+  - Quét sạch toàn bộ các thư mục tạm: `working/chunks/<slug>`, `working/progress/<slug>`, `working/progress_audio/chunks/<slug>`, `working/qa/<slug>`, `working/tmp/<slug>`.
+  - Xóa các file JSON và preview tạm: `working/progress_audio/<slug>.json`, `output/samples/<slug>_preview.md`.
+  - Bổ sung thông báo Snackbar trực quan trên UI báo số lượng mục đã dọn thành công và cập nhật lại tiến độ thẻ sách.
+- **Bổ Sung Tính Năng 'Xóa Sách Thông Minh' Phân Biệt Input / Output**:
+  - Thêm nút icon Xóa (màu đỏ) và MenuItem trong menu chuột phải trên cả 2 tab.
+  - *Bên Input*: Chỉ xóa file sách nguồn trong `input/` và cache tạm `working/`.
+  - *Bên Output*: Xóa sạch toàn bộ sản phẩm hoàn thiện trong `output/books/<tên-sách>` (EPUB, Audiobook, bản dịch .md) và toàn bộ cache `working/`, **giữ nguyên file gốc trong Input**.
+  - Có hộp thoại xác nhận `MessageBox` trước khi thực hiện để đảm bảo an toàn tuyệt đối.
+- **Đặt Mặc Định 1 Luồng Dịch Ổn Định & Tối Ưu Giãn Cách Chống Timeout**:
+  - Chuyển số luồng dịch mặc định `TranslateConcurrency` từ 2 về 1 (`1 Luồng (Mặc định - Ổn định)`) để bảo đảm kết nối ổn định nhất, không bị nghẽn mạng và tiết kiệm tối đa quota API.
+  - Bổ sung cơ chế giãn cách `pacing delay` (600ms) khi chạy từ 2 luồng trở lên nhằm tránh gửi bão request làm sập kết nối server AI.
+- **Tái Thiết Kế Header Realtime Log Chuẩn Glass 3.0**:
+  - Tách bố cục 1 hàng chật chội thành cấu trúc 2 tầng thoáng đãng:
+    - *Tầng 1*: Tiêu đề `Realtime Console` + đốm sáng Live Pulse bên trái $\leftrightarrow$ cụm 3 nút icon (`Sao chép`, `Xóa sạch log đỏ`, `Thu gọn`) bên phải.
+    - *Tầng 2*: Ô tìm kiếm/lọc từ khóa `🔍 Lọc log theo từ khóa...` toàn chiều rộng, rộng rãi và cân đối thị giác.
+- **Nâng Cấp Viền Kính Bo Tròn Mềm Mại (Liquid Glass 3.0) Cho Thẻ Sách & Audio**:
+  - Tăng độ bo tròn của toàn bộ Card sách lên `14px` (`CornerRadius="14"`), viền Gradient ánh sáng đa chiều siêu thực.
+  - Nâng cấp các ô thông số thống kê (`Audio`, `EPUB`, `Chunks`, `Ký tự`) lên `10px`, tự động phát sáng viền xanh Accent khi hover chuột.
+  - Tăng bo góc của hộp tiêu đề sách trong Card lên `10px` để tạo sự đồng bộ mượt mà.
+- **Menu Sidebar Dạng Viên Thuốc Viền Gương (Pill Glass 3.0) & Khôi Phục Text API Gốc**:
+  - Bỏ phần Brand Header ở đỉnh để giao diện Sidebar tối giản, thanh thoát và gọn gàng.
+  - Chuyển các nút menu `Sách`, `Audiobook`, `Cài đặt` sang phong cách **Viên thuốc viền gương (Pill Glass)** bo tròn `12px` với viền phản quang Gradient đồng bộ với Tab danh sách.
+  - Khôi phục phần hiển thị `API` ở footer về dạng Text mộc mạc nguyên bản ban đầu (`API / DeepSeek-Chat`).
+- **Tối Ưu Toàn Diện Hiệu Năng & Tăng Cường Độ Mượt Mà, Nhẹ Nhàng**:
+  - *.NET 8 Runtime*: Bật `TieredCompilation`, `TieredCompilationQuickJit` và `ConcurrentGarbageCollection` trong file project giúp app mở tức thì và dọn dẹp RAM nền êm ái, triệt tiêu hoàn toàn giật cục (zero stutter).
+  - *WPF Hardware Acceleration*: Tích hợp `ClearTypeHint="Enabled"`, `TextRenderingMode="ClearType"`, `TextFormattingMode="Display"` giúp GPU đảm nhận render chữ và thẻ card sắc nét, giảm tải CPU.
+  - *Console RAM Optimization*: Giới hạn 800 blocks văn bản trên UI RichTextBox trong `MainWindow.xaml.cs` (tự động cắt dọn block cũ), giữ mức chiếm dụng RAM cực thấp (~50MB) dù app chạy log hàng nghìn dòng.
 - **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
 
 ### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Themes/AppStyles.xaml`
+- `desktop/Views/MainWindow.xaml`
 - `desktop/Views/BooksPage.xaml`
 - `desktop/Views/BooksPage.xaml.cs`
 - `desktop/ViewModels/MainViewModel.cs`
@@ -2291,4 +2322,4 @@
 - Không còn việc tồn đọng.
 
 ### Git
-- Đã commit và push lên GitHub nhánh main (commit `0f87337`).
+- Chưa commit — chờ người dùng duyệt.

@@ -160,6 +160,12 @@ namespace TranslateBook.Views;
             var textRun = new Run(entry.Text) { Foreground = textBrush, FontWeight = weight };
             para.Inlines.Add(textRun);
 
+            // Giữ tối đa 800 blocks trên màn hình UI để render siêu mượt, không bao giờ ngốn RAM/lag giao diện
+            if (LogBox.Document.Blocks.Count > 800)
+            {
+                LogBox.Document.Blocks.Remove(LogBox.Document.Blocks.FirstBlock);
+            }
+
             LogBox.Document.Blocks.Add(para);
             LogBox.ScrollToEnd();
             LogScrollViewer?.ScrollToEnd();

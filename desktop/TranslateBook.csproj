@@ -9,6 +9,11 @@
     <AssemblyName>TranslateBook</AssemblyName>
     <RootNamespace>TranslateBook</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- Hardware & Runtime Performance Optimizations -->
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

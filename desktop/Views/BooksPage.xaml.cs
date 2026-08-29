@@ -237,6 +237,23 @@ public partial class BooksPage : Page
         }
     }
 
+    private void ContextMenuDeleteBook_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        var book = fe.DataContext as Models.BookStatus;
+        if (book == null && fe.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement pt)
+        {
+            book = pt.DataContext as Models.BookStatus;
+        }
+        if (book == null) return;
+
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            vm.DeleteBookCommand.Execute(book);
+        }
+    }
+
     /// <summary>Fades the target panel in with a slight upward slide.</summary>
     private static void AnimatePanelIn(UIElement panel)
     {

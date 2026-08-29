@@ -74,18 +74,22 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Nav + Main Page Content -->
+                <!-- Left Nav + Main Page Content (Menu dạng viên thuốc viền gương Glass 3.0) -->
                 <ui:NavigationView Grid.Column="0" x:Name="NavView"
                                    IsPaneOpen="True" OpenPaneLength="210" PaneDisplayMode="Left"
                                    Margin="0"
                                    Background="Transparent">
+
                     <ui:NavigationView.MenuItems>
                         <ui:NavigationViewItem Content="Sách" IsActive="True"
                                                TargetPageType="{x:Type views:BooksPage}"
-                                               Icon="{ui:SymbolIcon BookOpen24}"/>
-                        <ui:NavigationViewItem Content="Audio" TargetPageType="{x:Type views:AudioPage}"
-                                               Icon="{ui:SymbolIcon Headphones24}"/>
+                                               Icon="{ui:SymbolIcon BookOpen24}"
+                                               Style="{StaticResource GlassNavPillItem}"/>
+                        <ui:NavigationViewItem Content="Audiobook" TargetPageType="{x:Type views:AudioPage}"
+                                               Icon="{ui:SymbolIcon Headphones24}"
+                                               Style="{StaticResource GlassNavPillItem}"/>
                     </ui:NavigationView.MenuItems>
+
                     <ui:NavigationView.FooterMenuItems>
                         <ui:NavigationViewItem IsHitTestVisible="False">
                             <StackPanel Margin="0,6">
@@ -94,8 +98,10 @@
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
                             </StackPanel>
                         </ui:NavigationViewItem>
+
                         <ui:NavigationViewItem Content="Cài đặt" TargetPageType="{x:Type views:ApiPage}"
-                                               Icon="{ui:SymbolIcon Settings24}"/>
+                                               Icon="{ui:SymbolIcon Settings24}"
+                                               Style="{StaticResource GlassNavPillItem}"/>
                     </ui:NavigationView.FooterMenuItems>
                 </ui:NavigationView>
 
@@ -148,44 +154,55 @@
                                  <RowDefinition Height="Auto"/>
                              </Grid.RowDefinitions>
 
-                             <!-- Panel header: toggle + title + live status + filter + clear + copy -->
-                             <Border Grid.Row="0" Background="{DynamicResource GlassElementBackground2Brush}" Padding="8,6"
+                             <!-- Panel header: Thiết kế 2 tầng chuẩn Glass 3.0 sang trọng & thoáng đãng -->
+                             <Border Grid.Row="0" Background="{DynamicResource GlassElementBackground2Brush}" Padding="10,8"
                                      BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,0,0,1">
-                                 <Grid>
-                                     <Grid.ColumnDefinitions>
-                                         <ColumnDefinition Width="Auto"/>
-                                         <ColumnDefinition Width="Auto"/>
-                                         <ColumnDefinition Width="*"/>
-                                         <ColumnDefinition Width="Auto"/>
-                                         <ColumnDefinition Width="Auto"/>
-                                     </Grid.ColumnDefinitions>
-                                     <Button Grid.Column="0" Width="26" Height="26" Cursor="Hand"
-                                             Style="{StaticResource GlassIconButton}"
-                                             ToolTip="Thu Realtime Log (Ctrl+/)"
-                                             Command="{Binding ToggleLogCommand}">
-                                         <ui:SymbolIcon Symbol="ChevronRight24" FontSize="14"/>
-                                     </Button>
-                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                                         <!-- Live Glowing Dot -->
-                                         <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,6,0"
-                                                 Background="#00F0FF"/>
-                                         <TextBlock Text="Realtime Log" FontWeight="SemiBold" FontSize="12"
-                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                     </StackPanel>
+                                 <StackPanel>
+                                     <!-- Tầng 1: Tiêu đề + Live Pulse + Bộ nút Action nhanh -->
+                                     <Grid Margin="0,0,0,8">
+                                         <Grid.ColumnDefinitions>
+                                             <ColumnDefinition Width="*"/>
+                                             <ColumnDefinition Width="Auto"/>
+                                         </Grid.ColumnDefinitions>
 
-                                     <ui:TextBox x:Name="LogFilterBox" Grid.Column="2" Margin="8,0,6,0" Height="26"
-                                                 PlaceholderText="Lọc log..." Style="{StaticResource InteractiveTextBox}" FontSize="11"
+                                         <!-- Bên trái: Live Pulse + Tiêu đề Console -->
+                                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                             <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,7,0"
+                                                     Background="#00F0FF" VerticalAlignment="Center"/>
+                                             <TextBlock Text="Realtime Console" FontWeight="Bold" FontSize="12.5"
+                                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                                         </StackPanel>
+
+                                         <!-- Bên phải: Các nút icon thao tác (Sao chép, Xóa sạch, Thu gọn) -->
+                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                             <Button Width="28" Height="28" Margin="0,0,4,0" Cursor="Hand"
+                                                     Style="{StaticResource GlassIconButton}"
+                                                     ToolTip="Sao chép toàn bộ nội dung Log" Click="CopyLogButton_Click">
+                                                 <ui:SymbolIcon Symbol="Copy24" FontSize="13"/>
+                                             </Button>
+                                             <Button Width="28" Height="28" Margin="0,0,6,0" Cursor="Hand"
+                                                     Style="{StaticResource GlassIconButton}"
+                                                     ToolTip="Xóa sạch màn hình Log" Click="ClearLogButton_Click">
+                                                 <ui:SymbolIcon Symbol="Delete24" FontSize="13" Foreground="#FFEF5350"/>
+                                             </Button>
+                                             
+                                             <!-- Nút thu gọn dạng Pill kính mờ sang trọng -->
+                                             <Button Width="28" Height="28" Cursor="Hand"
+                                                     Style="{StaticResource GlassCollapseButton}"
+                                                     ToolTip="Thu gọn bảng Log (Ctrl+/)"
+                                                     Command="{Binding ToggleLogCommand}">
+                                                 <ui:SymbolIcon Symbol="ChevronRight24" FontSize="13"/>
+                                             </Button>
+                                         </StackPanel>
+                                     </Grid>
+
+                                     <!-- Tầng 2: Thanh tìm kiếm / Lọc log phủ rộng thoáng đãng -->
+                                     <ui:TextBox x:Name="LogFilterBox" Height="28"
+                                                 PlaceholderText="🔍 Lọc log theo từ khóa..." 
+                                                 Style="{StaticResource InteractiveTextBox}" FontSize="11"
                                                  Text="{Binding LogFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  TextChanged="LogFilterBox_TextChanged"/>
-                                     <Button Grid.Column="3" Content="Xóa" FontSize="11" Padding="8,3" Height="26" Cursor="Hand"
-                                             Style="{StaticResource GlassPlainButton}" Margin="0,0,4,0"
-                                             Click="ClearLogButton_Click"/>
-                                     <Button Grid.Column="4" Width="26" Height="26" Cursor="Hand"
-                                             Style="{StaticResource GlassIconButton}"
-                                             ToolTip="Sao chép toàn bộ log" Click="CopyLogButton_Click">
-                                         <ui:SymbolIcon Symbol="Copy24" FontSize="14"/>
-                                     </Button>
-                                 </Grid>
+                                 </StackPanel>
                              </Border>
 
                              <!-- Khu vực hiển thị dòng Log Console -->
@@ -235,7 +252,7 @@
                              </Border>
                         </Grid>
 
-                        <!-- Collapsed View Button -->
+                        <!-- Collapsed View: Nút dải dọc phát sáng thanh thoát -->
                         <Grid x:Name="LogCollapsedArea">
                             <Grid.Style>
                                 <Style TargetType="Grid">
@@ -249,13 +266,17 @@
                                     </Style.Triggers>
                                 </Style>
                             </Grid.Style>
-                            <Button Width="26" Height="32" Cursor="Hand"
-                                    Style="{StaticResource GlassCollapseButton}"
-                                    ToolTip="Mở Realtime Log (Ctrl+/)"
-                                    VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,8,0,0"
-                                    Command="{Binding ToggleLogCommand}">
-                                <ui:SymbolIcon Symbol="ChevronLeft24" FontSize="14"/>
-                            </Button>
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0">
+                                <Button Width="26" Height="42" Cursor="Hand"
+                                        Style="{StaticResource GlassCollapseButton}"
+                                        ToolTip="Mở rộng Realtime Log (Ctrl+/)"
+                                        Command="{Binding ToggleLogCommand}">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border Width="6" Height="6" CornerRadius="3" Background="#00F0FF" Margin="0,0,0,4"/>
+                                        <ui:SymbolIcon Symbol="ChevronLeft24" FontSize="13"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Grid>
                 </Border>

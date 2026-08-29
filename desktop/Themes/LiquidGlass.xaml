@@ -163,7 +163,7 @@
            xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="14"/>
+        <Setter Property="Padding" Value="15"/>
         <Setter Property="Margin" Value="6"/>
         <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
         <Setter Property="RenderTransform">
@@ -178,7 +178,7 @@
                             Background="{DynamicResource GlassElementBackgroundBrush}"
                             BorderBrush="{DynamicResource GlassGradientBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="12"
+                            CornerRadius="14"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
@@ -271,14 +271,14 @@
     <!-- ===== 11. STAT TILE (no shadow — perf) ===== -->
     <Style x:Key="LiquidGlassStatTile" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource GlassElementBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource GlassElementBorderBrush}"/>
-        <Setter Property="BorderThickness" Value="0.3,0.3,0.3,1"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Padding" Value="8,6"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource GlassBackgroundHoverBrush}"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -378,10 +378,10 @@
 
     <!-- ===== 17. GLASS COLLAPSE BUTTON (Dock expand/collapse bar button) ===== -->
     <Style x:Key="GlassCollapseButton" TargetType="Button">
-        <Setter Property="Background" Value="{DynamicResource GlassElementBackground2Brush}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource GlassElementBorderBrush}"/>
-        <Setter Property="BorderThickness" Value="0.3,0.3,0.3,1"/>
+        <Setter Property="Background" Value="{DynamicResource GlassButtonNormalBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -389,14 +389,14 @@
                     <Border x:Name="Bd" Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            CornerRadius="8" Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassButtonHoverBrush}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <Setter Property="Foreground" Value="#00F0FF"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassButtonPressedBrush}"/>
@@ -429,9 +429,57 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassTabHoverBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassTabSelectedBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== 15B. GLASS NAV PILL ITEM (Left Sidebar Pill Style) ===== -->
+    <Style x:Key="GlassNavPillItem" TargetType="ui:NavigationViewItem"
+           xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+        <Setter Property="Margin" Value="6,4"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="FontSize" Value="13.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:NavigationViewItem">
+                    <Border x:Name="PillBorder"
+                            Background="{DynamicResource GlassTabNormalBrush}"
+                            BorderBrush="{DynamicResource GlassGradientBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
+                                              VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ContentPresenter Grid.Column="1" Content="{TemplateBinding Content}"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="PillBorder" Property="Background" Value="{DynamicResource GlassTabHoverBrush}"/>
+                            <Setter TargetName="PillBorder" Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsActive" Value="True">
+                            <Setter TargetName="PillBorder" Property="Background" Value="{DynamicResource GlassTabSelectedBrush}"/>
+                            <Setter TargetName="PillBorder" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>

@@ -5,6 +5,10 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:models="clr-namespace:TranslateBook.Models"
         Loaded="Page_Loaded"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled"
+        RenderOptions.BitmapScalingMode="HighQuality"
         ScrollViewer.CanContentScroll="False">
 
     <Grid Margin="12,8,16,0">
@@ -95,14 +99,14 @@
                         <ui:SymbolIcon Symbol="Flash24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,6,0"/>
                         <TextBlock Text="Luồng dịch:" FontSize="12" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ComboBox Width="150" Height="28" FontSize="11.5"
+                        <ComboBox Width="160" Height="28" FontSize="11.5"
                                   SelectedValuePath="Tag"
                                   SelectedValue="{Binding TranslateConcurrency, Mode=TwoWay}"
                                   Style="{StaticResource GlassComboBox}">
-                            <ComboBoxItem Content="1 Luồng (An toàn Free)" Tag="1"/>
-                            <ComboBoxItem Content="2 Luồng (Khuyên dùng)" Tag="2"/>
-                            <ComboBoxItem Content="3 Luồng (Nhanh)" Tag="3"/>
-                            <ComboBoxItem Content="4 Luồng (Key trả phí)" Tag="4"/>
+                            <ComboBoxItem Content="1 Luồng (Mặc định - Ổn định)" Tag="1"/>
+                            <ComboBoxItem Content="2 Luồng (Nhanh - Proxy mạnh)" Tag="2"/>
+                            <ComboBoxItem Content="3 Luồng (Cực nhanh)" Tag="3"/>
+                            <ComboBoxItem Content="4 Luồng (Key trả phí cao)" Tag="4"/>
                         </ComboBox>
                     </StackPanel>
                 </Border>
@@ -170,6 +174,13 @@
                                                       Command="{Binding Path=PlacementTarget.Tag.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       Click="ContextMenuCleanCache_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Xóa sách khỏi Input"
+                                                      Icon="{ui:SymbolIcon Delete24}"
+                                                      Foreground="#FFEF5350"
+                                                      Command="{Binding Path=PlacementTarget.Tag.DeleteBookCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuDeleteBook_Click"/>
                                         </ContextMenu>
                                     </ui:Card.ContextMenu>
                                     <StackPanel>
@@ -244,21 +255,32 @@
                                         </ui:Button.Style>
                                     </ui:Button>
 
-                                    <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}" Margin="0,6,0,0"
-                                               Content="Sửa chữa &amp; Rà soát" Height="34" HorizontalAlignment="Stretch"
-                                               ToolTip="Chế độ thông minh: Rà soát lỗi từng chunk, giữ lại các chunk đã tốt, chỉ dịch lại các chunk lỗi/lệch dòng và tự động gộp lại file thành phẩm"
-                                               Click="RepairBook_Click">
-                                        <ui:Button.Style>
-                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
-                                                        <Setter Property="Content" Value="Đang rà soát &amp; sửa..."/>
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ui:Button.Style>
-                                    </ui:Button>
+                                    <Grid Margin="0,6,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="6"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ui:Button Grid.Column="0" Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}"
+                                                   Content="Sửa chữa &amp; Rà soát" Height="34" HorizontalAlignment="Stretch"
+                                                   ToolTip="Chế độ thông minh: Rà soát lỗi từng chunk, giữ lại các chunk đã tốt, chỉ dịch lại các chunk lỗi/lệch dòng và tự động gộp lại file thành phẩm"
+                                                   Click="RepairBook_Click">
+                                            <ui:Button.Style>
+                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                            <Setter Property="Content" Value="Đang rà soát &amp; sửa..."/>
+                                                            <Setter Property="IsEnabled" Value="False"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ui:Button.Style>
+                                        </ui:Button>
+                                        <ui:Button Grid.Column="2" Icon="{ui:SymbolIcon Delete24}" Width="36" Height="34"
+                                                   ToolTip="Xóa file sách này khỏi Input" Foreground="#FFEF5350"
+                                                   Command="{Binding DataContext.DeleteBookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                   CommandParameter="{Binding}"/>
+                                    </Grid>
                                 </StackPanel>
 
                                         <!-- Progress area with GlassProgressBar + realtime percentage -->
@@ -383,6 +405,13 @@
                                                       Command="{Binding Path=PlacementTarget.Tag.CleanBookCacheCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       Click="ContextMenuCleanCache_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="Xóa toàn bộ bản dịch (Giữ file gốc)"
+                                                      Icon="{ui:SymbolIcon Delete24}"
+                                                      Foreground="#FFEF5350"
+                                                      Command="{Binding Path=PlacementTarget.Tag.DeleteBookCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      Click="ContextMenuDeleteBook_Click"/>
                                         </ContextMenu>
                                     </ui:Card.ContextMenu>
                                     <StackPanel>
@@ -510,7 +539,9 @@
                                         <Grid Margin="0,12,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="6"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="6"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <ui:Button Grid.Column="0" Appearance="Primary" Content="Đọc sách" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
@@ -519,8 +550,12 @@
                                                        Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                        CommandParameter="{Binding}"/>
                                             <ui:Button Grid.Column="2" Content="" Icon="{ui:SymbolIcon Folder24}"
-                                                       ToolTip="Mở thư mục sách trong Windows Explorer" Width="38"
+                                                       ToolTip="Mở thư mục sách trong Windows Explorer" Width="36"
                                                        Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
+                                                       CommandParameter="{Binding}"/>
+                                            <ui:Button Grid.Column="4" Icon="{ui:SymbolIcon Delete24}" Width="36"
+                                                       ToolTip="Xóa toàn bộ bản dịch và cache (Giữ lại file gốc trong Input)" Foreground="#FFEF5350"
+                                                       Command="{Binding DataContext.DeleteBookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                        CommandParameter="{Binding}"/>
                                         </Grid>
                                     </StackPanel>

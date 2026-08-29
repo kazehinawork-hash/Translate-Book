@@ -57,8 +57,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _audioTemperature = 0.3;
     [ObservableProperty] private int _audioTopK = 10;
 
-    /// <summary>Số luồng dịch song song an toàn ngữ cảnh (1: Tuần tự, 2-3: Song song tốc độ cao kèm Sliding Window Context)</summary>
-    [ObservableProperty] private int _translateConcurrency = 2;
+    /// <summary>Số luồng dịch song song an toàn ngữ cảnh (Mặc định 1: Tuần tự an toàn chống Timeout, 2-3: Song song tốc độ cao kèm Sliding Window Context)</summary>
+    [ObservableProperty] private int _translateConcurrency = 1;
 
     [ObservableProperty] private string _selectedProvider = "deepseek";
     [ObservableProperty] private string _apiKeyInput = "";
@@ -367,22 +367,182 @@ public partial class MainViewModel : ObservableObject
     private void CleanBookCache(BookStatus? book)
     {
         if (book == null || string.IsNullOrWhiteSpace(book.Slug)) return;
-        var chunksDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
-        var progDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
-        var progAudioDir = Path.Combine(_projectRoot, "working", "progress_audio", "chunks", book.Slug);
+        var app = Application.Current;
 
-        int count = 0;
+        var dirsToClean = new List<string>
+        {
+            Path.Combine(_projectRoot, "working", "chunks", book.Slug),
+            Path.Combine(_projectRoot, "working", "progress", book.Slug),
+            Path.Combine(_projectRoot, "working", "progress_audio", "chunks", book.Slug),
+            Path.Combine(_projectRoot, "working", "qa", book.Slug),
+            Path.Combine(_projectRoot, "working", "tmp", book.Slug)
+        };
+
+        var filesToClean = new List<string>
+        {
+            Path.Combine(_projectRoot, "working", "progress_audio", $"{book.Slug}.json"),
+            Path.Combine(_projectRoot, "output", "samples", $"{book.Slug}_preview.md")
+        };
+
+        int deletedCount = 0;
         try
         {
-            if (Directory.Exists(chunksDir)) { Directory.Delete(chunksDir, true); count++; }
-            if (Directory.Exists(progDir)) { Directory.Delete(progDir, true); count++; }
-            if (Directory.Exists(progAudioDir)) { Directory.Delete(progAudioDir, true); count++; }
-            AppendLog($"🧹 Đã dọn sạch cache trung gian cho cuốn: {book.DisplayTitle}");
+            foreach (var dir in dirsToClean)
+            {
+                if (Directory.Exists(dir))
+                {
+                    Directory.Delete(dir, true);
+                    deletedCount++;
+                }
+            }
+
+            foreach (var file in filesToClean)
+            {
+                if (File.Exists(file))
+                {
+                    File.Delete(file);
+                    deletedCount++;
+                }
+            }
+
+            var msg = $"Đã dọn sạch toàn bộ cache trung gian ({deletedCount} mục) cho cuốn: {book.DisplayTitle}";
+            AppendLog($"🧹 {msg}");
+            
+            app?.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw)
+                    mw.ShowSnackbar(msg, isError: false);
+            });
+
             LoadBooks();
         }
         catch (Exception ex)
         {
+            var errMsg = $"Lỗi dọn cache: {ex.Message}";
             AppendLog($"[Lỗi dọn cache] {ex.Message}", "error");
+            app?.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw)
+                    mw.ShowSnackbar(errMsg, isError: true);
+            });
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteBook(BookStatus? book)
+    {
+        if (book == null) return;
+        var app = Application.Current;
+
+        bool isInputTab = string.Equals(book.Source, "input", StringComparison.OrdinalIgnoreCase);
+
+        string prompt = isInputTab
+            ? $"Bạn có chắc chắn muốn xóa file sách gốc '{book.DisplayTitle}' khỏi thư mục Input không?\n\n(Lưu ý: Hành động này sẽ xóa file nguồn trong input và không thể hoàn tác)"
+            : $"Bạn có chắc chắn muốn XÓA TOÀN BỘ sản phẩm đã dịch của cuốn '{book.DisplayTitle}' không?\n\n- Sẽ xóa sạch thư mục Output (EPUB, Audiobook, bản dịch .md)\n- Sẽ xóa sạch toàn bộ cache trong Working\n- GIỮ NGUYÊN file gốc trong Input (nếu có)";
+
+        var confirm = MessageBox.Show(prompt, "Xác nhận xóa sách", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        try
+        {
+            int deletedCount = 0;
+
+            if (isInputTab)
+            {
+                // Chỉ xóa file trong input
+                if (!string.IsNullOrEmpty(book.FilePath) && File.Exists(book.FilePath))
+                {
+                    File.Delete(book.FilePath);
+                    deletedCount++;
+                }
+                else if (!string.IsNullOrEmpty(book.FolderPath) && Directory.Exists(book.FolderPath))
+                {
+                    Directory.Delete(book.FolderPath, true);
+                    deletedCount++;
+                }
+
+                // Dọn thêm cache working nếu có
+                if (!string.IsNullOrWhiteSpace(book.Slug))
+                {
+                    var cDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
+                    var pDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
+                    if (Directory.Exists(cDir)) Directory.Delete(cDir, true);
+                    if (Directory.Exists(pDir)) Directory.Delete(pDir, true);
+                }
+
+                var msg = $"Đã xóa sách khỏi Input: {book.DisplayTitle}";
+                AppendLog($"🗑️ {msg}");
+                app?.Dispatcher.Invoke(() =>
+                {
+                    if (app.MainWindow is MainWindow mw)
+                        mw.ShowSnackbar(msg, isError: false);
+                });
+            }
+            else
+            {
+                // Xóa toàn bộ output + working, giữ lại input
+                var possibleOutDirs = new List<string>
+                {
+                    Path.Combine(_projectRoot, "output", "books", book.Title),
+                    Path.Combine(_projectRoot, "output", "books", book.Slug)
+                };
+
+                foreach (var outDir in possibleOutDirs)
+                {
+                    if (Directory.Exists(outDir))
+                    {
+                        Directory.Delete(outDir, true);
+                        deletedCount++;
+                    }
+                }
+
+                // Xóa toàn bộ working cache
+                if (!string.IsNullOrWhiteSpace(book.Slug))
+                {
+                    var workingDirs = new List<string>
+                    {
+                        Path.Combine(_projectRoot, "working", "extracted", book.Slug),
+                        Path.Combine(_projectRoot, "working", "chunks", book.Slug),
+                        Path.Combine(_projectRoot, "working", "progress", book.Slug),
+                        Path.Combine(_projectRoot, "working", "progress_audio", "chunks", book.Slug),
+                        Path.Combine(_projectRoot, "working", "qa", book.Slug),
+                        Path.Combine(_projectRoot, "working", "tmp", book.Slug),
+                        Path.Combine(_projectRoot, "working", "profile", $"{book.Slug}.md")
+                    };
+
+                    foreach (var wd in workingDirs)
+                    {
+                        if (Directory.Exists(wd)) Directory.Delete(wd, true);
+                        else if (File.Exists(wd)) File.Delete(wd);
+                    }
+
+                    var pJson = Path.Combine(_projectRoot, "working", "progress_audio", $"{book.Slug}.json");
+                    if (File.Exists(pJson)) File.Delete(pJson);
+
+                    var sPreview = Path.Combine(_projectRoot, "output", "samples", $"{book.Slug}_preview.md");
+                    if (File.Exists(sPreview)) File.Delete(sPreview);
+                }
+
+                var msg = $"Đã xóa sạch toàn bộ sản phẩm dịch và cache của cuốn: {book.DisplayTitle} (Giữ nguyên file gốc Input)";
+                AppendLog($"🗑️ {msg}");
+                app?.Dispatcher.Invoke(() =>
+                {
+                    if (app.MainWindow is MainWindow mw)
+                        mw.ShowSnackbar(msg, isError: false);
+                });
+            }
+
+            LoadBooks();
+        }
+        catch (Exception ex)
+        {
+            var errMsg = $"Lỗi khi xóa sách: {ex.Message}";
+            AppendLog($"[Lỗi xóa sách] {ex.Message}", "error");
+            app?.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw)
+                    mw.ShowSnackbar(errMsg, isError: true);
+            });
         }
     }
 
@@ -2044,6 +2204,12 @@ public partial class MainViewModel : ObservableObject
                 }
 
                 await semaphore.WaitAsync(ct);
+
+                // Giãn cách nhẹ giữa các request để tránh bão kết nối làm Server AI trả về Timeout/503/429
+                if (concurrency > 1 && i > 0)
+                {
+                    await Task.Delay(600, ct);
+                }
 
                 var task = Task.Run(async () =>
                 {

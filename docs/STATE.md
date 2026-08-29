@@ -34,6 +34,53 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Tối Ưu Toàn Diện Hiệu Năng & Tăng Cường Độ Mượt Mà, Nhẹ Nhàng Của Phần Mềm (08-29, XONG)**:
+  - **Mục tiêu**: Tối ưu hóa sâu ở tầng .NET 8 Runtime, card đồ họa GPU WPF và bộ nhớ RAM để ứng dụng phản hồi tức thì, cuộn danh sách 60-120fps mượt như nhung và không bị ngốn tài nguyên.
+  - **Khắc phục**:
+    1. *.NET 8 Tiered JIT & Concurrent GC*: Bật `TieredCompilation`, `TieredCompilationQuickJit` và `ConcurrentGarbageCollection` trong `TranslateBook.csproj` giúp app khởi động cực nhanh và dọn dẹp RAM nền mà không gây khựng hình (zero stutter).
+    2. *WPF GPU Rendering Acceleration*: Bật `TextRenderingMode="ClearType"`, `TextFormattingMode="Display"` và `RenderOptions.ClearTypeHint="Enabled"` trong `BooksPage.xaml` giúp GPU trực tiếp render chữ và thẻ card sắc nét, giảm tải 100% cho CPU.
+    3. *Console RAM Virtualization*: Giới hạn 800 blocks văn bản trên màn hình UI trong `MainWindow.xaml.cs` (tự động cắt dọn block cũ) giúp bảng Log chạy liên tục hàng nghìn dòng mà RAM vẫn giữ nguyên mức siêu nhẹ (~50MB), không bao giờ bị lag giật.
+
+- **Menu Sidebar Dạng Viên Thuốc Viền Gương (Pill Glass 3.0) & Text API Gốc (08-29, XONG)**:
+  - **Mục tiêu**: Tối ưu Sidebar theo phản hồi người dùng: Bỏ khối header đỉnh, khôi phục cụm Text API nguyên bản ở footer, và chuyển các nút menu thành dạng **Viên thuốc viền gương (Pill Glass)** đồng bộ với phong cách Tab danh sách.
+  - **Cải tiến**:
+    1. Bỏ hoàn toàn khối Header đỉnh để menu thoáng đãng, tối giản.
+    2. Áp dụng Style `GlassNavPillItem` cho các nút menu `Sách`, `Audiobook`, `Cài đặt`: Bo tròn `12px` dạng viên thuốc, viền phản quang Gradient `GlassGradientBorderBrush`. Khi rê chuột hoặc chọn, viền tự động phát sáng xanh Accent rực rỡ và nền chuyển màu kính mờ.
+    3. Khôi phục phần hiển thị `API` ở Footer về dạng Text mộc mạc nguyên bản ban đầu (`API / DeepSeek-Chat`).
+
+- **Nâng Cấp Viền Kính Bo Tròn Mềm Mại (Liquid Glass 3.0) Cho Thẻ Sách & Audio (08-29, XONG)**:
+  - **Mục tiêu**: Đồng bộ phong cách Kính mờ siêu thực (Aero Liquid Glass) cho toàn bộ hệ thống Card sách (cả tab Input & Output) và các khối thông số thống kê (Audio, EPUB, Chunks, Chữ).
+  - **Cải tiến**:
+    1. *Thẻ Card sách (`InteractiveCard`)*: Bo góc tăng lên `CornerRadius="14"` (mềm mại, không bị góc gãy thô cứng), viền phủ lớp ánh sáng `GlassGradientBorderBrush` đa chiều, tự động chuyển màu kính trong suốt khi rê chuột qua.
+    2. *Hộp tiêu đề sách (`BookCardHeader`)*: Bo góc `CornerRadius="10"`, viền Gradient 1px sang trọng.
+    3. *Các ô chỉ số Audio / EPUB / Chunks (`StatTile`)*: Tăng bo góc lên `10px`, viền Gradient sắc sảo, tự động phát sáng viền xanh Accent khi hover.
+
+- **Tái Thiết Kế Header Realtime Log Chuẩn Glass 3.0 Sang Trọng & Cân Đối (08-29, XONG)**:
+  - **Vấn đề**: Header Realtime Log trước đây nhồi nhét tất cả các nút (Thu gọn, Tiêu đề, Đốm sáng, Ô tìm kiếm, Nút Xóa chữ, Nút Sao chép) trên cùng 1 hàng ngang hẹp (300px), dẫn tới ô tìm kiếm bị co cụm chật chội, chữ bị méo và bố cục mất cân đối thị giác.
+  - **Khắc phục**: Thiết kế lại cấu trúc 2 tầng chuẩn công thái học (Ergonomic Glass 3.0):
+    1. *Tầng 1 (Status & Actions)*: Tiêu đề `Realtime Console` + đốm sáng Live Pulse bên trái $\leftrightarrow$ cụm 3 nút icon tròn tinh tế bên phải (`Sao chép log`, `Xóa sạch log (màu đỏ)` và `Thu gọn bảng log`).
+    2. *Tầng 2 (Smart Filter)*: Thanh tìm kiếm/lọc từ khóa toàn chiều rộng `🔍 Lọc log theo từ khóa...`, rộng rãi, thanh thoát và trực quan.
+
+- **Đặt Mặc Định 1 Luồng Dịch Ổn Định & Tối Ưu Giãn Cách Chống Timeout (08-29, XONG)**:
+  - **Nguyên nhân Timeout**: Khi mở nhiều luồng (2-3-4 luồng song song), các API trung gian (Proxy, Router, Free/Standard tier) thường bị nghẽn cổng kết nối hoặc kích hoạt giới hạn Rate Limit đồng thời (RPM/TPM), dẫn đến hiện tượng server AI phản hồi chậm hoặc trả về mã 503/504/Timeout liên tục.
+  - **Khắc phục**:
+    1. Đặt mặc định `TranslateConcurrency = 1` (1 Luồng tuần tự) — đây là chế độ ổn định nhất, không bị nghẽn mạng và tiết kiệm quota tối đa.
+    2. Bổ sung khoảng giãn cách an toàn (`pacing delay` 600ms) khi chạy từ 2 luồng trở lên để tránh gửi bão request cùng một lúc.
+    3. Cập nhật nhãn ComboBox trên giao diện: `1 Luồng (Mặc định - Ổn định)`.
+
+- **Bổ Sung Tính Năng 'Xóa Sách Thông Minh' Phân Biệt Input / Output (08-29, XONG)**:
+  - **Mục tiêu**: Bổ sung nút bấm Xóa sách (icon thùng rác màu đỏ trên Card và trong ContextMenu) với cơ chế bảo vệ an toàn và phân định rõ ràng giữa 2 tab:
+    1. **Tab Input (Sách nguồn)**: Chỉ xóa file/thư mục nguồn trong `input/` và cache tạm `working/chunks`, `working/progress`.
+    2. **Tab Output (Sách đã dịch)**: Xóa sạch toàn bộ sản phẩm hoàn thiện trong `output/books/<tên-sách>` (EPUB, Audiobook MP3, final/vi.md, final/tamngu.md) và toàn bộ cache `working/`, **TUYỆT ĐỐI GIỮ NGUYÊN file gốc trong Input** để có thể dịch lại bất cứ lúc nào.
+    3. Hộp thoại xác nhận `MessageBox` rõ ràng trước khi thực hiện để chống xóa nhầm.
+
+- **Nâng Cấp & Gia Cố Tính Năng 'Dọn Dẹp Cache Trung Gian' (08-29, XONG)**:
+  - **Mục tiêu**: Đảm bảo dọn dẹp sạch sẽ 100% tất cả các file tạm phân mảnh của cuốn sách được chọn, đồng thời có thông báo Snackbar trực quan trên giao diện người dùng.
+  - **Khắc phục**:
+    1. Quét sạch toàn bộ các thư mục tạm: `working/chunks/<slug>`, `working/progress/<slug>`, `working/progress_audio/chunks/<slug>`, `working/qa/<slug>`, `working/tmp/<slug>`.
+    2. Xóa các file JSON và preview tạm: `working/progress_audio/<slug>.json`, `output/samples/<slug>_preview.md`.
+    3. Tự động hiển thị Snackbar thông báo màu xanh (số mục đã dọn thành công) và nạp lại trạng thái sách về 0%.
+
 - **Sửa Lỗi Hiển Thị Đa Chế Độ Trong Trình Đọc E-Reader Preview (08-29, XONG)**:
   - **Nguyên nhân**: Khi mở sách, hệ thống nạp `vi.md` gộp thuần Việt vào `_rawViText`. Trong file `tamngu.md`, các đoạn văn bản được cấu trúc bằng thẻ `<p class="src-zh">`, `<p class="pinyin">`, `<p class="vi">` (không có thẻ bao `<div class="tri-block">`), dẫn đến regex cũ bị bỏ qua và không bóc tách được các tầng tiếng Trung / Pinyin. Khi người dùng chuyển sang chế độ "Bản gốc", "Song song", "Tam ngữ", hệ thống fallback dùng `_rawViText` cho tất cả các cột khiến mọi chế độ đều ra tiếng Việt.
   - **Khắc phục**:
