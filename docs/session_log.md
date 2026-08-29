@@ -2291,4 +2291,4 @@
 - Không còn việc tồn đọng.
 
 ### Git
-- Chưa commit — chờ người dùng duyệt.
+- Đã commit và push lên GitHub nhánh main (commit `0f87337`).
