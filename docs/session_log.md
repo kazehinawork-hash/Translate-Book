@@ -2306,6 +2306,10 @@
   - *.NET 8 Runtime*: Bật `TieredCompilation`, `TieredCompilationQuickJit` và `ConcurrentGarbageCollection` trong file project giúp app mở tức thì và dọn dẹp RAM nền êm ái, triệt tiêu hoàn toàn giật cục (zero stutter).
   - *WPF Hardware Acceleration*: Tích hợp `ClearTypeHint="Enabled"`, `TextRenderingMode="ClearType"`, `TextFormattingMode="Display"` giúp GPU đảm nhận render chữ và thẻ card sắc nét, giảm tải CPU.
   - *Console RAM Optimization*: Giới hạn 800 blocks văn bản trên UI RichTextBox trong `MainWindow.xaml.cs` (tự động cắt dọn block cũ), giữ mức chiếm dụng RAM cực thấp (~50MB) dù app chạy log hàng nghìn dòng.
+- **Cố Định Sidebar Menu Vĩnh Viễn & Xóa Bỏ Hoàn Toàn Nút 3 Gạch**:
+  - Xóa bỏ thẻ `NavigationView.PaneHeader` chứa nút 3 gạch (Pane Toggle Button).
+  - Cố định Sidebar bên trái mở hoàn toàn 210px (`IsPaneOpen="True"`, `IsPaneToggleVisible="False"`), loại bỏ cơ chế co giãn trượt ra/vào giúp giao diện luôn vững chãi, trực quan và sạch sẽ.
+  - Các nút `Sách`, `Audiobook`, `Cài đặt` dạng viên thuốc viền gương hiển thị đầy đủ, ngay ngắn 100%.
 - **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
 
 ### File đổi

@@ -34,6 +34,13 @@
 
 ## 🔨 Đang làm (hiện tại)
 
+- **Cố Định Sidebar Menu Vĩnh Viễn & Xóa Bỏ Hoàn Toàn Nút 3 Gạch (08-30, XONG)**:
+  - **Mục tiêu**: Xóa bỏ hoàn toàn nút 3 gạch (Pane Toggle Button), giữ Sidebar bên trái ở trạng thái mở cố định (`IsPaneOpen="True"`), loại bỏ hoàn toàn cơ chế trượt ra/trượt vào giúp giao diện luôn vững chãi, trực quan và dễ sử dụng.
+  - **Cải tiến**:
+    1. Xóa bỏ thẻ `NavigationView.PaneHeader` chứa nút 3 gạch.
+    2. Cố định `IsPaneOpen="True"` và `IsPaneToggleVisible="False"`.
+    3. Các nút menu dạng viên thuốc viền gương `Sách`, `Audiobook`, `Cài đặt` hiển thị đầy đủ, ngay ngắn và cố định 100%.
+
 - **Tối Ưu Toàn Diện Hiệu Năng & Tăng Cường Độ Mượt Mà, Nhẹ Nhàng Của Phần Mềm (08-29, XONG)**:
   - **Mục tiêu**: Tối ưu hóa sâu ở tầng .NET 8 Runtime, card đồ họa GPU WPF và bộ nhớ RAM để ứng dụng phản hồi tức thì, cuộn danh sách 60-120fps mượt như nhung và không bị ngốn tài nguyên.
   - **Khắc phục**:
