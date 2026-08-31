@@ -63,7 +63,7 @@
 
             <ui:Button Grid.Column="2" Width="36" Height="36"
                        Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Làm mới danh sách sách" Cursor="Hand"
-                       Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                       Style="{StaticResource GlassIconButton}" VerticalAlignment="Center"
                        Command="{Binding RefreshBooksCommand}"/>
         </Grid>
 
@@ -139,12 +139,14 @@
                                        HorizontalAlignment="Center" FontSize="14" Margin="0,0,0,16"/>
                             <ui:Button Content="Mở thư mục input" Icon="{ui:SymbolIcon Folder24}"
                                        HorizontalAlignment="Center" Padding="16,6" Cursor="Hand"
+                                       Style="{StaticResource InteractiveButton}"
                                        Click="OpenInputFolder_Click"/>
                         </StackPanel>
                         <ItemsControl x:Name="InputItemsControl" ItemsSource="{Binding InputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel/>
+                                <WrapPanel VirtualizingStackPanel.IsVirtualizing="True"
+                                           VirtualizingStackPanel.VirtualizationMode="Recycling"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -209,7 +211,7 @@
                                             </Grid>
                                         </Border>
 
-                                        <!-- Khung Dịch test thử theo chương (Test chất lượng trước) -->
+                                        <!-- Khung Dịch test thử theo chương -->
                                         <Border Margin="0,8,0,10" Padding="10" CornerRadius="10"
                                                 Background="{DynamicResource GlassElementBackgroundBrush}"
                                                 BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.5">
@@ -230,21 +232,27 @@
                                                               Loaded="ChapterCombo_Loaded"
                                                               Style="{StaticResource GlassComboBox}"/>
                                                     <ui:Button Grid.Column="2" Content="Dịch test" Icon="{ui:SymbolIcon PlayCircle24}"
-                                                               Height="32" Padding="12,0" FontSize="12"
+                                                               Height="34" Padding="12,0" FontSize="12"
                                                                ToolTip="Dịch test thử chương đã chọn qua API và mở cửa sổ xem trước (Preview)"
+                                                               Style="{StaticResource InteractiveButton}"
                                                                Click="SampleTranslate_Click"/>
                                                 </Grid>
                                             </StackPanel>
                                         </Border>
 
-                                <!-- Nút chạy Dịch toàn bộ cuốn sách & Sửa chữa -->
+                                <!-- Nút Xem nội dung + chạy Dịch toàn bộ cuốn sách & Sửa chữa -->
                                 <StackPanel Margin="0,2,0,0">
-                                    <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Play24}"
-                                               Content="Dịch Toàn bộ" Height="34" HorizontalAlignment="Stretch"
+                                    <ui:Button Content="Xem nội dung" Icon="{ui:SymbolIcon Eye24}"
+                                               Height="34" HorizontalAlignment="Stretch" FontSize="12" Margin="0,0,0,6"
+                                               ToolTip="Xem nội dung file gốc của sách (hỗ trợ EPUB, PDF, MOBI, AZW, DOC...)"
+                                               Style="{StaticResource InteractiveButton}"
+                                               Click="PreviewInputBook_Click"/>
+                                    <ui:Button Icon="{ui:SymbolIcon Play24}"
+                                               Content="Dịch Toàn bộ" Height="34" HorizontalAlignment="Stretch" FontSize="12"
                                                ToolTip="Chạy toàn bộ quy trình dịch từ đầu: Trích xuất → Chia chunk → Tạo khung → Dịch mới → Merge → EPUB"
                                                Click="RunPipeline_Click">
                                         <ui:Button.Style>
-                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                            <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButton}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsBusy}" Value="True">
                                                         <Setter Property="Content" Value="Đang chạy toàn bộ..."/>
@@ -261,12 +269,12 @@
                                             <ColumnDefinition Width="6"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <ui:Button Grid.Column="0" Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}"
-                                                   Content="Sửa chữa &amp; Rà soát" Height="34" HorizontalAlignment="Stretch"
+                                        <ui:Button Grid.Column="0" Icon="{ui:SymbolIcon Wrench24}"
+                                                   Content="Sửa chữa &amp; Rà soát" Height="34" HorizontalAlignment="Stretch" FontSize="12"
                                                    ToolTip="Chế độ thông minh: Rà soát lỗi từng chunk, giữ lại các chunk đã tốt, chỉ dịch lại các chunk lỗi/lệch dòng và tự động gộp lại file thành phẩm"
                                                    Click="RepairBook_Click">
                                             <ui:Button.Style>
-                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButton}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsBusy}" Value="True">
                                                             <Setter Property="Content" Value="Đang rà soát &amp; sửa..."/>
@@ -276,10 +284,13 @@
                                                 </Style>
                                             </ui:Button.Style>
                                         </ui:Button>
-                                        <ui:Button Grid.Column="2" Icon="{ui:SymbolIcon Delete24}" Width="36" Height="34"
-                                                   ToolTip="Xóa file sách này khỏi Input" Foreground="#FFEF5350"
+                                        <ui:Button Grid.Column="2" Width="36" Height="34"
+                                                   ToolTip="Xóa file sách này khỏi Input"
+                                                   Style="{StaticResource GlassPlainButton}"
                                                    Command="{Binding DataContext.DeleteBookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                   CommandParameter="{Binding}"/>
+                                                   CommandParameter="{Binding}">
+                                            <ui:SymbolIcon Symbol="Delete24" FontSize="15" Foreground="#FFEF5350"/>
+                                        </ui:Button>
                                     </Grid>
                                 </StackPanel>
 
@@ -323,11 +334,11 @@
                                                        HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                         </Grid>
                                         <ui:Button Content="Hủy" Icon="{ui:SymbolIcon Dismiss24}" Margin="0,6,0,0"
-                                                   HorizontalAlignment="Center" Padding="12,2"
+                                                   HorizontalAlignment="Center" Padding="12,2" FontSize="12"
                                                    Command="{Binding DataContext.CancelTaskCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                    CommandParameter="{Binding}">
                                             <ui:Button.Style>
-                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButton}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsBusy}" Value="True">
@@ -375,7 +386,8 @@
                     <ItemsControl x:Name="OutputItemsControl" ItemsSource="{Binding OutputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel/>
+                                <WrapPanel VirtualizingStackPanel.IsVirtualizing="True"
+                                           VirtualizingStackPanel.VirtualizationMode="Recycling"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -544,19 +556,25 @@
                                                 <ColumnDefinition Width="6"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <ui:Button Grid.Column="0" Appearance="Primary" Content="Đọc sách" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
-                                                       HorizontalAlignment="Stretch"
+                                            <ui:Button Grid.Column="0" Content="Đọc sách" Icon="{ui:SymbolIcon BookOpen24}" FontSize="12"
+                                                       Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                                                        ToolTip="Mở Trình đọc E-Reader (hỗ trợ Thuần Việt, Song song 2 cột, Tam ngữ)"
                                                        Command="{Binding DataContext.PreviewTranslatedCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}"/>
-                                            <ui:Button Grid.Column="2" Content="" Icon="{ui:SymbolIcon Folder24}"
-                                                       ToolTip="Mở thư mục sách trong Windows Explorer" Width="36"
+                                                       CommandParameter="{Binding}" Style="{StaticResource InteractiveButton}"/>
+                                            <ui:Button Grid.Column="2" Width="36" Height="34"
+                                                       ToolTip="Mở thư mục sách trong Windows Explorer"
+                                                       Style="{StaticResource GlassPlainButton}"
                                                        Command="{Binding DataContext.OpenBookFolderCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}"/>
-                                            <ui:Button Grid.Column="4" Icon="{ui:SymbolIcon Delete24}" Width="36"
-                                                       ToolTip="Xóa toàn bộ bản dịch và cache (Giữ lại file gốc trong Input)" Foreground="#FFEF5350"
+                                                       CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="Folder24" FontSize="15" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="4" Width="36" Height="34"
+                                                       ToolTip="Xóa toàn bộ bản dịch và cache (Giữ lại file gốc trong Input)"
+                                                       Style="{StaticResource GlassPlainButton}"
                                                        Command="{Binding DataContext.DeleteBookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
-                                                       CommandParameter="{Binding}"/>
+                                                       CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="Delete24" FontSize="15" Foreground="#FFEF5350"/>
+                                            </ui:Button>
                                         </Grid>
                                     </StackPanel>
                                 </ui:Card>

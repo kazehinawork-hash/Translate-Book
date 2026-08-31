@@ -149,6 +149,16 @@ public partial class BooksPage : Page
         }
     }
 
+    private void PreviewInputBook_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement el || el.DataContext is not Models.BookStatus book) return;
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm != null)
+        {
+            _ = vm.PreviewInputBookCommand.ExecuteAsync(book);
+        }
+    }
+
     private void RunPipeline_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement el || el.DataContext is not Models.BookStatus book) return;
