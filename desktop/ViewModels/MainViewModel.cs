@@ -46,6 +46,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isApiOk;
     [ObservableProperty] private bool _logExpanded = true;
     [ObservableProperty] private string _logFilter = "";
+
+    /// <summary>Trạng thái mở/thu gọn của NavigationView (sidebar trái).</summary>
+    [ObservableProperty] private bool _isNavPaneOpen = true;
+
+    [RelayCommand]
+    private void ToggleNavPane() => IsNavPaneOpen = !IsNavPaneOpen;
     
     [ObservableProperty] private string _globalSearchQuery = "";
     partial void OnGlobalSearchQueryChanged(string value) => GlobalSearchQueryChanged?.Invoke(value);
@@ -224,7 +230,7 @@ public partial class MainViewModel : ObservableObject
 
     private void OnAnyBookBusyChanged() => OnPropertyChanged(nameof(IsBusyAny));
 
-    public void LoadBooks()
+    public async void LoadBooks()
     {
         InputBooks.Clear();
         OutputBooks.Clear();
@@ -232,30 +238,33 @@ public partial class MainViewModel : ObservableObject
         var booksDir = Path.Combine(_projectRoot, "output", "books");
         var inputDir = Path.Combine(_projectRoot, "input");
 
-        if (Directory.Exists(booksDir))
+        // Run all file system I/O on a background thread to avoid freezing the UI
+        var (outputBooks, inputBooks) = await Task.Run(() =>
         {
-            foreach (var d in Directory.GetDirectories(booksDir).OrderBy(x => x))
-            {
-                var title = Path.GetFileName(d);
-                OutputBooks.Add(GetBookStatus(_projectRoot, d, title, "output"));
-            }
-        }
+            var outputs = new List<BookStatus>();
+            var inputs = new List<BookStatus>();
 
-        if (Directory.Exists(inputDir))
-        {
-            // input/ giờ chia thư mục con (chua-lam/, da-dich/, da-audio/) — quét đệ quy
-            foreach (var f in Directory.GetFiles(inputDir, "*", SearchOption.AllDirectories).OrderBy(x => x))
+            if (Directory.Exists(booksDir))
             {
-                var ext = Path.GetExtension(f).ToLower();
-                if (ext is ".pdf" or ".epub" or ".docx")
+                foreach (var d in Directory.GetDirectories(booksDir).OrderBy(x => x))
                 {
-                    var name = Path.GetFileName(f);
+                    var title = Path.GetFileName(d);
+                    outputs.Add(GetBookStatus(_projectRoot, d, title, "output"));
+                }
+            }
+
+            if (Directory.Exists(inputDir))
+            {
+                foreach (var f in Directory.GetFiles(inputDir, "*", SearchOption.AllDirectories).OrderBy(x => x))
+                {
+                    var ext = Path.GetExtension(f).ToLower();
+                    if (ext is not (".pdf" or ".epub" or ".docx")) continue;
+
                     var relDir = Path.GetRelativePath(inputDir, Path.GetDirectoryName(f) ?? inputDir);
                     var category = relDir.Replace("\\", "/").Split('/')[0];
                     if (string.IsNullOrEmpty(category) || category == ".") category = "chua-lam";
 
                     var rawTitle = Path.GetFileNameWithoutExtension(f);
-                    // Tìm xem đã có thư mục output tương ứng để lấy slug chuẩn chưa
                     var slug = SanitizeFileName(rawTitle);
                     var candidateOutputDir = Path.Combine(_projectRoot, "output", "books", rawTitle);
                     if (Directory.Exists(candidateOutputDir))
@@ -284,7 +293,6 @@ public partial class MainViewModel : ObservableObject
                         EpubTitle = rawTitle
                     };
 
-                    // Nạp sẵn danh sách chương để Dropdown luôn có sẵn dữ liệu chọn
                     var chunksDir = Path.Combine(_projectRoot, "working", "chunks", slug);
                     if (Directory.Exists(chunksDir))
                     {
@@ -313,10 +321,15 @@ public partial class MainViewModel : ObservableObject
                         book.AvailableChapters.Add("Chương 4");
                         book.AvailableChapters.Add("Chương 5");
                     }
-                    InputBooks.Add(book);
+                    inputs.Add(book);
                 }
             }
-        }
+
+            return (outputs, inputs);
+        });
+
+        foreach (var book in outputBooks) OutputBooks.Add(book);
+        foreach (var book in inputBooks) InputBooks.Add(book);
 
         // Cập nhật các chỉ số Dashboard Analytics
         PendingBooksCount = InputBooks.Count(b => b.InputCategory == "chua-lam");
@@ -324,26 +337,28 @@ public partial class MainViewModel : ObservableObject
         AudioBooksCount = OutputBooks.Count(b => b.Mp3Count > 0) + InputBooks.Count(b => b.InputCategory == "da-audio");
         TotalBooksCount = InputBooks.Count + OutputBooks.Count;
 
-        // Ước tính tổng số từ đã dịch từ các file final/vi.md
-        long totalWords = 0;
-        try
+        // Ước tính tổng số từ đã dịch (background I/O)
+        TotalTranslatedWords = await Task.Run(() =>
         {
-            var booksDir2 = Path.Combine(_projectRoot, "output", "books");
-            if (Directory.Exists(booksDir2))
+            long totalWords = 0;
+            try
             {
-                foreach (var d in Directory.GetDirectories(booksDir2))
+                if (Directory.Exists(booksDir))
                 {
-                    var viFile = Path.Combine(d, "final", "vi.md");
-                    if (File.Exists(viFile))
+                    foreach (var d in Directory.GetDirectories(booksDir))
                     {
-                        var info = new FileInfo(viFile);
-                        totalWords += info.Length / 5; // ước lượng ký tự -> từ
+                        var viFile = Path.Combine(d, "final", "vi.md");
+                        if (File.Exists(viFile))
+                        {
+                            var info = new FileInfo(viFile);
+                            totalWords += info.Length / 5;
+                        }
                     }
                 }
             }
-        }
-        catch { }
-        TotalTranslatedWords = totalWords;
+            catch { }
+            return totalWords;
+        });
 
         AppendLog($"Đã tải {InputBooks.Count} input, {OutputBooks.Count} output (Chưa làm: {PendingBooksCount}, Đã dịch: {TranslatedBooksCount}, Có Audio: {AudioBooksCount})");
     }
@@ -428,6 +443,77 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Xóa thư mục an toàn: xóa read-only, retry khi file bị khóa tạm thời,
+    /// và KHÔNG fail toàn bộ nếu 1 file đang bị process khác giữ (bỏ qua).
+    /// Đặc biệt xử lý file OneDrive cloud (ReparsePoint/Offline) — không đụng
+    /// attributes placeholder, chỉ File.Delete để OneDrive tự giải phóng.
+    /// Lặp nhiều vòng để dọn triệt để các thư mục lồng nhau.
+    /// Trả về số file thực sự xóa được.
+    /// </summary>
+    private static int DeleteDirectorySafe(string dir)
+    {
+        if (!Directory.Exists(dir)) return 0;
+        int deleted = 0;
+
+        // Vòng 1: xóa toàn bộ file (kể cả read-only), retry nếu bị khóa tạm
+        foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                try
+                {
+                    // Chỉ bỏ ReadOnly (an toàn); KHÔNG đụng ReparsePoint/Offline của OneDrive
+                    try
+                    {
+                        var attrs = File.GetAttributes(f);
+                        if ((attrs & FileAttributes.ReadOnly) != 0)
+                            File.SetAttributes(f, attrs & ~FileAttributes.ReadOnly);
+                    }
+                    catch (Exception) { }
+
+                    File.Delete(f);
+                    deleted++;
+                    break;
+                }
+                catch (Exception) when (i < 2)
+                {
+                    System.Threading.Thread.Sleep(200);
+                }
+            }
+        }
+
+        // Vòng 2: xóa thư mục con từ sâu lên, LẶP LẠI nhiều vòng
+        // (thư mục lồng nhau có thể rỗng dần khi các file bị khóa được giải phóng)
+        for (int pass = 0; pass < 5; pass++)
+        {
+            bool removedAny = false;
+            foreach (var d in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories).OrderByDescending(x => x.Length))
+            {
+                try
+                {
+                    // Bỏ ReadOnly/archive nếu thư mục bị set đặc biệt (an toàn cho thư mục thường)
+                    try
+                    {
+                        var attrs = File.GetAttributes(d);
+                        if ((attrs & FileAttributes.ReadOnly) != 0)
+                            File.SetAttributes(d, attrs & ~FileAttributes.ReadOnly);
+                    }
+                    catch (Exception) { }
+
+                    Directory.Delete(d, false);
+                    removedAny = true;
+                }
+                catch (Exception) { /* còn file bên trong hoặc bị khóa — vòng sau thử lại */ }
+            }
+            if (!removedAny) break;
+        }
+
+        // Cuối cùng xóa thư mục gốc
+        try { Directory.Delete(dir, false); } catch (Exception) { }
+        return deleted;
+    }
+
     [RelayCommand]
     private void DeleteBook(BookStatus? book)
     {
@@ -457,7 +543,7 @@ public partial class MainViewModel : ObservableObject
                 }
                 else if (!string.IsNullOrEmpty(book.FolderPath) && Directory.Exists(book.FolderPath))
                 {
-                    Directory.Delete(book.FolderPath, true);
+                    DeleteDirectorySafe(book.FolderPath);
                     deletedCount++;
                 }
 
@@ -466,8 +552,8 @@ public partial class MainViewModel : ObservableObject
                 {
                     var cDir = Path.Combine(_projectRoot, "working", "chunks", book.Slug);
                     var pDir = Path.Combine(_projectRoot, "working", "progress", book.Slug);
-                    if (Directory.Exists(cDir)) Directory.Delete(cDir, true);
-                    if (Directory.Exists(pDir)) Directory.Delete(pDir, true);
+                    if (Directory.Exists(cDir)) DeleteDirectorySafe(cDir);
+                    if (Directory.Exists(pDir)) DeleteDirectorySafe(pDir);
                 }
 
                 var msg = $"Đã xóa sách khỏi Input: {book.DisplayTitle}";
@@ -491,7 +577,7 @@ public partial class MainViewModel : ObservableObject
                 {
                     if (Directory.Exists(outDir))
                     {
-                        Directory.Delete(outDir, true);
+                        DeleteDirectorySafe(outDir);
                         deletedCount++;
                     }
                 }
@@ -512,7 +598,7 @@ public partial class MainViewModel : ObservableObject
 
                     foreach (var wd in workingDirs)
                     {
-                        if (Directory.Exists(wd)) Directory.Delete(wd, true);
+                        if (Directory.Exists(wd)) DeleteDirectorySafe(wd);
                         else if (File.Exists(wd)) File.Delete(wd);
                     }
 
@@ -672,6 +758,88 @@ public partial class MainViewModel : ObservableObject
     private void RefreshBooks()
     {
         LoadBooks();
+    }
+
+    /// <summary>Mở EpubPreviewWindow đọc nội dung file gốc của sách Input (EPUB native hoặc chuyển đổi qua Calibre).</summary>
+    [RelayCommand]
+    private async Task PreviewInputBookAsync(BookStatus? book)
+    {
+        if (book == null || string.IsNullOrWhiteSpace(book.FilePath)) return;
+        var app = Application.Current;
+        if (app == null) return;
+
+        var filePath = book.FilePath;
+        if (!File.Exists(filePath))
+        {
+            var msg = $"Không tìm thấy file: {filePath}";
+            AppendLog($"[Lỗi] {msg}", "error");
+            app.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw) mw.ShowSnackbar(msg, isError: true);
+            });
+            return;
+        }
+
+        if (!Services.EbookConvertService.CanPreview(filePath))
+        {
+            var ext = Path.GetExtension(filePath);
+            var msg = $"Định dạng '{ext}' chưa được hỗ trợ xem trước.";
+            AppendLog($"[Thông báo] {msg}", "warning");
+            app.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw) mw.ShowSnackbar(msg, isError: true);
+            });
+            return;
+        }
+
+        // Chuyển đổi (nếu cần) ở background, hiển thị snackbar bận nếu lâu
+        var convertTask = Task.Run(() => Services.EbookConvertService.GetPreviewEpub(filePath, _projectRoot));
+        string? epubPath = null;
+        string? error = null;
+        try
+        {
+            epubPath = await convertTask;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+
+        if (error != null)
+        {
+            AppendLog($"[Lỗi] {error}", "error");
+            app.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw) mw.ShowSnackbar(error, isError: true);
+            });
+            return;
+        }
+
+        if (string.IsNullOrEmpty(epubPath) || !File.Exists(epubPath))
+        {
+            var msg = $"Không mở được nội dung của '{book.DisplayTitle}'.";
+            AppendLog($"[Lỗi] {msg}", "error");
+            app.Dispatcher.Invoke(() =>
+            {
+                if (app.MainWindow is MainWindow mw) mw.ShowSnackbar(msg, isError: true);
+            });
+            return;
+        }
+
+        app.Dispatcher.Invoke(() =>
+        {
+            try
+            {
+                var window = new Views.EpubPreviewWindow(epubPath);
+                if (app.MainWindow != null) window.Owner = app.MainWindow;
+                window.Show();
+                AppendLog($"👁️ Đang xem nội dung sách: {book.DisplayTitle}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Lỗi] Mở xem sách: {ex.Message}", "error");
+            }
+        });
     }
 
     [RelayCommand]
