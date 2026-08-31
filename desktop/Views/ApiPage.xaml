@@ -69,7 +69,7 @@
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <ui:Button Appearance="Primary" Style="{StaticResource InteractiveButton}" Content="Lưu cấu hình" Height="36" Padding="18,0"
+                    <ui:Button Style="{StaticResource InteractiveButtonPrimary}" Content="Lưu cấu hình" Height="36" Padding="18,0"
                                Icon="{ui:SymbolIcon Save24}"
                                Click="SaveConfig_Click"/>
                     <ui:Button Style="{StaticResource InteractiveButton}" Content="Kiểm tra kết nối" Margin="12,0,0,0" Height="36" Padding="18,0"

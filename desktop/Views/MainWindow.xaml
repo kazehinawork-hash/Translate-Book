@@ -74,9 +74,11 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Nav + Main Page Content (Menu dạng viên thuốc viền gương Glass 3.0) -->
+                <!-- Left Nav + Main Page Content (Menu dạng viên thuốc viền gương Glass 3.0 - Cố định) -->
                 <ui:NavigationView Grid.Column="0" x:Name="NavView"
-                                   IsPaneOpen="True" OpenPaneLength="210" PaneDisplayMode="Left"
+                                   IsPaneOpen="True" OpenPaneLength="210"
+                                   PaneDisplayMode="Left"
+                                   IsBackButtonVisible="Collapsed" IsPaneToggleVisible="False"
                                    Margin="0"
                                    Background="Transparent">
 
@@ -209,8 +211,7 @@
                              <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
                                            VerticalScrollBarVisibility="Auto">
                                  <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
-                                              FontFamily="Consolas" FontSize="11"
-                                              TextChanged="LogTextBox_TextChanged"/>
+                                               FontFamily="Consolas" FontSize="11"/>
                              </ScrollViewer>
 
                              <!-- AI Thinking & Processing Live Status Bar (Hiệu ứng AI đang suy nghĩ) -->
@@ -244,10 +245,10 @@
                                                     Foreground="#E0E6ED" TextTrimming="CharacterEllipsis"/>
                                      </StackPanel>
 
-                                     <!-- Wave Pulse Progress -->
+                                     <!-- Wave Pulse Progress (Glass 3.0 — viền gương + bo tròn pill) -->
                                      <ProgressBar Grid.Column="2" Width="60" Height="4" IsIndeterminate="True"
-                                                  Foreground="{DynamicResource AccentFillColorDefaultBrush}"
-                                                  Background="#203040" VerticalAlignment="Center"/>
+                                                  Style="{StaticResource GlassProgressBar}"
+                                                  VerticalAlignment="Center"/>
                                  </Grid>
                              </Border>
                         </Grid>

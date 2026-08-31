@@ -38,6 +38,20 @@
         </Style.Triggers>
     </Style>
 
+    <!-- InteractiveButtonPrimary — Glass 3.0 accent button: gradient mirror border + accent fill -->
+    <Style x:Key="InteractiveButtonPrimary" TargetType="ui:Button" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+           BasedOn="{StaticResource LiquidGlassButtonPrimary}">
+        <Style.Triggers>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <ScaleTransform ScaleX="0.97" ScaleY="0.97"/>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- InteractiveTextBox — Glass 3.0: gradient border + focus accent -->
     <Style x:Key="InteractiveTextBox" TargetType="ui:TextBox" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
            BasedOn="{StaticResource LiquidGlassTextBox}">
@@ -59,6 +73,37 @@
         <Setter Property="Background" Value="{DynamicResource GlassElementBackground2Brush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- NavPaneToggleButton — nút 3 gạch sidebar: luôn nổi bật, viền gương phát sáng, không chìm vào nền -->
+    <Style x:Key="NavPaneToggleButton" TargetType="Button">
+        <Setter Property="Background" Value="#38223048"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="10" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassButtonHoverBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <Setter Property="Foreground" Value="#00F0FF"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GlassButtonPressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- TreeViewItem toggle chevron -->

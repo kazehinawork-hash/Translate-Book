@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
@@ -15,6 +16,18 @@ namespace TranslateBook.Views;
     {
         private readonly Wpf.Ui.SnackbarService _snackbarService = new();
         private readonly List<ViewModels.MainViewModel.LogEntry> _logHistory = new();
+
+        // Cached brushes for log entry colors (avoids allocating a new SolidColorBrush per line)
+        private static readonly SolidColorBrush BrushTimestamp = new(Color.FromRgb(0x75, 0x85, 0x95));
+        private static readonly SolidColorBrush BrushError = new(Color.FromRgb(0xff, 0x52, 0x52));
+        private static readonly SolidColorBrush BrushWarning = new(Color.FromRgb(0xff, 0xb7, 0x4d));
+        private static readonly SolidColorBrush BrushSuccess = new(Color.FromRgb(0x69, 0xf0, 0xae));
+        private static readonly SolidColorBrush BrushInfo = new(Color.FromRgb(0x40, 0xc4, 0xff));
+        private static readonly SolidColorBrush BrushMusic = new(Color.FromRgb(0xe0, 0x82, 0xff));
+        private static readonly SolidColorBrush BrushDefault = new(Color.FromRgb(0xd0, 0xd8, 0xe0));
+
+        // Debounce timer for log filter: waits 200ms after last keystroke before re-rendering
+        private DispatcherTimer? _logFilterDebounce;
 
         public MainWindow()
         {
@@ -118,49 +131,45 @@ namespace TranslateBook.Views;
             var timeStr = DateTime.Now.ToString("HH:mm:ss");
             var para = new Paragraph { Margin = new Thickness(0, 1, 0, 1), LineHeight = 16 };
 
-            // Timestamp in subtle muted color
-            var timeRun = new Run($"[{timeStr}] ")
-            {
-                Foreground = new SolidColorBrush(Color.FromRgb(0x75, 0x85, 0x95)),
-                FontWeight = FontWeights.Normal
-            };
+            // Timestamp in subtle muted color (reuses cached brush)
+            var timeRun = new Run($"[{timeStr}] ") { Foreground = BrushTimestamp, FontWeight = FontWeights.Normal };
             para.Inlines.Add(timeRun);
 
-            // Message with dynamic professional hacker/terminal theme colors
+            // Message with cached brushes per severity/content (no allocation per line)
             Brush textBrush;
             FontWeight weight = FontWeights.Normal;
 
             if (entry.Level == "error" || entry.Text.Contains("[Lỗi]") || entry.Text.Contains("Failed") || entry.Text.Contains("❌"))
             {
-                textBrush = new SolidColorBrush(Color.FromRgb(0xff, 0x52, 0x52)); // Vivid Red
+                textBrush = BrushError;
                 weight = FontWeights.SemiBold;
             }
             else if (entry.Level == "warning" || entry.Text.Contains("[Cảnh báo]") || entry.Text.Contains("⚠️"))
             {
-                textBrush = new SolidColorBrush(Color.FromRgb(0xff, 0xb7, 0x4d)); // Amber Orange
+                textBrush = BrushWarning;
             }
             else if (entry.Text.Contains("Hoàn thành") || entry.Text.Contains("hoàn tất") || entry.Text.Contains("✅") || entry.Text.Contains("OK"))
             {
-                textBrush = new SolidColorBrush(Color.FromRgb(0x69, 0xf0, 0xae)); // Neon Mint Green
+                textBrush = BrushSuccess;
                 weight = FontWeights.SemiBold;
             }
             else if (entry.Text.Contains("Bắt đầu") || entry.Text.Contains("Đang tạo") || entry.Text.Contains("Chapter") || entry.Text.Contains("Chương") || entry.Text.Contains("RTF"))
             {
-                textBrush = new SolidColorBrush(Color.FromRgb(0x40, 0xc4, 0xff)); // Cyber Cyan
+                textBrush = BrushInfo;
             }
             else if (entry.Text.Contains("🎵") || entry.Text.Contains("Nhạc nền") || entry.Text.Contains("giọng"))
             {
-                textBrush = new SolidColorBrush(Color.FromRgb(0xe0, 0x82, 0xff)); // Purple Accent
+                textBrush = BrushMusic;
             }
             else
             {
-                textBrush = new SolidColorBrush(Color.FromRgb(0xd0, 0xd8, 0xe0)); // Clean Slate White
+                textBrush = BrushDefault;
             }
 
             var textRun = new Run(entry.Text) { Foreground = textBrush, FontWeight = weight };
             para.Inlines.Add(textRun);
 
-            // Giữ tối đa 800 blocks trên màn hình UI để render siêu mượt, không bao giờ ngốn RAM/lag giao diện
+            // Giữ tối đa 800 blocks trên màn hình UI để render siêu mượt
             if (LogBox.Document.Blocks.Count > 800)
             {
                 LogBox.Document.Blocks.Remove(LogBox.Document.Blocks.FirstBlock);
@@ -182,12 +191,6 @@ namespace TranslateBook.Views;
             }
         }
 
-    private void LogTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (sender is System.Windows.Controls.RichTextBox tb)
-            tb.ScrollToEnd();
-    }
-
     private void ClearLogButton_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is ViewModels.MainViewModel vm)
@@ -207,7 +210,27 @@ namespace TranslateBook.Views;
     private void LogFilterBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (LogBox == null || DataContext is not ViewModels.MainViewModel vm) return;
-        // Re-render from history so only matching lines are shown (colored).
+
+        // Debounce: restart timer on each keystroke, only re-render after 200ms of inactivity.
+        // This prevents lag when typing quickly in the filter box with a large log history.
+        if (_logFilterDebounce == null)
+        {
+            _logFilterDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            _logFilterDebounce.Tick += (s, args) =>
+            {
+                _logFilterDebounce.Stop();
+                RebuildLogFromHistory();
+            };
+        }
+
+        _logFilterDebounce.Stop();
+        _logFilterDebounce.Start();
+    }
+
+    /// <summary>Re-renders the LogBox from _logHistory, applying the current filter.</summary>
+    private void RebuildLogFromHistory()
+    {
+        if (LogBox == null || DataContext is not ViewModels.MainViewModel vm) return;
         LogBox.Document.Blocks.Clear();
         foreach (var entry in _logHistory)
         {

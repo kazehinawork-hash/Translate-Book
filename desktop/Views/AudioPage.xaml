@@ -212,7 +212,8 @@
                     <ItemsControl ItemsSource="{Binding OutputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel/>
+                                <WrapPanel VirtualizingStackPanel.IsVirtualizing="True"
+                                           VirtualizingStackPanel.VirtualizationMode="Recycling"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -308,13 +309,13 @@
                                                     <ColumnDefinition Width="6"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <ui:Button Grid.Column="0" Appearance="Primary" Content="Tạo Audio Toàn bộ"
+                                                <ui:Button Grid.Column="0" Content="Tạo Audio Toàn bộ"
                                                            Icon="{ui:SymbolIcon Headphones24}" Height="34" FontSize="12"
                                                            ToolTip="Tạo mới toàn bộ Audiobook từ đầu (xóa cache và tạo lại toàn bộ các chương)"
                                                            Command="{Binding DataContext.GenerateFullAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                            CommandParameter="{Binding}">
                                                     <ui:Button.Style>
-                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButtonPrimary}">
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsBusy}" Value="True">
                                                                     <Setter Property="Content" Value="Đang tạo..."/>
@@ -340,13 +341,13 @@
                                                 </Button>
                                             </Grid>
 
-                                            <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Wrench24}" Margin="0,6,0,0"
+                                            <ui:Button Icon="{ui:SymbolIcon Wrench24}" Margin="0,6,0,0"
                                                        Content="Sửa chữa &amp; Rà soát Audio" Height="34" HorizontalAlignment="Stretch"
                                                        ToolTip="Chế độ thông minh: Rà soát các chương đã có MP3, giữ lại chương chuẩn, chỉ tạo tiếp các chương còn thiếu hoặc bị lỗi"
                                                        Command="{Binding DataContext.GenerateAudiobookCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                        CommandParameter="{Binding}">
                                                 <ui:Button.Style>
-                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButton}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsBusy}" Value="True">
                                                                 <Setter Property="Content" Value="Đang rà soát..."/>
@@ -362,7 +363,7 @@
                                                    Command="{Binding DataContext.CancelTaskCommand, RelativeSource={RelativeSource AncestorType={x:Type Page}}}"
                                                    CommandParameter="{Binding}" Margin="0,6,0,0" HorizontalAlignment="Center" Padding="12,2">
                                             <ui:Button.Style>
-                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButton}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsBusy}" Value="True">
