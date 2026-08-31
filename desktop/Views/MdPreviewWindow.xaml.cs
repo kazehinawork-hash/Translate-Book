@@ -33,6 +33,7 @@ namespace TranslateBook.Views
                 TitleBar.Title = $"Preview: {bookTitle}";
 
             Loaded += MdPreviewWindow_Loaded;
+            Closed += MdPreviewWindow_Closed;
         }
 
         public void LoadMdFile(string path)
@@ -906,6 +907,17 @@ namespace TranslateBook.Views
                 ZoomPercent.Text = $"{(int)ZoomSlider.Value}%";
                 e.Handled = true;
             }
+        }
+
+        private void MdPreviewWindow_Closed(object? sender, EventArgs e)
+        {
+            // Giải phóng WebView2 khi đóng để không giữ handle file (tránh lỗi xóa sách sau khi xem preview)
+            try
+            {
+                WebView?.CoreWebView2?.RemoveHostObjectFromScript("TranslateBookBridge");
+                WebView?.Dispose();
+            }
+            catch { }
         }
     }
 }

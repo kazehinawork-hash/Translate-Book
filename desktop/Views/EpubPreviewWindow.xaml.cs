@@ -1748,8 +1748,20 @@ namespace TranslateBook.Views
                     _mediaPlayer = null;
                 }
 
+                // Giải phóng WebView2 để không giữ handle file ảnh/EPUB đã load
+                // (nếu không, việc xóa sách Output sau khi xem preview sẽ bị "Access denied")
+                try
+                {
+                    WebView?.CoreWebView2?.RemoveHostObjectFromScript("TranslateBookBridge");
+                    WebView?.Dispose();
+                }
+                catch { }
+
                 if (Directory.Exists(_tempExtractPath))
-                    Directory.Delete(_tempExtractPath, true);
+                {
+                    try { Directory.Delete(_tempExtractPath, true); }
+                    catch { }
+                }
             }
             catch
             {
