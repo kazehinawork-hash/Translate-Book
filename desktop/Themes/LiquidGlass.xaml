@@ -444,6 +444,41 @@
         </Setter>
     </Style>
 
+    <!-- ===== 17B. GLASS DANGER BUTTON (Dừng / Hủy khẩn cấp Glass) ===== -->
+    <Style x:Key="GlassDangerButton" TargetType="Button">
+        <Setter Property="Background" Value="#2A1B1B"/>
+        <Setter Property="Foreground" Value="#FF6B6B"/>
+        <Setter Property="BorderBrush" Value="#66FF5252"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="8,3"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#4D1F1F"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#FF5252"/>
+                            <Setter Property="Foreground" Value="#FF8A80"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#661A1A"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ===== 15. GLASS TAB HEADER (File Explorer tab style) ===== -->
     <Style x:Key="GlassTabHeader" TargetType="RadioButton">
         <Setter Property="Background" Value="{DynamicResource GlassTabNormalBrush}"/>
@@ -579,23 +614,21 @@
                             <!-- Bubble trượt trái → phải cho chế độ Indeterminate -->
                             <Border x:Name="PART_GlowRect"
                                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                                    Margin="4,0"
                                     CornerRadius="4" ClipToBounds="True"
                                     Visibility="Collapsed">
                                 <Border.Background>
-                                    <!-- Vệt sáng gradient: dịch RelativeTransform để chạy hết track -->
+                                    <!-- Vệt sáng gradient Neon Cyan + Hologram lướt mượt -->
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                         <LinearGradientBrush.RelativeTransform>
                                             <TranslateTransform x:Name="GlowBrushTransform" X="-1"/>
                                         </LinearGradientBrush.RelativeTransform>
-                                        <GradientStop Color="#0048CAE4" Offset="0"/>
-                                        <GradientStop Color="#3848CAE4" Offset="0.12"/>
-                                        <GradientStop Color="#B848CAE4" Offset="0.28"/>
-                                        <GradientStop Color="#FF48CAE4" Offset="0.45"/>
-                                        <GradientStop Color="#FF7B2CBF" Offset="0.55"/>
-                                        <GradientStop Color="#B89D4EDD" Offset="0.72"/>
-                                        <GradientStop Color="#389D4EDD" Offset="0.88"/>
-                                        <GradientStop Color="#009D4EDD" Offset="1"/>
+                                        <GradientStop Color="#0000F0FF" Offset="0"/>
+                                        <GradientStop Color="#2500F0FF" Offset="0.15"/>
+                                        <GradientStop Color="#A000F0FF" Offset="0.35"/>
+                                        <GradientStop Color="#FFFFFFFF" Offset="0.5"/>
+                                        <GradientStop Color="#D0B388FF" Offset="0.65"/>
+                                        <GradientStop Color="#407B2CBF" Offset="0.85"/>
+                                        <GradientStop Color="#007B2CBF" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Border.Background>
                             </Border>
@@ -611,9 +644,77 @@
                                         <DoubleAnimation Storyboard.TargetName="GlowBrushTransform"
                                                          Storyboard.TargetProperty="X"
                                                          From="-1.2" To="1.8"
-                                                         Duration="0:0:1.8"
-                                                         AccelerationRatio="0.1"
-                                                         DecelerationRatio="0.1"/>
+                                                         Duration="0:0:1.4"
+                                                         AccelerationRatio="0.2"
+                                                         DecelerationRatio="0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== 17. REALTIME PULSE PROGRESS BAR (Đồng bộ chuẩn Liquid Glass 3.0 với dự án) ===== -->
+    <Style x:Key="RealtimePulseProgressBar" TargetType="ProgressBar">
+        <Setter Property="Background" Value="{StaticResource ProgressBarGlassTrackBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Height" Value="6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <!-- Khung Pill kính mờ viền phản quang đồng bộ Liquid Glass -->
+                        <Border x:Name="Track" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" ClipToBounds="True">
+                            <Grid x:Name="PART_Track">
+                                <!-- Indicator (khi có % cụ thể): Accent Gradient chuẩn của dự án -->
+                                <Border x:Name="PART_Indicator" HorizontalAlignment="Left"
+                                        CornerRadius="3" ClipToBounds="True"
+                                        Background="{StaticResource ProgressBarGlassIndicatorBrush}">
+                                    <!-- Lớp ánh gương phản chiếu kính mờ đặc trưng Liquid Glass -->
+                                    <Border Background="{StaticResource ProgressBarGlassHighlightBrush}"/>
+                                </Border>
+                                
+                                <!-- Dải ánh sáng lướt mượt chuẩn Liquid Glass: Sapphire Blue → Accent Mint → Purple -->
+                                <Border x:Name="PART_LaserBeam" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                        CornerRadius="3" ClipToBounds="True" Visibility="Collapsed">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <LinearGradientBrush.RelativeTransform>
+                                                <TranslateTransform x:Name="LaserTransform" X="-1"/>
+                                            </LinearGradientBrush.RelativeTransform>
+                                            <GradientStop Color="#0000B4D8" Offset="0"/>
+                                            <GradientStop Color="#2548CAE4" Offset="0.15"/>
+                                            <GradientStop Color="#9048CAE4" Offset="0.35"/>
+                                            <GradientStop Color="#E6FFFFFF" Offset="0.5"/>
+                                            <GradientStop Color="#B87B2CBF" Offset="0.65"/>
+                                            <GradientStop Color="#409D4EDD" Offset="0.85"/>
+                                            <GradientStop Color="#009D4EDD" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsIndeterminate" Value="True">
+                            <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_LaserBeam" Property="Visibility" Value="Visible"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="LaserTransform"
+                                                         Storyboard.TargetProperty="X"
+                                                         From="-1.2" To="1.8"
+                                                         Duration="0:0:1.5"
+                                                         AccelerationRatio="0.2"
+                                                         DecelerationRatio="0.2"/>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </Trigger.EnterActions>

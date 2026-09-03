@@ -9,7 +9,12 @@
         TextOptions.TextRenderingMode="ClearType"
         RenderOptions.ClearTypeHint="Enabled"
         RenderOptions.BitmapScalingMode="HighQuality"
-        ScrollViewer.CanContentScroll="False">
+        ScrollViewer.CanContentScroll="False"
+        AllowDrop="True"
+        DragEnter="BooksPage_DragEnter"
+        DragOver="BooksPage_DragOver"
+        DragLeave="BooksPage_DragLeave"
+        Drop="BooksPage_Drop">
 
     <Grid Margin="12,8,16,0">
         <Grid.RowDefinitions>
@@ -585,5 +590,25 @@
                 </ScrollViewer>
             </Border>
         </Grid>
+
+        <!-- Drag & Drop Visual Overlay (Hiệu ứng kính mờ khi kéo thả sách) -->
+        <Border x:Name="DragDropOverlay" Grid.Row="0" Grid.RowSpan="2"
+                Background="#D90D1117" BorderBrush="{DynamicResource AccentFillColorDefaultBrush}"
+                BorderThickness="2" CornerRadius="16" Visibility="Collapsed"
+                IsHitTestVisible="False" Margin="-4,-4,-4,-4">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Width="64" Height="64" CornerRadius="32"
+                        Background="{DynamicResource GlassButtonNormalBrush}"
+                        BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1.5"
+                        HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="32" Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="Thả file sách vào đây để thêm vào Input" FontSize="18" FontWeight="Bold"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                <TextBlock Text="Hỗ trợ định dạng: .pdf, .epub, .azw3, .mobi, .txt" FontSize="13"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </Page>

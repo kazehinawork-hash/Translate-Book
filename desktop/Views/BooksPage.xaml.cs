@@ -284,4 +284,91 @@ public partial class BooksPage : Page
         panel.RenderTransform.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
+    #region Drag & Drop Import Sách
+
+    private void BooksPage_DragEnter(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+            DragDropOverlay.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void BooksPage_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+            if (DragDropOverlay.Visibility != Visibility.Visible)
+                DragDropOverlay.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void BooksPage_DragLeave(object sender, DragEventArgs e)
+    {
+        DragDropOverlay.Visibility = Visibility.Collapsed;
+        e.Handled = true;
+    }
+
+    private void BooksPage_Drop(object sender, DragEventArgs e)
+    {
+        DragDropOverlay.Visibility = Visibility.Collapsed;
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+
+        var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+        if (files == null || files.Length == 0) return;
+
+        var vm = DataContext as ViewModels.MainViewModel ?? Window.GetWindow(this)?.DataContext as ViewModels.MainViewModel;
+        if (vm == null) return;
+
+        var projectRoot = Services.ProjectHelper.FindProjectRoot();
+        var targetDir = Path.Combine(projectRoot, "input", "chua-lam");
+        if (!Directory.Exists(targetDir))
+        {
+            Directory.CreateDirectory(targetDir);
+        }
+
+        var validExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".pdf", ".epub", ".azw3", ".mobi", ".txt" };
+        int importedCount = 0;
+
+        foreach (var file in files)
+        {
+            if (!File.Exists(file)) continue;
+            var ext = Path.GetExtension(file);
+            if (!validExts.Contains(ext)) continue;
+
+            var fileName = Path.GetFileName(file);
+            var destPath = Path.Combine(targetDir, fileName);
+
+            try
+            {
+                File.Copy(file, destPath, overwrite: true);
+                importedCount++;
+                vm.AppendLog($"[Thêm sách] Đã chép file vào input/chua-lam: {fileName}");
+            }
+            catch (Exception ex)
+            {
+                vm.AppendLog($"[Lỗi thêm sách] Không thể chép file {fileName}: {ex.Message}", "error");
+            }
+        }
+
+        if (importedCount > 0)
+        {
+            vm.RefreshBooksCommand.Execute(null);
+            vm.AppendLog($"✨ Đã thêm thành công {importedCount} file sách vào mục 'Chưa làm'!");
+        }
+    }
+
+    #endregion
 }

@@ -8,6 +8,10 @@
         WindowStartupLocation="CenterScreen"
         WindowBackdropType="Acrylic" ExtendsContentIntoTitleBar="True" WindowCornerPreference="Round"
         Background="Transparent"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled"
+        RenderOptions.BitmapScalingMode="HighQuality"
         AllowDrop="True" DragEnter="Window_DragEnter" DragLeave="Window_DragLeave" Drop="Window_Drop">
 
     <ui:FluentWindow.Resources>
@@ -182,10 +186,16 @@
                                                      ToolTip="Sao chép toàn bộ nội dung Log" Click="CopyLogButton_Click">
                                                  <ui:SymbolIcon Symbol="Copy24" FontSize="13"/>
                                              </Button>
-                                             <Button Width="28" Height="28" Margin="0,0,6,0" Cursor="Hand"
+                                             <Button Width="28" Height="28" Margin="0,0,4,0" Cursor="Hand"
                                                      Style="{StaticResource GlassIconButton}"
                                                      ToolTip="Xóa sạch màn hình Log" Click="ClearLogButton_Click">
                                                  <ui:SymbolIcon Symbol="Delete24" FontSize="13" Foreground="#FFEF5350"/>
+                                             </Button>
+                                             <Button Width="28" Height="28" Margin="0,0,6,0" Cursor="Hand"
+                                                     Style="{StaticResource GlassIconButton}"
+                                                     ToolTip="Dừng khẩn cấp tiến trình đang chạy"
+                                                     Command="{Binding CancelCommand}">
+                                                 <ui:SymbolIcon Symbol="Stop24" FontSize="13" Foreground="#FF5252"/>
                                              </Button>
                                              
                                              <!-- Nút thu gọn dạng Pill kính mờ sang trọng -->
@@ -214,8 +224,8 @@
                                                FontFamily="Consolas" FontSize="11"/>
                              </ScrollViewer>
 
-                             <!-- AI Thinking & Processing Live Status Bar (Hiệu ứng AI đang suy nghĩ) -->
-                             <Border Grid.Row="2" Background="#141824" Padding="10,8"
+                             <!-- AI Thinking & Processing Live Status Bar (Hiệu ứng AI đang suy nghĩ - Đồng bộ Liquid Glass 3.0) -->
+                             <Border Grid.Row="2" Background="{DynamicResource GlassElementBackground2Brush}" Padding="12,7"
                                      BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0,1,0,0">
                                  <Border.Style>
                                      <Style TargetType="Border">
@@ -232,23 +242,41 @@
                                          <ColumnDefinition Width="Auto"/>
                                          <ColumnDefinition Width="*"/>
                                          <ColumnDefinition Width="Auto"/>
+                                         <ColumnDefinition Width="Auto"/>
                                      </Grid.ColumnDefinitions>
                                      
-                                     <!-- Thinking Sparkle Icon -->
-                                     <ui:SymbolIcon Grid.Column="0" Symbol="Sparkle24" FontSize="15"
-                                                    Foreground="#B388FF" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                     <!-- Thinking Sparkle Icon chuẩn kính mờ Liquid Glass -->
+                                     <Border Grid.Column="0" Width="22" Height="22" CornerRadius="6"
+                                             Background="{DynamicResource GlassButtonNormalBrush}"
+                                             BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
+                                             Margin="0,0,9,0" VerticalAlignment="Center">
+                                         <ui:SymbolIcon Symbol="Sparkle24" FontSize="12"
+                                                        Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                     </Border>
 
                                      <!-- Thinking Title / Busy Status -->
                                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                          <TextBlock Text="{Binding BusyMessage, TargetNullValue='AI đang suy nghĩ và dịch thuật ngữ...'}"
-                                                    FontSize="11" FontWeight="SemiBold"
-                                                    Foreground="#E0E6ED" TextTrimming="CharacterEllipsis"/>
+                                                    FontSize="11.5" FontWeight="SemiBold"
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
                                      </StackPanel>
 
-                                     <!-- Wave Pulse Progress (Glass 3.0 — viền gương + bo tròn pill) -->
-                                     <ProgressBar Grid.Column="2" Width="60" Height="4" IsIndeterminate="True"
-                                                  Style="{StaticResource GlassProgressBar}"
-                                                  VerticalAlignment="Center"/>
+                                     <!-- Wave Pulse Progress (Chuẩn GlassProgressBar lướt mượt đồng bộ) -->
+                                     <ProgressBar Grid.Column="2" Width="80" Height="6" IsIndeterminate="True"
+                                                  Style="{StaticResource RealtimePulseProgressBar}"
+                                                  VerticalAlignment="Center" Margin="8,0,8,0"/>
+
+                                     <!-- Nút Dừng khẩn cấp (Cancel / Abort Process) -->
+                                     <Button Grid.Column="3" Height="24" Padding="6,1" FontSize="11"
+                                             Style="{StaticResource GlassDangerButton}"
+                                             ToolTip="Dừng khẩn cấp tiến trình đang chạy"
+                                             Command="{Binding CancelCommand}">
+                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                             <ui:SymbolIcon Symbol="DismissCircle24" FontSize="12" Margin="0,0,3,0"/>
+                                             <TextBlock Text="Dừng" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                         </StackPanel>
+                                     </Button>
                                  </Grid>
                              </Border>
                         </Grid>

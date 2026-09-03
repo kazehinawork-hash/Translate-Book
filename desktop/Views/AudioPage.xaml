@@ -4,6 +4,10 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:models="clr-namespace:TranslateBook.Models"
         Loaded="Page_Loaded"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        RenderOptions.ClearTypeHint="Enabled"
+        RenderOptions.BitmapScalingMode="HighQuality"
         ScrollViewer.CanContentScroll="False">
 
     <Grid Margin="12,8,16,0">
@@ -120,11 +124,15 @@
                     
                     <DockPanel LastChildFill="True" Margin="0,0,0,8">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button Content="Đặt chính" FontSize="11" Height="28" Padding="8,0" Margin="4,0,4,0"
+                            <Button Content="Đặt chính" FontSize="11" Height="28" Padding="8,0" Margin="4,0,3,0"
                                     Style="{StaticResource GlassPlainButton}" Command="{Binding SetActiveVoiceCommand}"/>
+                            <Button Width="28" Height="28" Style="{StaticResource GlassIconButton}" Margin="0,0,2,0"
+                                    ToolTip="Phát nhanh file mẫu gốc có sẵn" Command="{Binding PlayReferenceVoiceCommand}">
+                                <ui:SymbolIcon Symbol="Speaker224" FontSize="13" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            </Button>
                             <Button Width="28" Height="28" Style="{StaticResource GlassIconButton}"
-                                    ToolTip="Nghe thử giọng đọc" Command="{Binding PreviewVoiceCommand}">
-                                <ui:SymbolIcon Symbol="Play24" FontSize="13" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                    ToolTip="Tạo và nghe thử câu mẫu tùy chỉnh" Command="{Binding PreviewVoiceCommand}">
+                                <ui:SymbolIcon Symbol="Play24" FontSize="13" Foreground="#00F0FF"/>
                             </Button>
                         </StackPanel>
                         <ComboBox Height="28" FontSize="11.5" ItemsSource="{Binding VoiceList}"

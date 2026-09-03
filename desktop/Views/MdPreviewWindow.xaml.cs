@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -12,6 +15,14 @@ using Wpf.Ui.Controls;
 
 namespace TranslateBook.Views
 {
+    public class MdTocItem
+    {
+        public string Title { get; set; } = "";
+        public string AnchorId { get; set; } = "";
+        public int Level { get; set; } = 1;
+        public ObservableCollection<MdTocItem> NestedItems { get; set; } = new();
+    }
+
     public partial class MdPreviewWindow : FluentWindow
     {
         private string _mdFilePath = "";
@@ -20,6 +31,11 @@ namespace TranslateBook.Views
         private string _rawPinyinText = "";   // Pinyin (nếu có, sách Trung)
         private string _bookTitle = "";
         private string _bookSlug = "";
+        private readonly ObservableCollection<MdTocItem> _tocItems = new();
+        private bool _isTocVisible = true;
+        private bool _isPinyinVisible = true;
+        private bool _isFindBarVisible = false;
+        private string _lastFindQuery = "";
 
         public MdPreviewWindow(string mdFilePath = "", string bookTitle = "", string bookSlug = "")
         {
@@ -31,6 +47,8 @@ namespace TranslateBook.Views
 
             if (!string.IsNullOrEmpty(bookTitle))
                 TitleBar.Title = $"Preview: {bookTitle}";
+
+            TocTreeView.ItemsSource = _tocItems;
 
             Loaded += MdPreviewWindow_Loaded;
             Closed += MdPreviewWindow_Closed;
@@ -67,6 +85,9 @@ namespace TranslateBook.Views
                 var core = WebView.CoreWebView2;
                 if (core == null)
                     throw new InvalidOperationException("Không thể khởi tạo WebView2.");
+
+                core.WebMessageReceived -= Core_WebMessageReceived;
+                core.WebMessageReceived += Core_WebMessageReceived;
 
                 // Đọc toàn bộ nội dung từ các file và nạp đầy đủ dữ liệu
                 LoadAllBookLayers();
@@ -261,32 +282,40 @@ namespace TranslateBook.Views
         private void RenderMode(string mode)
         {
             string html;
+            string targetContent;
             switch (mode)
             {
                 case "src":
-                    html = BuildHtml(!string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText, "Bản gốc nguyên tác");
+                    targetContent = !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText;
+                    html = BuildHtml(targetContent, "Bản gốc nguyên tác");
                     break;
                 case "split":
+                    targetContent = !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText;
                     html = BuildSplitViewHtml(
                         !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText,
-                        !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText);
+                        targetContent);
                     break;
                 case "bi":
+                    targetContent = !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText;
                     html = BuildBilingualHtml(
                         !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText,
-                        !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText);
+                        targetContent);
                     break;
                 case "tri":
+                    targetContent = !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText;
                     html = BuildTrilingualHtml(
                         !string.IsNullOrEmpty(_rawSrcText) ? _rawSrcText : _rawViText,
                         !string.IsNullOrEmpty(_rawPinyinText) ? _rawPinyinText : "",
-                        !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText);
+                        targetContent);
                     break;
                 case "vi":
                 default:
-                    html = BuildHtml(!string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText, "Bản dịch (Thuần Việt)");
+                    targetContent = !string.IsNullOrEmpty(_rawViText) ? _rawViText : _rawSrcText;
+                    html = BuildHtml(targetContent, "Bản dịch (Thuần Việt)");
                     break;
             }
+
+            BuildTocFromContent(targetContent);
 
             if (WebView?.CoreWebView2 != null)
             {
@@ -459,6 +488,22 @@ namespace TranslateBook.Views
                 }}
                 .split-cell-vi {{
                     color: var(--fg-color);
+                }}
+                /* Tùy biến ẩn hiện dòng Pinyin */
+                body.hide-pinyin .pinyin {{
+                    display: none !important;
+                }}
+                /* Search highlight styling */
+                mark.find-match {{
+                    background-color: #FFD54F !important;
+                    color: #000000 !important;
+                    border-radius: 2px;
+                    padding: 0 2px;
+                }}
+                mark.find-match.find-current {{
+                    background-color: #FF7043 !important;
+                    color: #FFFFFF !important;
+                    outline: 2px solid #D84315;
                 }}
                 ::-webkit-scrollbar {{ width: 8px; }}
                 ::-webkit-scrollbar-track {{ background: rgba(128,128,128,0.1); border-radius: 4px; }}
@@ -739,7 +784,8 @@ namespace TranslateBook.Views
                     FlushParagraph();
                     int level = headingMatch.Groups[1].Value.Length;
                     var text = headingMatch.Groups[2].Value.Trim();
-                    sb.AppendLine($"<h{level}>{InlineMarkdown(text)}</h{level}>");
+                    var anchorId = GenerateAnchorId(text);
+                    sb.AppendLine($"<h{level} id='{anchorId}'>{InlineMarkdown(text)}</h{level}>");
                     continue;
                 }
 
@@ -838,6 +884,7 @@ namespace TranslateBook.Views
             {
                 ReapplyThemeColors();
                 ApplyTypographySettings();
+                InjectScrollSpy();
             }
 
             // Tắt hiệu ứng loading overlay khi trình duyệt đã render xong
@@ -845,6 +892,55 @@ namespace TranslateBook.Views
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private void InjectScrollSpy()
+        {
+            if (WebView?.CoreWebView2 == null) return;
+
+            string js = @"
+                (function() {
+                    if (window._scrollSpyAttached) return;
+                    window._scrollSpyAttached = true;
+
+                    var lastActiveId = '';
+                    var scrollTimeout = null;
+
+                    window.addEventListener('scroll', function() {
+                        if (scrollTimeout) clearTimeout(scrollTimeout);
+                        scrollTimeout = setTimeout(function() {
+                            var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                            if (!headings || headings.length === 0) return;
+
+                            var currentId = '';
+                            var scrollY = window.scrollY || window.pageYOffset;
+
+                            for (var i = 0; i < headings.length; i++) {
+                                var h = headings[i];
+                                var top = h.offsetTop;
+                                if (top <= scrollY + 120) {
+                                    currentId = h.id || '';
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            if (!currentId && headings.length > 0) {
+                                currentId = headings[0].id || '';
+                            }
+
+                            if (currentId && currentId !== lastActiveId) {
+                                lastActiveId = currentId;
+                                if (window.chrome && window.chrome.webview) {
+                                    window.chrome.webview.postMessage(JSON.stringify({ type: 'headingActive', id: currentId }));
+                                }
+                            }
+                        }, 100);
+                    });
+                })();
+            ";
+
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
         }
 
         private void ApplyTypographySettings()
@@ -907,6 +1003,332 @@ namespace TranslateBook.Views
                 ZoomPercent.Text = $"{(int)ZoomSlider.Value}%";
                 e.Handled = true;
             }
+            else if (e.Key == Key.T && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                ToggleToc();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.F && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                ToggleFindBar();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.F3)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+                    NavigateFindMatch(-1);
+                else
+                    NavigateFindMatch(1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape && _isFindBarVisible)
+            {
+                CloseFindBar();
+                e.Handled = true;
+            }
+        }
+
+        private void BtnToggleToc_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleToc();
+        }
+
+        private double _lastTocWidth = 260;
+
+        private void ToggleToc()
+        {
+            _isTocVisible = !_isTocVisible;
+            if (_isTocVisible)
+            {
+                if (ColToc != null)
+                    ColToc.Width = new GridLength(_lastTocWidth > 100 ? _lastTocWidth : 260);
+                if (ColSplitter != null)
+                    ColSplitter.Width = new GridLength(5);
+                if (TocSidebar != null)
+                    TocSidebar.Visibility = Visibility.Visible;
+                if (TocSplitter != null)
+                    TocSplitter.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                if (ColToc != null)
+                {
+                    if (ColToc.ActualWidth > 100)
+                        _lastTocWidth = ColToc.ActualWidth;
+                    ColToc.Width = new GridLength(0);
+                }
+                if (ColSplitter != null)
+                    ColSplitter.Width = new GridLength(0);
+                if (TocSidebar != null)
+                    TocSidebar.Visibility = Visibility.Collapsed;
+                if (TocSplitter != null)
+                    TocSplitter.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private static string GenerateAnchorId(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "sec-top";
+            var clean = Regex.Replace(text.Trim().ToLowerInvariant(), @"[^a-z0-9\u00C0-\u1EF9]+", "-").Trim('-');
+            if (string.IsNullOrEmpty(clean)) clean = "heading";
+            return "sec-" + clean;
+        }
+
+        private void BuildTocFromContent(string markdown)
+        {
+            _tocItems.Clear();
+            var list = new List<MdTocItem>();
+
+            if (!string.IsNullOrWhiteSpace(markdown))
+            {
+                var lines = markdown.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    var m = Regex.Match(trimmed, @"^(#{1,3})\s+(.*)$");
+                    if (m.Success)
+                    {
+                        int level = m.Groups[1].Value.Length;
+                        string title = m.Groups[2].Value.Trim();
+                        // Bỏ định dạng inline markdown như **bold**, *italic* khỏi tiêu đề TOC
+                        title = Regex.Replace(title, @"[\*_`~]", "");
+                        if (string.IsNullOrWhiteSpace(title)) continue;
+
+                        list.Add(new MdTocItem
+                        {
+                            Title = title,
+                            AnchorId = GenerateAnchorId(title),
+                            Level = level
+                        });
+                    }
+                }
+            }
+
+            // Nếu không tìm thấy heading nào từ markdown nhưng có chunk files
+            if (list.Count == 0 && !string.IsNullOrEmpty(_bookSlug))
+            {
+                var projectRoot = Services.ProjectHelper.FindProjectRoot();
+                if (!string.IsNullOrEmpty(projectRoot))
+                {
+                    var chunksDir = Path.Combine(projectRoot, "working", "chunks", _bookSlug);
+                    if (Directory.Exists(chunksDir))
+                    {
+                        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var f in Directory.GetFiles(chunksDir, "chunk-*.json").OrderBy(x => x))
+                        {
+                            try
+                            {
+                                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(f));
+                                if (doc.RootElement.TryGetProperty("chapter", out var ch))
+                                {
+                                    var cName = ch.GetString();
+                                    if (!string.IsNullOrWhiteSpace(cName) && seen.Add(cName))
+                                    {
+                                        list.Add(new MdTocItem
+                                        {
+                                            Title = cName,
+                                            AnchorId = GenerateAnchorId(cName),
+                                            Level = 1
+                                        });
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+
+            // Xây dựng cây phân cấp (H1 chứa H2, H2 chứa H3)
+            MdTocItem? currentH1 = null;
+            MdTocItem? currentH2 = null;
+
+            foreach (var item in list)
+            {
+                if (item.Level == 1)
+                {
+                    _tocItems.Add(item);
+                    currentH1 = item;
+                    currentH2 = null;
+                }
+                else if (item.Level == 2)
+                {
+                    if (currentH1 != null)
+                    {
+                        currentH1.NestedItems.Add(item);
+                    }
+                    else
+                    {
+                        _tocItems.Add(item);
+                    }
+                    currentH2 = item;
+                }
+                else
+                {
+                    if (currentH2 != null)
+                    {
+                        currentH2.NestedItems.Add(item);
+                    }
+                    else if (currentH1 != null)
+                    {
+                        currentH1.NestedItems.Add(item);
+                    }
+                    else
+                    {
+                        _tocItems.Add(item);
+                    }
+                }
+            }
+
+            // Tự động mở rộng cây mục lục
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ExpandAllTocItems(TocTreeView);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private static void ExpandAllTocItems(ItemsControl itemsControl)
+        {
+            if (itemsControl == null) return;
+            foreach (var item in itemsControl.Items)
+            {
+                if (itemsControl.ItemContainerGenerator.ContainerFromItem(item) is System.Windows.Controls.TreeViewItem container)
+                {
+                    container.IsExpanded = true;
+                    if (container.HasItems)
+                        ExpandAllTocItems(container);
+                }
+            }
+        }
+
+        private bool _isProgrammaticTocSelection = false;
+
+        private void TocTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (_isProgrammaticTocSelection) return;
+            if (e.NewValue is MdTocItem item)
+            {
+                ScrollToHeading(item.AnchorId, item.Title);
+            }
+        }
+
+        private void Core_WebMessageReceived(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                var rawJson = e.TryGetWebMessageAsString();
+                if (string.IsNullOrEmpty(rawJson)) return;
+
+                using var doc = System.Text.Json.JsonDocument.Parse(rawJson);
+                if (doc.RootElement.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "headingActive")
+                {
+                    if (doc.RootElement.TryGetProperty("id", out var idProp))
+                    {
+                        var activeId = idProp.GetString();
+                        if (!string.IsNullOrEmpty(activeId))
+                        {
+                            Dispatcher.Invoke(() => SelectTocItemById(activeId));
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void SelectTocItemById(string anchorId)
+        {
+            if (TocTreeView == null || _tocItems == null || _tocItems.Count == 0) return;
+
+            MdTocItem? FindInList(IEnumerable<MdTocItem> items, string id)
+            {
+                foreach (var it in items)
+                {
+                    if (string.Equals(it.AnchorId, id, StringComparison.OrdinalIgnoreCase)) return it;
+                    var found = FindInList(it.NestedItems, id);
+                    if (found != null) return found;
+                }
+                return null;
+            }
+
+            var target = FindInList(_tocItems, anchorId);
+            if (target == null) return;
+
+            _isProgrammaticTocSelection = true;
+            try
+            {
+                // Tìm container TreeViewItem tương ứng và đánh dấu IsSelected
+                void SelectContainer(ItemsControl parent, MdTocItem item)
+                {
+                    var container = parent.ItemContainerGenerator.ContainerFromItem(item) as System.Windows.Controls.TreeViewItem;
+                    if (container != null)
+                    {
+                        container.IsSelected = true;
+                        container.BringIntoView();
+                        return;
+                    }
+
+                    foreach (var child in parent.Items)
+                    {
+                        if (parent.ItemContainerGenerator.ContainerFromItem(child) is System.Windows.Controls.TreeViewItem childContainer)
+                        {
+                            SelectContainer(childContainer, item);
+                        }
+                    }
+                }
+
+                SelectContainer(TocTreeView, target);
+            }
+            finally
+            {
+                _isProgrammaticTocSelection = false;
+            }
+        }
+
+        private void ScrollToHeading(string anchorId, string title)
+        {
+            if (WebView?.CoreWebView2 == null) return;
+
+            string cleanAnchor = EscapeJsString(anchorId);
+            string cleanTitle = EscapeJsString(title.Trim());
+
+            string js = $@"
+                (function() {{
+                    // 1. Thử cuộn theo ID anchor
+                    var el = document.getElementById('{cleanAnchor}');
+                    if (el) {{
+                        el.scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                        return;
+                    }}
+
+                    // 2. Thử tìm kiếm theo textContent của heading
+                    var title = '{cleanTitle}'.toLowerCase();
+                    var headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                    for (var i = 0; i < headings.length; i++) {{
+                        var text = headings[i].textContent.trim().toLowerCase();
+                        if (text === title || text.indexOf(title) >= 0 || title.indexOf(text) >= 0) {{
+                            headings[i].scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                            return;
+                        }}
+                    }}
+
+                    // 3. Fallback: tìm theo chuỗi slug ID mờ
+                    var slug = '{cleanAnchor}'.replace(/^sec-/, '');
+                    for (var j = 0; j < headings.length; j++) {{
+                        if (headings[j].id && headings[j].id.indexOf(slug) >= 0) {{
+                            headings[j].scrollIntoView({{behavior: 'smooth', block: 'start'}});
+                            return;
+                        }}
+                    }}
+                }})();
+            ";
+
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private static string EscapeJsString(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n").Replace("\r", "\\r");
         }
 
         private void MdPreviewWindow_Closed(object? sender, EventArgs e)
@@ -919,5 +1341,253 @@ namespace TranslateBook.Views
             }
             catch { }
         }
+
+        #region In-Page Find (Tìm kiếm trong trang) & Pinyin Toggle
+
+        private void BtnToggleFind_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleFindBar();
+        }
+
+        private void ToggleFindBar()
+        {
+            _isFindBarVisible = !_isFindBarVisible;
+            if (_isFindBarVisible)
+            {
+                FindBar.Visibility = Visibility.Visible;
+                TxtFindQuery.Focus();
+                TxtFindQuery.SelectAll();
+                if (!string.IsNullOrWhiteSpace(TxtFindQuery.Text))
+                {
+                    PerformFind(TxtFindQuery.Text);
+                }
+            }
+            else
+            {
+                CloseFindBar();
+            }
+        }
+
+        private void CloseFindBar()
+        {
+            _isFindBarVisible = false;
+            FindBar.Visibility = Visibility.Collapsed;
+            ClearFindHighlights();
+            WebView.Focus();
+        }
+
+        private void BtnFindClose_Click(object sender, RoutedEventArgs e)
+        {
+            CloseFindBar();
+        }
+
+        private void TxtFindQuery_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var query = TxtFindQuery.Text.Trim();
+            if (string.IsNullOrEmpty(query))
+            {
+                ClearFindHighlights();
+                TxtFindCount.Text = "0/0";
+            }
+            else
+            {
+                PerformFind(query);
+            }
+        }
+
+        private void TxtFindQuery_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+                    NavigateFindMatch(-1);
+                else
+                    NavigateFindMatch(1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                CloseFindBar();
+                e.Handled = true;
+            }
+        }
+
+        private void BtnFindPrev_Click(object sender, RoutedEventArgs e)
+        {
+            NavigateFindMatch(-1);
+        }
+
+        private void BtnFindNext_Click(object sender, RoutedEventArgs e)
+        {
+            NavigateFindMatch(1);
+        }
+
+        private async void PerformFind(string query)
+        {
+            if (WebView?.CoreWebView2 == null) return;
+            _lastFindQuery = query;
+            string clean = EscapeJsString(query);
+
+            string js = $@"
+                (function() {{
+                    // Xóa các highlight cũ
+                    var oldMarks = document.querySelectorAll('mark.find-match');
+                    for (var i = 0; i < oldMarks.length; i++) {{
+                        var parent = oldMarks[i].parentNode;
+                        parent.replaceChild(document.createTextNode(oldMarks[i].textContent), oldMarks[i]);
+                        parent.normalize();
+                    }}
+
+                    var query = '{clean}'.toLowerCase();
+                    if (!query) return JSON.stringify({{ count: 0, index: 0 }});
+
+                    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {{
+                        acceptNode: function(node) {{
+                            if (node.parentNode && (node.parentNode.nodeName === 'SCRIPT' || node.parentNode.nodeName === 'STYLE'))
+                                return NodeFilter.FILTER_REJECT;
+                            return NodeFilter.FILTER_ACCEPT;
+                        }}
+                    }});
+
+                    var nodes = [];
+                    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+                    var count = 0;
+                    for (var n = 0; n < nodes.length; n++) {{
+                        var node = nodes[n];
+                        var text = node.nodeValue;
+                        var lower = text.toLowerCase();
+                        var idx = lower.indexOf(query);
+                        if (idx >= 0) {{
+                            var frag = document.createDocumentFragment();
+                            var lastIdx = 0;
+                            while (idx >= 0) {{
+                                if (idx > lastIdx) {{
+                                    frag.appendChild(document.createTextNode(text.substring(lastIdx, idx)));
+                                }}
+                                var mark = document.createElement('mark');
+                                mark.className = 'find-match';
+                                mark.setAttribute('data-find-index', count);
+                                mark.textContent = text.substring(idx, idx + query.length);
+                                frag.appendChild(mark);
+                                count++;
+                                lastIdx = idx + query.length;
+                                idx = lower.indexOf(query, lastIdx);
+                            }}
+                            if (lastIdx < text.length) {{
+                                frag.appendChild(document.createTextNode(text.substring(lastIdx)));
+                            }}
+                            node.parentNode.replaceChild(frag, node);
+                        }}
+                    }}
+
+                    window._findMatchesCount = count;
+                    window._currentFindIndex = count > 0 ? 0 : -1;
+
+                    if (count > 0) {{
+                        var first = document.querySelector('mark.find-match[data-find-index=""0""]');
+                        if (first) {{
+                            first.classList.add('find-current');
+                            first.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                        }}
+                    }}
+
+                    return JSON.stringify({{ count: count, index: count > 0 ? 1 : 0 }});
+                }})();
+            ";
+
+            try
+            {
+                var resultJson = await WebView.CoreWebView2.ExecuteScriptAsync(js);
+                if (!string.IsNullOrEmpty(resultJson))
+                {
+                    // ExecuteScriptAsync trả về chuỗi JSON được bọc string literal
+                    var unescaped = System.Text.Json.JsonSerializer.Deserialize<string>(resultJson);
+                    if (!string.IsNullOrEmpty(unescaped))
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(unescaped);
+                        int count = doc.RootElement.GetProperty("count").GetInt32();
+                        int idx = doc.RootElement.GetProperty("index").GetInt32();
+                        TxtFindCount.Text = count > 0 ? $"{idx}/{count}" : "0/0";
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private async void NavigateFindMatch(int delta)
+        {
+            if (WebView?.CoreWebView2 == null) return;
+            string js = $@"
+                (function() {{
+                    var count = window._findMatchesCount || 0;
+                    if (count === 0) return JSON.stringify({{ count: 0, index: 0 }});
+
+                    var current = window._currentFindIndex;
+                    var oldMark = document.querySelector('mark.find-match[data-find-index=""' + current + '""]');
+                    if (oldMark) oldMark.classList.remove('find-current');
+
+                    var next = (current + {delta} + count) % count;
+                    window._currentFindIndex = next;
+
+                    var nextMark = document.querySelector('mark.find-match[data-find-index=""' + next + '""]');
+                    if (nextMark) {{
+                        nextMark.classList.add('find-current');
+                        nextMark.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    }}
+
+                    return JSON.stringify({{ count: count, index: next + 1 }});
+                }})();
+            ";
+
+            try
+            {
+                var resultJson = await WebView.CoreWebView2.ExecuteScriptAsync(js);
+                if (!string.IsNullOrEmpty(resultJson))
+                {
+                    var unescaped = System.Text.Json.JsonSerializer.Deserialize<string>(resultJson);
+                    if (!string.IsNullOrEmpty(unescaped))
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(unescaped);
+                        int count = doc.RootElement.GetProperty("count").GetInt32();
+                        int idx = doc.RootElement.GetProperty("index").GetInt32();
+                        TxtFindCount.Text = $"{idx}/{count}";
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void ClearFindHighlights()
+        {
+            if (WebView?.CoreWebView2 == null) return;
+            string js = @"
+                (function() {
+                    var oldMarks = document.querySelectorAll('mark.find-match');
+                    for (var i = 0; i < oldMarks.length; i++) {
+                        var parent = oldMarks[i].parentNode;
+                        parent.replaceChild(document.createTextNode(oldMarks[i].textContent), oldMarks[i]);
+                        parent.normalize();
+                    }
+                    window._findMatchesCount = 0;
+                    window._currentFindIndex = -1;
+                })();
+            ";
+            WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+
+        private void BtnTogglePinyin_Click(object sender, RoutedEventArgs e)
+        {
+            _isPinyinVisible = !_isPinyinVisible;
+            if (WebView?.CoreWebView2 != null)
+            {
+                string js = _isPinyinVisible
+                    ? "document.body.classList.remove('hide-pinyin');"
+                    : "document.body.classList.add('hide-pinyin');";
+                WebView.CoreWebView2.ExecuteScriptAsync(js);
+            }
+        }
+
+        #endregion
     }
 }

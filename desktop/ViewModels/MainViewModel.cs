@@ -3534,6 +3534,41 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void PlayReferenceVoice()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedVoice)) return;
+
+        // 1. Thử tìm trong core/voices/<SelectedVoice>.wav
+        var refWav = Path.Combine(_projectRoot, "core", "voices", $"{SelectedVoice}.wav");
+        if (!File.Exists(refWav))
+        {
+            // 2. Thử tìm trong output/voice_preview/preview_<SelectedVoice>.wav
+            refWav = Path.Combine(_projectRoot, "output", "voice_preview", $"preview_{SelectedVoice}.wav");
+        }
+
+        if (File.Exists(refWav))
+        {
+            AppendLog($"[Phát âm mẫu] {SelectedVoice}: {Path.GetFileName(refWav)}");
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = refWav,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[Lỗi] Không thể mở trình phát: {ex.Message}", "error");
+            }
+        }
+        else
+        {
+            AppendLog($"Chưa có file mẫu sẵn cho '{SelectedVoice}'. Bấm nút '▶' để tạo bản đọc thử tự động.", "warning");
+        }
+    }
+
+    [RelayCommand]
     private async Task SetActiveVoiceAsync()
     {
         if (string.IsNullOrEmpty(SelectedVoice)) return;

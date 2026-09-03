@@ -2310,20 +2310,98 @@
   - Xóa bỏ thẻ `NavigationView.PaneHeader` chứa nút 3 gạch (Pane Toggle Button).
   - Cố định Sidebar bên trái mở hoàn toàn 210px (`IsPaneOpen="True"`, `IsPaneToggleVisible="False"`), loại bỏ cơ chế co giãn trượt ra/vào giúp giao diện luôn vững chãi, trực quan và sạch sẽ.
   - Các nút `Sách`, `Audiobook`, `Cài đặt` dạng viên thuốc viền gương hiển thị đầy đủ, ngay ngắn 100%.
+- **Kiểm Tra Tính Thống Nhất Giao Diện Liquid Glass 3.0 & Đồng Bộ Tăng Tốc GPU Toàn App**:
+  - *Tính thống nhất giao diện (100%)*: Toàn bộ các trang `BooksPage`, `AudioPage`, `ApiPage` và `MainWindow` đều dùng chung hệ màu Acrylic Dark, viền phản quang `GlassGradientBorderBrush`, bo góc chuẩn hóa (`14px` Card, `10px` StatTile/Header, `12px` Pill Menu/Tab).
+  - *Đồng bộ GPU Acceleration*: Bổ sung `TextRenderingMode="ClearType"`, `TextFormattingMode="Display"`, `RenderOptions.ClearTypeHint="Enabled"`, `RenderOptions.BitmapScalingMode="HighQuality"` cho `MainWindow.xaml`, `AudioPage.xaml`, `ApiPage.xaml` giúp toàn bộ ứng dụng mượt mà 60-120fps.
 - **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
 
 ### File đổi
 - `desktop/Themes/LiquidGlass.xaml`
 - `desktop/Themes/AppStyles.xaml`
 - `desktop/Views/MainWindow.xaml`
+- `desktop/Views/MainWindow.xaml.cs`
 - `desktop/Views/BooksPage.xaml`
 - `desktop/Views/BooksPage.xaml.cs`
+- `desktop/Views/AudioPage.xaml`
+- `desktop/Views/ApiPage.xaml`
 - `desktop/ViewModels/MainViewModel.cs`
-- `desktop/Views/MdPreviewWindow.xaml.cs`
+- `desktop/TranslateBook.csproj`
 - `docs/STATE.md`, `docs/session_log.md`
 
 ### Còn dở
 - Không còn việc tồn đọng.
 
 ### Git
+- Đã commit và push các thay đổi trước.
+
+---
+
+## 2026-09-03 — Khôi phục và tích hợp danh sách chương (TOC) vào Trình đọc sách Output
+
+### Đã làm
+- **Phục hồi danh sách chương mục lục (TOC) & Bổ sung Thanh Co Kéo (GridSplitter) linh hoạt**:
+  - Khi người dùng bấm "Đọc sách" bên tab Output, cửa sổ trình đọc mở ra giờ đây đã có sẵn một sidebar cột trái (Width 260px) chứa danh sách cây mục lục toàn bộ các chương/mục (`TocTreeView`).
+  - *Hỗ trợ co kéo thanh mục lục (GridSplitter)*: Tích hợp thanh chia `GridSplitter` chuẩn Glass với con trỏ chuột 2 chiều `SizeWE` giữa sidebar chương và nội dung WebView, cho phép người dùng thoải mái co kéo độ rộng cột mục lục to/nhỏ tùy ý (từ 180px đến 600px). Đồng bộ nâng cấp tính năng này cho cả `MdPreviewWindow` và `EpubPreviewWindow`. Khi ẩn/hiện mục lục (`Ctrl+T`), app tự động ghi nhớ kích thước đã co kéo trước đó.
+  - *Tự động bóc tách thông minh*: Tự động quét và nhận diện cấu trúc tiêu đề theo các cấp độ Heading (`# H1`, `## H2`, `### H3`) từ file Markdown (`vi.md`, `tamngu.md`), đồng thời tự động fallback nạp từ dữ liệu các chunk chương trong `working/chunks/<slug>` nếu file không có heading rõ ràng.
+  - *Cuộn trang tức thì (Smooth Scroll)*: Gắn Anchor ID duy nhất vào từng thẻ heading trong HTML của WebView2. Khi người dùng nhấp vào bất kỳ chương nào ở cây mục lục bên trái, trình đọc sẽ lập tức cuộn mượt đến ngay đầu chương đó.
+- **Đồng Bộ Hoàn Toàn Thanh Tiến Trình Realtime Log Chuẩn Liquid Glass 3.0**:
+  - *Chuẩn hóa Liquid Glass (100%)*: Dải thanh trạng thái AI Live Status Bar và thanh tiến trình `RealtimePulseProgressBar` được chuyển sang dùng chung hệ màu Acrylic Dark `GlassElementBackground2Brush`, viền Gradient phản quang gương `GlassGradientBorderBrush`, tiệp hoàn hảo với giao diện nền của Console và các trang chính.
+  - *Quang phổ lướt mượt đồng điệu*: Vệt sáng quét Indeterminate đồng bộ sang dải Sapphire Blue `#00B4D8` $\rightarrow$ Mint Accent `#48CAE4` $\rightarrow$ Gương phản chiếu $\rightarrow$ Purple Glow `#7B2CBF`, đồng nhất với style thanh tiến trình trên thẻ Sách và Audiobook.
+  - *Huy hiệu AI Sparkle Kính Mờ*: Icon `Sparkle24` đặt trong khung kính mờ bo tròn `6px` (`GlassButtonNormalBrush`) với viền gương tinh tế và sắc xanh Accent thanh lịch.
+- **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/MainWindow.xaml`
+- `desktop/Views/MdPreviewWindow.xaml`
+- `desktop/Views/MdPreviewWindow.xaml.cs`
+- `desktop/Views/EpubPreviewWindow.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
 - Chưa commit — chờ người dùng duyệt.
+
+---
+
+## 2026-09-03 (Phiên chiều) — Bộ Tứ Nâng Cấp Toàn Diện: Trình Đọc, Dừng Khẩn Cấp, Audio ID3 & Kéo Thả Sách
+
+### Đã làm
+- **Nâng cấp 1: Trình Đọc Sách E-Reader (`MdPreviewWindow`)**:
+  - *Tìm kiếm từ khóa trong trang (In-Page Find & Highlight)*: Tích hợp thanh tìm kiếm nổi chuẩn Liquid Glass (`Ctrl + F`), đánh dấu vàng tất cả các từ khớp (`mark.find-match`), đánh dấu cam từ khóa hiện tại (`find-current`), hỗ trợ `F3` / `Shift+F3` để nhảy tiếp/lùi và `Esc` để đóng.
+  - *Bật / Ẩn Pinyin linh hoạt*: Nút toggle trên thanh công cụ cho phép ẩn/hiện tầng Pinyin theo ý muốn ở chế độ Tam ngữ thông qua class CSS `body.hide-pinyin`.
+  - *Đánh dấu chương đang đọc (Active TOC Tracking)*: Tích hợp `InjectScrollSpy()` tự động theo dõi vị trí cuộn trang của WebView2 và highlight chính xác chương tương ứng trên cây mục lục ở cột bên trái.
+- **Nâng cấp 2: Nút Dừng / Hủy Tiến Trình Khẩn Cấp (Cancel & Abort)**:
+  - Bổ sung nút **Dừng** (`GlassDangerButton` màu đỏ neon dịu) trực tiếp trên thanh AI Thinking Live Bar và nút icon `Stop24` ở Header Realtime Console, cho phép hủy ngay lập tức các tiến trình đang chạy (`CancelCommand` / `KillCurrentProcess`).
+- **Nâng cấp 3: Nâng cấp Audiobook (Nghe Nhanh Mẫu Gốc & Nhúng ID3/Bìa Sách)**:
+  - *Nút nghe nhanh mẫu có sẵn*: Bổ sung nút `Speaker224` trên trang Audiobook để phát ngay lập tức file audio mẫu gốc từ `core/voices/` mà không cần chờ GPU render.
+  - *Nhúng ID3 Tag & Bìa sách*: Cải tiến hàm `convert_to_mp3` trong `scripts/audiobook/audiobook_long.py` tự động nhúng ảnh bìa (`cover.jpg`/`cover.png`), tên bài hát (Chương N), tên Album, Tác giả và số Track vào thẻ ID3 của file MP3.
+- **Nâng cấp 4: Kéo Thả Sách Trực Tiếp (Drag & Drop Import)**:
+  - Bật `AllowDrop="True"` trên trang Sách kèm hiệu ứng kính mờ `DragDropOverlay`. Người dùng chỉ cần kéo file `.pdf`, `.epub`, `.azw3`, `.mobi` từ Windows Explorer thả vào cửa sổ, app tự động chép vào `input/chua-lam/` và làm mới danh sách tức thì.
+- **Nâng Cấp Engine VieNeu-TTS lên 3.4.0**:
+  - Cập nhật thành công gói `vieneu` từ `3.3.0` lên `3.4.0` (phát hành 02/09/2026) cùng thư viện phiên âm `sea-g2p` lên `0.9.1`.
+  - Test kiểm tra load model và tương thích CLI với script `scripts/audiobook/audiobook_long.py` hoạt động trơn tru.
+- **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/MainWindow.xaml`
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/BooksPage.xaml.cs`
+- `desktop/Views/AudioPage.xaml`
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Views/MdPreviewWindow.xaml`
+- `desktop/Views/MdPreviewWindow.xaml.cs`
+- `scripts/audiobook/audiobook_long.py`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+

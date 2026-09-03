@@ -27,8 +27,13 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left section: Zoom + Typography -->
+                <!-- Left section: Zoom + Typography + TOC Toggle -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button x:Name="BtnToggleToc" Icon="{ui:SymbolIcon Navigation24}"
+                               Width="34" Height="30" Margin="0,0,6,0" Click="BtnToggleToc_Click"
+                               ToolTip="Bật / Ẩn danh sách chương mục lục (Ctrl+T)"
+                               Style="{StaticResource GlassIconButton}"/>
+
                     <ui:Button x:Name="BtnRefreshTheme" Icon="{ui:SymbolIcon ArrowClockwise24}"
                                Width="32" Height="30" Margin="0,0,6,0" Click="BtnRefreshTheme_Click"
                                ToolTip="Cập nhật lại màu sắc theo theme hiện tại"
@@ -73,15 +78,25 @@
                     </ComboBox>
                 </StackPanel>
 
-                <!-- Right section: Mode toggle (Source | Bilingual | Translated) -->
+                <!-- Right section: Find + Toggle Pinyin + Mode toggle -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button x:Name="BtnToggleFind" Icon="{ui:SymbolIcon Search24}"
+                               Width="32" Height="30" Margin="0,0,6,0" Click="BtnToggleFind_Click"
+                               ToolTip="Tìm kiếm trong trang (Ctrl + F)"
+                               Style="{StaticResource GlassIconButton}"/>
+
+                    <ui:Button x:Name="BtnTogglePinyin" Icon="{ui:SymbolIcon TextGrammarCheckmark24}"
+                               Width="32" Height="30" Margin="0,0,8,0" Click="BtnTogglePinyin_Click"
+                               ToolTip="Bật / Ẩn dòng Pinyin (ở chế độ Tam ngữ)"
+                               Style="{StaticResource GlassIconButton}"/>
+
                     <TextBlock Text="Hiển thị:" VerticalAlignment="Center" FontSize="11.5"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="CmbMode" Width="200" Height="30" FontSize="11.5"
+                    <ComboBox x:Name="CmbMode" Width="185" Height="30" FontSize="11.5"
                               Style="{StaticResource GlassComboBox}"
                               SelectionChanged="CmbMode_SelectionChanged" ToolTip="Chọn chế độ hiển thị">
                         <ComboBoxItem Content="Bản dịch (Thuần Việt)" IsSelected="True" Tag="vi"/>
-                        <ComboBoxItem Content="Song song Đối chiếu (2 Cột)" Tag="split"/>
+                        <ComboBoxItem Content="Song song (2 Cột)" Tag="split"/>
                         <ComboBoxItem Content="Tam ngữ (Gốc + Pinyin + Việt)" Tag="tri"/>
                         <ComboBoxItem Content="Song ngữ (Từng đoạn)" Tag="bi"/>
                         <ComboBoxItem Content="Bản gốc" Tag="src"/>
@@ -90,21 +105,97 @@
             </Grid>
         </Border>
 
+        <!-- Main Body: Sidebar danh sách chương (TOC) + WebView -->
         <Grid Grid.Row="2">
-            <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="#1E1E1E"
-                          NavigationCompleted="WebView_NavigationCompleted"/>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ColToc" Width="260" MinWidth="180" MaxWidth="600"/>
+                <ColumnDefinition x:Name="ColSplitter" Width="5"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-            <!-- Loading Overlay khi chuyển chế độ hoặc nạp sách lớn -->
-            <Border x:Name="LoadingOverlay" Background="#99000000" Visibility="Collapsed"
-                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48" Margin="0,0,0,14"/>
-                    <TextBlock x:Name="TxtLoadingStatus" Text="Đang xử lý và chuyển chế độ đọc..."
-                               FontSize="13.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               HorizontalAlignment="Center"/>
-                </StackPanel>
+            <!-- Sidebar TOC danh sách chương -->
+            <Border Grid.Column="0" x:Name="TocSidebar" Background="{DynamicResource GlassBackgroundBrush}" Padding="4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Margin="8,6,8,8">
+                        <TextBlock Text="📑 MỤC LỤC CHƯƠNG" FontSize="11" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    </Border>
+
+                    <TreeView x:Name="TocTreeView" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                              Margin="4" SelectedItemChanged="TocTreeView_SelectedItemChanged"
+                              ItemContainerStyle="{StaticResource AppTreeViewItem}">
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding NestedItems}">
+                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontSize="12.5"/>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </Grid>
             </Border>
+
+            <!-- GridSplitter cho phép co kéo độ rộng cột mục lục chương linh hoạt -->
+            <GridSplitter Grid.Column="1" x:Name="TocSplitter"
+                          Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="Transparent" Cursor="SizeWE" ShowsPreview="False">
+                <GridSplitter.Template>
+                    <ControlTemplate TargetType="GridSplitter">
+                        <Border Background="Transparent">
+                            <Border Width="1" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                                    Background="{DynamicResource GlassGradientBorderBrush}"/>
+                        </Border>
+                    </ControlTemplate>
+                </GridSplitter.Template>
+            </GridSplitter>
+
+            <!-- Reader WebView Container -->
+            <Grid Grid.Column="2">
+                <wv2:WebView2 x:Name="WebView" DefaultBackgroundColor="#1E1E1E"
+                              NavigationCompleted="WebView_NavigationCompleted"/>
+
+                <!-- Floating Find In-Page Bar (Ctrl + F) chuẩn Liquid Glass -->
+                <Border x:Name="FindBar" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,12,24,0" Padding="8,6" CornerRadius="10"
+                        Background="{DynamicResource GlassElementBackground2Brush}"
+                        BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
+                        Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:TextBox x:Name="TxtFindQuery" Width="180" Height="28" FontSize="11.5"
+                                    PlaceholderText="Tìm từ khóa..."
+                                    Style="{StaticResource InteractiveTextBox}"
+                                    KeyDown="TxtFindQuery_KeyDown"
+                                    TextChanged="TxtFindQuery_TextChanged"/>
+                        <TextBlock x:Name="TxtFindCount" Text="0/0" FontSize="11"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Margin="8,0,8,0" VerticalAlignment="Center"/>
+                        <ui:Button x:Name="BtnFindPrev" Icon="{ui:SymbolIcon ChevronUp24}"
+                                   Width="28" Height="28" Margin="0,0,3,0" Click="BtnFindPrev_Click"
+                                   ToolTip="Kết quả trước (Shift + F3)" Style="{StaticResource GlassIconButton}"/>
+                        <ui:Button x:Name="BtnFindNext" Icon="{ui:SymbolIcon ChevronDown24}"
+                                   Width="28" Height="28" Margin="0,0,4,0" Click="BtnFindNext_Click"
+                                   ToolTip="Kết quả kế tiếp (F3)" Style="{StaticResource GlassIconButton}"/>
+                        <ui:Button x:Name="BtnFindClose" Icon="{ui:SymbolIcon Dismiss24}"
+                                   Width="28" Height="28" Click="BtnFindClose_Click"
+                                   ToolTip="Đóng tìm kiếm (Esc)" Style="{StaticResource GlassIconButton}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Loading Overlay khi chuyển chế độ hoặc nạp sách lớn -->
+                <Border x:Name="LoadingOverlay" Background="#99000000" Visibility="Collapsed"
+                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ui:ProgressRing IsIndeterminate="True" Width="48" Height="48" Margin="0,0,0,14"/>
+                        <TextBlock x:Name="TxtLoadingStatus" Text="Đang xử lý và chuyển chế độ đọc..."
+                                   FontSize="13.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </ui:FluentWindow>

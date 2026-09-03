@@ -1283,8 +1283,9 @@ def _subprocess_kwargs() -> dict:
 
 
 def convert_to_mp3(wav_path: str, keep_wav: bool = False, bitrate: str = "128k",
-                   title: str = None, album: str = None) -> str | None:
-    """Convert WAV → MP3 bằng ffmpeg nếu có. Trả về mp3 path hoặc None."""
+                   title: str = None, album: str = None, artist: str = None,
+                   track: int = None, cover_path: str = None) -> str | None:
+    """Convert WAV → MP3 bằng ffmpeg nếu có, tự động nhúng Metadata ID3 & Cover Art. Trả về mp3 path hoặc None."""
     ffmpeg = _find_ffmpeg()
     if not ffmpeg:
         print("   ⚠️  Không tìm thấy ffmpeg — giữ file WAV (dung lượng lớn)")
@@ -1292,11 +1293,35 @@ def convert_to_mp3(wav_path: str, keep_wav: bool = False, bitrate: str = "128k",
 
     mp3_path = wav_path.rsplit(".", 1)[0] + ".mp3"
     try:
-        cmd = [ffmpeg, "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-b:a", bitrate]
+        # Nếu chưa truyền cover_path, tự động tìm cover trong thư mục sách
+        if not cover_path:
+            parent_dir = os.path.dirname(wav_path)
+            book_dir = os.path.dirname(parent_dir) if os.path.basename(parent_dir) == "audiobook" else parent_dir
+            for c_name in ["cover.jpg", "cover.png", "cover.jpeg", "images/cover.jpg", "images/cover.png"]:
+                cand = os.path.join(book_dir, c_name)
+                if os.path.exists(cand):
+                    cover_path = cand
+                    break
+
+        cmd = [ffmpeg, "-y", "-i", wav_path]
+        has_cover = cover_path and os.path.exists(cover_path)
+        if has_cover:
+            cmd += ["-i", cover_path, "-map", "0:a", "-map", "1:v"]
+
+        cmd += ["-codec:a", "libmp3lame", "-b:a", bitrate]
+
+        if has_cover:
+            cmd += ["-codec:v", "mjpeg", "-disposition:v", "attached_pic"]
+
         if title:
             cmd += ["-metadata", f"title={title}"]
         if album:
             cmd += ["-metadata", f"album={album}"]
+        if artist:
+            cmd += ["-metadata", f"artist={artist}"]
+        if track:
+            cmd += ["-metadata", f"track={track}"]
+
         cmd.append(mp3_path)
         result = subprocess.run(cmd, timeout=300, encoding="utf-8", errors="replace",
                                 **_subprocess_kwargs())
@@ -1854,10 +1879,12 @@ def main():
         wav_info = sf.info(wav_path)
         wav_duration = wav_info.duration
 
-        # Convert to MP3 (có metadata title/album)
+        # Convert to MP3 (có metadata title/album/artist/track/cover)
         mp3_title = f"Chương {num}" + (f": {title}" if title else "")
+        album_name = os.path.basename(book_dir) if book_dir else slug
         mp3_path = convert_to_mp3(wav_path, keep_wav=args.keep_wav,
-                                  bitrate=args.bitrate, title=mp3_title, album=slug)
+                                  bitrate=args.bitrate, title=mp3_title, album=album_name,
+                                  track=num)
         final_path = mp3_path if mp3_path else wav_path
         size_mb = os.path.getsize(final_path) / 1024 / 1024
         total_gen += gen_time

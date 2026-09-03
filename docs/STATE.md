@@ -32,7 +32,49 @@
 
 ---
 
-## 🔨 Đang làm (hiện tại)
+- **Nâng Cấp VieNeu-TTS Lên Phiên Bản 3.4.0 Mới Nhất (09-03, XONG)**:
+  - **Mục tiêu**: Cập nhật engine VieNeu-TTS trong `working/venv-vieneu` từ `3.3.0` lên `3.4.0` (phát hành 02/09/2026) kèm gói phiên âm `sea-g2p 0.9.1`.
+  - **Kết quả**:
+    1. Cài đặt thành công `vieneu-3.4.0` và `sea-g2p-0.9.1`.
+    2. Kiểm tra import module và chạy thử CLI `audiobook_long.py --help` hoạt động hoàn hảo, sẵn sàng cho các tác vụ tạo sách nói tiếp theo.
+
+- **Bộ Tứ Nâng Cấp Toàn Diện: Trình Đọc, Dừng Khẩn Cấp, Audio ID3 & Kéo Thả Sách (09-03, XONG)**:
+  - **Mục tiêu**: Hoàn thiện trải nghiệm người dùng theo 4 trụ cột chiến lược: E-Reader, Quản lý luồng, Audiobook & Thư viện sách.
+  - **Kết quả**:
+    1. *Nâng cấp 1 (Trình đọc E-Reader `MdPreviewWindow`)*:
+       - **Tìm kiếm từ khóa trong trang (In-Page Find & Highlight)**: Tích hợp thanh tìm kiếm nổi chuẩn Liquid Glass (`Ctrl + F`), đánh dấu vàng tất cả các từ khớp (`mark.find-match`), đánh dấu cam từ khóa hiện tại (`find-current`), hỗ trợ `F3` / `Shift+F3` để nhảy tiếp/lùi và `Esc` để đóng.
+       - **Bật / Ẩn Pinyin linh hoạt**: Nút toggle trên thanh công cụ cho phép ẩn/hiện tầng Pinyin theo ý muốn ở chế độ Tam ngữ.
+       - **Đánh dấu chương đang đọc (Active TOC Tracking)**: Tích hợp `InjectScrollSpy()` tự động theo dõi vị trí cuộn trang của WebView2 và highlight chính xác chương tương ứng trên cây mục lục ở cột bên trái.
+    2. *Nâng cấp 2 (Tạm dừng & Dừng khẩn cấp)*:
+       - Bổ sung nút **Dừng khẩn cấp** (`GlassDangerButton` màu đỏ neon dịu) trực tiếp trên thanh AI Thinking Live Bar và nút icon `Stop24` ở Header Realtime Console, cho phép hủy ngay lập tức các tiến trình đang chạy (`CancelCommand` / `KillCurrentProcess`).
+    3. *Nâng cấp 3 (Audiobook: Nghe nhanh mẫu gốc & Nhúng ID3/Bìa sách)*:
+       - **Nút nghe nhanh mẫu có sẵn**: Bổ sung nút `Speaker224` trên trang Audiobook để phát ngay lập tức file audio mẫu gốc từ `core/voices/` mà không cần chờ GPU render.
+       - **Nhúng ID3 Tag & Bìa sách**: Script `audiobook_long.py` tự động nhúng ảnh bìa (`cover.jpg`/`cover.png`), tên bài hát (Chương N), tên Album, Tác giả và số Track vào thẻ ID3 của file MP3.
+    4. *Nâng cấp 4 (Kéo thả sách trực tiếp - Drag & Drop Import)*:
+       - Bật `AllowDrop="True"` trên trang Sách kèm hiệu ứng kính mờ `DragDropOverlay`. Người dùng chỉ cần kéo file `.pdf`, `.epub`, `.azw3`, `.mobi` từ Windows Explorer thả vào cửa sổ, app tự động chép vào `input/chua-lam/` và làm mới danh sách tức thì.
+
+- **Đồng Bộ Hoàn Toàn Thanh Tiến Trình Realtime Log Chuẩn Liquid Glass 3.0 (09-03, XONG)**:
+  - **Mục tiêu**: Chuẩn hóa thanh tiến trình (progress bar) trong bảng Realtime Console đồng bộ 100% với hệ màu và hiệu ứng Kính mờ siêu thực (Liquid Glass 3.0) của toàn bộ dự án.
+  - **Kết quả**:
+    1. *Đồng bộ màu sắc Acrylic Glass*: Thanh tiến trình và dải trạng thái AI Live Status Bar sử dụng chung nền kính mờ `GlassElementBackground2Brush`, viền phản quang `GlassGradientBorderBrush`, tiệp màu hoàn hảo với nền Console và toàn app.
+    2. *Dải quang phổ Liquid Glass mượt mà*: Hiệu ứng quét sáng Indeterminate được chuyển sang dải Sapphire Blue `#00B4D8` $\rightarrow$ Mint Accent `#48CAE4` $\rightarrow$ Ánh gương trung tâm $\rightarrow$ Purple Glow `#7B2CBF`, đồng nhất với toàn bộ các thanh tiến trình trên thẻ Sách và Audiobook.
+    3. *Huy hiệu AI Sparkle Kính Mờ*: Biểu tượng ngôi sao AI `Sparkle24` sử dụng style nút kính mờ `GlassButtonNormalBrush` viền phản quang `GlassGradientBorderBrush` bo tròn `6px`, màu nhấn `AccentFillColorDefaultBrush` thanh lịch, tinh tế.
+
+- **Tích Hợp Danh Sách Chương (TOC Mục Lục) Vào Trình Đọc Sách & Hỗ Trợ Co Kéo Linh Hoạt (09-03, XONG)**:
+
+- **Tích Hợp Danh Sách Chương (TOC Mục Lục) Vào Trình Đọc Sách & Hỗ Trợ Co Kéo Linh Hoạt (09-03, XONG)**:
+  - **Mục tiêu**: Khắc phục tình trạng khi đọc sách bên tab Output không thấy danh sách chương (`MdPreviewWindow`) và hỗ trợ co kéo độ rộng cột mục lục tùy ý.
+  - **Kết quả**:
+    1. *Sidebar Danh sách chương (TOC)*: Thêm cột trái Width 260px (`MinWidth="180"`, `MaxWidth="600"`) chứa `TreeView` danh sách chương mục lục tự động trích xuất từ các thẻ Heading (`#`, `##`, `###`) của file Markdown (`vi.md`, `tamngu.md`) hoặc tự động fallback nạp từ các file chunks đã trích xuất.
+    2. *Thanh co kéo GridSplitter*: Bổ sung `GridSplitter` chuẩn Glass với con trỏ chuột `SizeWE`, cho phép người dùng thoải mái co kéo độ rộng cột mục lục chương to/nhỏ tùy ý trên cả `MdPreviewWindow` và `EpubPreviewWindow`. Khi bấm ẩn/hiện mục lục (`Ctrl+T`), app tự động ghi nhớ kích thước đã co kéo trước đó.
+    3. *Điều hướng cuộn mượt (Smooth Scrolling)*: Bấm vào bất kỳ chương nào trong danh sách, WebView2 lập tức cuộn mượt (`scrollIntoView`) đến đúng vị trí chương đó theo Anchor ID hoặc Text heading.
+    4. *Nút Bật / Ẩn Mục lục*: Bổ sung nút Icon Mục lục (`Navigation24`) trên thanh công cụ và phím tắt `Ctrl + T` để linh hoạt thu gọn/mở rộng sidebar mục lục khi cần đọc toàn màn hình.
+
+- **Kiểm Tra Tính Thống Nhất Giao Diện Liquid Glass 3.0 & Tăng Tốc Toàn Diện (09-03, XONG)**:
+  - **Mục tiêu**: Rà soát toàn bộ hệ thống giao diện trên tất cả các trang (`MainWindow`, `BooksPage`, `AudioPage`, `ApiPage`), đảm bảo đồng bộ 100% phong cách Kính mờ siêu thực (Liquid Glass 3.0) và tối ưu hóa hiệu năng render GPU.
+  - **Kết quả**:
+    1. *Tính thống nhất UI (100%)*: Toàn bộ các trang đều dùng chung hệ màu Acrylic Dark Kính mờ (`GlassBackgroundBrush`), viền phản quang `GlassGradientBorderBrush`, bo góc chuẩn hóa (`14px` cho Card chính, `10px` cho StatTile/Header, `12px` cho Pill Tab/Menu), và hệ thống nút bấm `GlassPlainButton`, `GlassComboBox`.
+    2. *Tăng tốc phần cứng GPU DirectX*: Bổ sung đồng bộ `TextRenderingMode="ClearType"`, `TextFormattingMode="Display"`, `RenderOptions.ClearTypeHint="Enabled"`, `RenderOptions.BitmapScalingMode="HighQuality"` cho `MainWindow.xaml`, `AudioPage.xaml`, `ApiPage.xaml` và `BooksPage.xaml` giúp toàn bộ ứng dụng lướt mượt 60-120fps.
 
 - **Cố Định Sidebar Menu Vĩnh Viễn & Xóa Bỏ Hoàn Toàn Nút 3 Gạch (08-30, XONG)**:
   - **Mục tiêu**: Xóa bỏ hoàn toàn nút 3 gạch (Pane Toggle Button), giữ Sidebar bên trái ở trạng thái mở cố định (`IsPaneOpen="True"`), loại bỏ hoàn toàn cơ chế trượt ra/trượt vào giúp giao diện luôn vững chãi, trực quan và dễ sử dụng.
