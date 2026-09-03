@@ -204,7 +204,7 @@ public class PythonPipelineService
     public async Task<bool> RunChunkAsync(string rawMdPath, string outputDir,
         CancellationToken ct = default)
     {
-        var args = $"--input \"{rawMdPath}\" --output-dir \"{outputDir}\" --strategy smart";
+        var args = $"--input \"{rawMdPath}\" --output-dir \"{outputDir}\" --strategy smart --min-chars 800 --max-chars 1600";
         return await RunScriptAsync("process/chunk_text.py", args, ct);
     }
 

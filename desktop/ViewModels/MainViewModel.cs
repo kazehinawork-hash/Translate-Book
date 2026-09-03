@@ -2424,8 +2424,10 @@ public partial class MainViewModel : ObservableObject
                         AppendLog($"  → [{currentMeta.index + 1}/{chunkMetaList.Count}] Dịch chunk {currentMeta.chunkId} ({currentMeta.chapter})...");
 
                         var sourceLang = currentMeta.isTrilingual ? "Chinese" : "English";
+                        // Lọc thông minh: chỉ nạp thuật ngữ thực sự xuất hiện trong chunk này để giảm tải token prompt
+                        var chunkGlossary = ApiTranslationService.LoadGlossary(book.Slug, _projectRoot, currentMeta.origText);
                         var result = await _apiService.TranslateAsync(
-                            currentMeta.origText, ActiveProvider, glossary,
+                            currentMeta.origText, ActiveProvider, chunkGlossary,
                             context: contextSb.ToString(),
                             sourceLang: sourceLang, targetLang: "Vietnamese",
                             trilingual: currentMeta.isTrilingual,

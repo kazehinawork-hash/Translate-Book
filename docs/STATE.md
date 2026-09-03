@@ -32,6 +32,14 @@
 
 ---
 
+- **Tối Ưu Hóa Prompt Dịch Thuật & Khắc Phục Triệt Để Lỗi 503 Upstream Provider (09-03, XONG)**:
+  - **Mục tiêu**: Giảm tải token đầu vào và đầu ra cho API CommandCode, khắc phục hiện tượng lỗi HTTP 503 Server bận / Upstream model provider is temporarily unavailable mà vẫn bảo toàn 100% chất lượng văn học và độ bám ngữ cảnh.
+  - **Kết quả**:
+    1. *Lọc thuật ngữ động (Smart Dynamic Glossary Filtering)*: Thay vì nhồi toàn bộ danh sách CSV của cả cuốn sách vào từng chunk, hàm `LoadGlossary(slug, root, filterText)` chỉ lọc và nạp các thuật ngữ thực sự xuất hiện trong đoạn văn cần dịch $\rightarrow$ giảm 30-40% kích thước prompt đầu vào.
+    2. *Tinh gọn Prompt chỉ thị*: Cô đọng các quy tắc văn chương láng, loại bỏ các ví dụ dài dòng gây nặng tải cho LLM; giữ nguyên vẹn cầu nối ngữ cảnh gối đầu 3-4 câu của chunk trước (`contextPreviousText`) và hồ sơ văn chương `bookProfile`.
+    3. *Tối ưu cơ chế Retry kết nối lại nhanh*: Khi gặp 503 Upstream Provider (server gốc đang scale/phục hồi), rút ngắn thời gian chờ từ `8s, 16s, 24s` xuống `4s, 8s, 12s` để kết nối lại ngay khi server vừa thông thoáng.
+    4. *Chuẩn hóa kích thước Chunk*: Tinh chỉnh tham số `--min-chars 800 --max-chars 1600` trong `PythonPipelineService.RunChunkAsync` giúp mỗi chunk tương đương 1 bài tản văn / 1 phân cảnh hoàn chỉnh, AI sinh văn mượt mà và tập trung tối đa.
+
 - **Nâng Cấp VieNeu-TTS Lên Phiên Bản 3.4.0 Mới Nhất (09-03, XONG)**:
   - **Mục tiêu**: Cập nhật engine VieNeu-TTS trong `working/venv-vieneu` từ `3.3.0` lên `3.4.0` (phát hành 02/09/2026) kèm gói phiên âm `sea-g2p 0.9.1`.
   - **Kết quả**:

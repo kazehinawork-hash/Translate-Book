@@ -23,7 +23,7 @@ public class ApiTranslationService
     public record TranslationResult(string Text, string Model, string Provider,
         int TokensIn = 0, int TokensOut = 0);
 
-    public static string LoadGlossary(string slug, string projectRoot)
+    public static string LoadGlossary(string slug, string projectRoot, string filterText = "")
     {
         var glossaryDir = Path.Combine(projectRoot, "glossary");
         if (!Directory.Exists(glossaryDir)) return "";
@@ -58,6 +58,10 @@ public class ApiTranslationService
 
                         if (!string.IsNullOrEmpty(src) && !string.IsNullOrEmpty(tgt))
                         {
+                            // Nếu có filterText (đoạn cần dịch), chỉ nạp thuật ngữ nếu nó thực sự có trong văn bản
+                            if (!string.IsNullOrEmpty(filterText) && !filterText.Contains(src, StringComparison.OrdinalIgnoreCase))
+                                continue;
+
                             allRows.Add((src, tgt, type, note, book, author, genre));
                         }
                     }
@@ -150,20 +154,20 @@ public class ApiTranslationService
 
                 if (isRateLimit && attempt < 5)
                 {
-                    onStatusLog?.Invoke($"⏳ [API Rate Limit/429] Server báo quá tải hạn mức ({errMsg}). Đang tự động chờ 25 giây (Lần thử {attempt}/5)...");
-                    await Task.Delay(25000, ct);
+                    onStatusLog?.Invoke($"⏳ [API Rate Limit/429] Server báo quá tải hạn mức ({errMsg}). Đang tự động chờ 20 giây (Lần thử {attempt}/5)...");
+                    await Task.Delay(20000, ct);
                 }
                 else if ((isUpstreamUnavailable || isTimeout) && attempt < 5)
                 {
-                    int waitSec = attempt * 8; // 8s, 16s, 24s, 32s
-                    string reason = isTimeout ? "Timeout chờ phản hồi quá lâu" : errMsg;
-                    onStatusLog?.Invoke($"⏳ [Server bận: {reason}] Đang thử lại sau {waitSec}s (Lần thử {attempt}/5)...");
+                    int waitSec = attempt * 4; // 4s, 8s, 12s, 16s - kết nối lại nhanh khi server upstream vừa phục hồi
+                    string reason = isTimeout ? "Timeout chờ phản hồi" : errMsg;
+                    onStatusLog?.Invoke($"⏳ [Server bận: {reason}] Kết nối lại sau {waitSec}s (Lần thử {attempt}/5)...");
                     await Task.Delay(waitSec * 1000, ct);
                 }
                 else if (attempt < 4)
                 {
                     onStatusLog?.Invoke($"⏳ [Tạm dừng kết nối: {errMsg}] Thử lại lần {attempt + 1}/5...");
-                    await Task.Delay(3000, ct);
+                    await Task.Delay(2000, ct);
                 }
                 else
                 {
@@ -584,50 +588,37 @@ public class ApiTranslationService
         string sourceLang, string targetLang, bool trilingualMode, string contextPreviousText = "")
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Bạn là một dịch giả văn học chuyên nghiệp hàng đầu.");
-        sb.AppendLine($"NHIỆM VỤ TỐI CAO: Dịch toàn bộ văn bản sau từ {sourceLang} sang {targetLang} (TIẾNG VIỆT).");
-        sb.AppendLine("⚠️ YÊU CẦU SỐ 1: BẢN DỊCH PHẢI LÀ 100% TIẾNG VIỆT. TUYỆT ĐỐI KHÔNG ĐƯỢC GIỮ LẠI CHỮ HÁN / TIẾNG TRUNG!");
+        sb.AppendLine("Bạn là dịch giả văn học chuyên nghiệp.");
+        sb.AppendLine($"NHIỆM VỤ: Dịch toàn bộ văn bản sau từ {sourceLang} sang {targetLang} (TIẾNG VIỆT 100%, không sót chữ Hán).");
         sb.AppendLine();
 
         if (!string.IsNullOrEmpty(glossary))
             sb.AppendLine("## THUẬT NGỮ CỐ ĐỊNH (BẮT BUỘC DÙNG ĐÚNG):").AppendLine(glossary).AppendLine();
         if (!string.IsNullOrEmpty(context))
-            sb.AppendLine("## HỒ SƠ VĂN CHƯƠNG (QUY TẮC XƯNG HÔ & PHONG CÁCH TÁC GIẢ):").AppendLine(context).AppendLine();
+            sb.AppendLine("## HỒ SƠ VĂN CHƯƠNG (XƯNG HÔ & PHONG CÁCH):").AppendLine(context).AppendLine();
         if (!string.IsNullOrEmpty(contextPreviousText))
         {
-            sb.AppendLine("## NGỮ CẢNH ĐOẠN TRƯỚC (BÁM SÁT MẠCH TRUYỆN & CẢM XÚC NHÂN VẬT):");
+            sb.AppendLine("## NGỮ CẢNH ĐOẠN TRƯỚC (NỐI TIẾP LIỀN MẠCH VĂN & CẢM XÚC):");
             sb.AppendLine(contextPreviousText);
-            sb.AppendLine("*(Hãy dịch đoạn tiếp theo sao cho nối tiếp tự nhiên, mượt mà với ngữ cảnh trên)*");
+            sb.AppendLine("*(Dịch đoạn sau nối tiếp tự nhiên với ngữ cảnh trên)*");
             sb.AppendLine();
         }
 
-        sb.AppendLine("## TIÊU CHUẨN VĂN CHƯƠNG LÁNG (LITERARY QUALITY — GIỮ HỒN NGUYÊN TÁC):");
-        sb.AppendLine("1. Dịch CẢ CÂU, CẢ ĐOẠN — không dịch thô từng từ; câu từ phải tự nhiên, mượt mà như văn phong của một nhà văn Việt Nam thực thụ.");
-        sb.AppendLine("2. GIỮ TRỌN HỒN NGUYÊN TÁC & VĂN HÓA: Tuyệt đối không thêm/bớt ý, không đổi logic; dịch chuẩn xác các danh từ văn hóa/đời sống (Ví dụ: 旗袍 bắt buộc dịch là 'sườn xám', không dịch thành 'áo dài Thượng Hải'; 汉服 là 'Hán phục'; 坐月子 là 'ở cữ').");
-        sb.AppendLine("3. Nhịp điệu & âm thanh: Ưu tiên câu có nhịp điệu uyển chuyển, tránh lặp từ vô cớ; tỉnh lược đại từ thừa để văn phong thanh thoát.");
-        sb.AppendLine("4. Khẩu ngữ & hội thoại: Lời thoại sống động như người Việt giao tiếp ngoài đời thực, xưng hô nhất quán theo ngữ cảnh.");
-        sb.AppendLine("5. Thuần Việt: Ưu tiên từ ngữ thuần Việt giàu hình tượng; tránh lạm dụng từ Hán-Việt tối nghĩa hay cụm từ dịch máy (như 'một cách', 'những điều', 'được bởi').");
-        sb.AppendLine();
-        sb.AppendLine("### VÍ DỤ ĐỐI CHIẾU CHUẨN (Bản Cứng vs Bản Láng Nhà Văn):");
-        sb.AppendLine("• Câu gốc: “她穿上一件修身的旗袍，心里很难过，但是她强忍着没有让泪水流下来。”");
-        sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Cô ấy mặc vào một chiếc áo dài Thượng Hải vừa người, trong lòng rất khó chịu, nhưng cố nén nước mắt...'");
-        sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Khoác lên mình chiếc sườn xám ôm dáng, lòng cô quặn thắt, nhưng vẫn nén hết vào trong, không để một giọt nước mắt rơi xuống.'");
-        sb.AppendLine("• Câu gốc: “他不停地工作，一直工作到很晚。”");
-        sb.AppendLine("  - 🛡️ Dịch máy thô cứng: 'Anh ấy không ngừng làm việc, một mực làm việc đến rất muộn.'");
-        sb.AppendLine("  - ✅ Chuẩn nhà văn (Láng): 'Anh miệt mài làm đến tận khuya.'");
-        sb.AppendLine("=> BẢN DỊCH CỦA BẠN BẮT BUỘC PHẢI ĐẠT CHUẨN LÁNG (NHÀ VĂN) NHƯ CÁC VÍ DỤ TRÊN.");
+        sb.AppendLine("## TIÊU CHUẨN VĂN HỌC (CHUẨN LÁNG):");
+        sb.AppendLine("1. Dịch thoát ý cả câu/đoạn, lời văn tự nhiên, mượt mà như tác phẩm văn học Việt Nam.");
+        sb.AppendLine("2. Giữ nguyên ý gốc và nét văn hóa (ví dụ: 旗袍 => sườn xám; 汉服 => Hán phục; 坐月子 => ở cữ).");
+        sb.AppendLine("3. Thoại tự nhiên ngoài đời thực; xưng hô nhất quán; từ ngữ thuần Việt, giàu cảm xúc.");
         sb.AppendLine();
 
         if (trilingualMode)
         {
             var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-            sb.AppendLine($"## QUY TẮC ĐỐI ỨNG DÒNG (BẮT BUỘC KHỚP {lines.Length} DÒNG 1:1):");
-            sb.AppendLine($"Văn bản gốc gồm đúng {lines.Length} dòng được đánh số [1] đến [{lines.Length}].");
-            sb.AppendLine("Bạn PHẢI trả về đúng từng dòng có tiền tố số thứ tự: [1] <bản dịch dòng 1>, [2] <bản dịch dòng 2>...");
-            sb.AppendLine("Giữ nguyên ký hiệu heading (# hoặc ##) và link ảnh ![...] ở vị trí dòng tương ứng.");
-            sb.AppendLine("CHỈ TRẢ VỀ DUY NHẤT CÁC DÒNG ĐÃ DỊCH ĐÁNH SỐ THEO THỨ TỰ. Không giải thích!");
+            sb.AppendLine($"## ĐỐI ỨNG DÒNG (BẮT BUỘC ĐỦ {lines.Length} DÒNG 1:1):");
+            sb.AppendLine($"Văn bản gốc gồm {lines.Length} dòng được đánh số [1] đến [{lines.Length}].");
+            sb.AppendLine("Trả về đúng từng dòng có tiền tố: [1] <bản dịch dòng 1>, [2] <bản dịch dòng 2>...");
+            sb.AppendLine("Giữ nguyên ký hiệu heading (#, ##) và link ảnh ![...] ở đúng dòng tương ứng. KHÔNG giải thích.");
             sb.AppendLine();
-            sb.AppendLine("VĂN BẢN GỐC CẦN DỊCH:");
+            sb.AppendLine("VĂN BẢN GỐC:");
             for (int i = 0; i < lines.Length; i++)
             {
                 sb.AppendLine($"[{i + 1}] {lines[i]}");
@@ -635,11 +626,9 @@ public class ApiTranslationService
         }
         else
         {
-            sb.AppendLine("## QUY TẮC DỊCH:");
-            sb.AppendLine("1. Dịch toàn bộ sang tiếng Việt trôi chảy theo chuẩn nhà văn, giữ nguyên định dạng Markdown (heading #, bảng, ảnh).");
-            sb.AppendLine("2. CHỈ TRẢ VỀ DUY NHẤT BẢN DỊCH TIẾNG VIỆT. Không giải thích.");
+            sb.AppendLine("## YÊU CẦU: Dịch trôi chảy chuẩn văn học, giữ nguyên heading (#), bảng, ảnh. CHỈ TRẢ VỀ BẢN DỊCH.");
             sb.AppendLine();
-            sb.AppendLine("VĂN BẢN GỐC CẦN DỊCH SANG TIẾNG VIỆT:");
+            sb.AppendLine("VĂN BẢN GỐC:");
             sb.Append(text);
         }
         return sb.ToString();

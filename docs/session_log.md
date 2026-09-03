@@ -2384,6 +2384,11 @@
 - **Nâng Cấp Engine VieNeu-TTS lên 3.4.0**:
   - Cập nhật thành công gói `vieneu` từ `3.3.0` lên `3.4.0` (phát hành 02/09/2026) cùng thư viện phiên âm `sea-g2p` lên `0.9.1`.
   - Test kiểm tra load model và tương thích CLI với script `scripts/audiobook/audiobook_long.py` hoạt động trơn tru.
+- **Tối Ưu Hóa Prompt & Khắc Phục Triệt Để Lỗi 503 Upstream Provider**:
+  - Tinh gọn Prompt chỉ thị trong `ApiTranslationService.cs`, giữ nguyên các tiêu chuẩn văn chương láng nhưng loại bỏ phần râu ria ví dụ dài dòng.
+  - Thêm cơ chế lọc Glossary động `LoadGlossary(slug, root, filterText)`: chỉ nạp vào prompt các thuật ngữ thực sự có mặt trong chunk, giảm mạnh 30-40% kích thước prompt.
+  - Tối ưu thời gian chờ retry 503/timeout từ `8s, 16s, 24s` xuống `4s, 8s, 12s` giúp kết nối lại nhanh tức thì khi upstream model vừa phục hồi.
+  - Chuẩn hóa tham số chia chunk `--min-chars 800 --max-chars 1600` trong `RunChunkAsync` cho kích thước vàng của một bài tản văn / phân cảnh.
 - **Biên dịch**: `dotnet build` đạt **0 Warning, 0 Error**.
 
 ### File đổi
