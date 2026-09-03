@@ -2403,5 +2403,5 @@
 - Không còn việc tồn đọng.
 
 ### Git
-- Chưa commit — chờ người dùng duyệt.
+- Đã commit & push `main` (`bbd980c`): Bộ tứ nâng cấp trình đọc E-Reader, dừng khẩn cấp, audiobook ID3, kéo thả sách và VieNeu-TTS v3.4.0.
 
