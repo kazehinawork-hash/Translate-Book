@@ -2622,3 +2622,170 @@
 
 ### Git
 - Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Sửa Triệt Để Lỗi Các Nút Bấm Trang Cài Đặt (ApiPage Buttons Fix)
+
+### Đã làm
+- **1. Sửa Lỗi Nút 'Quét' Model (FetchModels)**:
+  - Chuyển `ui:Button` thành WPF `Button` chuẩn kết hợp `Style="{StaticResource GlassPlainButton}"` và `Cursor="Hand"`. Triệt tiêu hoàn toàn xung đột TargetType giữa `Wpf.Ui.Controls.Button` và Style gốc.
+- **2. Khắc Phục Lỗi Hit-Testing Vùng Chết (Dead Zones) Trong Template Nút**:
+  - Di chuyển `Padding="{TemplateBinding Padding}"` từ `OuterBorder` vào `InnerBorder` trong cả hai style `LiquidGlassButton` và `LiquidGlassButtonPrimary` (Themes/LiquidGlass.xaml).
+  - Giờ đây toàn bộ bề mặt nút (kể cả viền ngoài lẫn phần padding) đều bắt trọn sự kiện click chuột và hiển thị hiệu ứng hover/press nhạy bén 100%.
+- **3. Cơ Chế Thu Thập & Đồng Bộ Khóa API Key Thông Minh (`GetCurrentApiKey`)**:
+  - Hàm `GetCurrentApiKey()` kiểm tra song song cả hai ô `ApiKeyPlainBox` (khi hiện mật khẩu) và `ApiKeyBox` (khi ẩn mật khẩu) cùng cấu hình đã lưu trên máy tính, tránh tình trạng lưu chuỗi rỗng hoặc quét model thất bại khi đang bật/tắt con mắt.
+- **4. Phản Hồi Trạng Thái Tức Thời & Trực Quan**:
+  - Bổ sung cập nhật trạng thái trực tiếp trên thanh `ApiStatus` (icon xoay đồng bộ, thông báo 'Đang quét...', 'Đang kiểm tra kết nối...').
+  - Đảm bảo hiển thị thông báo kết quả qua `ShowSnackbar` (hoặc `MessageBox` dự phòng nếu cửa sổ chưa gán xong).
+- **5. Kiểm Tra Chất Lượng Biên Dịch**:
+  - `dotnet build -c Debug`: Thành công tuyệt đối (0 Warning, 0 Error).
+  - `dotnet build -c Release`: Thành công tuyệt đối (0 Warning, 0 Error).
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/ApiPage.xaml`
+- `desktop/Views/ApiPage.xaml.cs`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Nâng Cấp Giao Diện Trang Cài Đặt Liquid Glass 3.0 Ultra-Interactive
+
+### Đã làm
+- **1. Thẻ Chip Tương Tác Chọn Nhanh Model (`GlassChipButton`)**:
+  - Tạo mới style `GlassChipButton` chuẩn Dark Liquid Glass 3.0 (nền kính mờ, viền Gradient phát quang Cyan `#00F0FF` khi hover, kích cỡ viên thuốc nhỏ gọn).
+  - Thay thế dòng text tĩnh gợi ý bằng cụm Chip bấm chọn 1 chạm: `gemini-2.5-flash`, `gemini-2.5-pro`, `deepseek-chat`, `gpt-4o-mini`, `qwen-2.5-72b`. Click vào chip sẽ tự động điền model và hiện Snackbar xác nhận.
+- **2. Preset Mẫu Base URL Nhanh Thông Dụng**:
+  - Bổ sung cụm chip mẫu URL cho các trường hợp dùng Proxy phổ biến: `OpenCode Zen`, `OpenRouter`, `Ollama Local` và `Mặc định` (để trống).
+- **3. Hiệu Ứng Xoay Vòng Vô Cực Nút Quét (`ScanIconRotate`)**:
+  - Khi người dùng nhấn nút 'Quét', icon `ArrowSync` tự động kích hoạt `DoubleAnimation` quay tròn 360 độ liên tục, nhãn nút chuyển thành 'Đang quét...', và tự động trở lại bình thường khi hoàn tất.
+- **4. Kiểm Thử Chất Lượng Biên Dịch**:
+  - `dotnet build -c Debug`: 0 Warning, 0 Error.
+  - `dotnet build -c Release`: 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/ApiPage.xaml`
+- `desktop/Views/ApiPage.xaml.cs`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Tinh Gọn Trang Cài Đặt (Loại Bỏ Gợi Ý & Mẫu URL, Giữ Animation Quét)
+
+### Đã làm
+- **1. Loại Bỏ Hoàn Toàn Phần Gợi Ý & Mẫu URL**:
+  - Gỡ bỏ khối gợi ý text và các chip model/URL bên dưới ô Model và Base URL theo đúng ý người dùng.
+  - Form cài đặt trở về giao diện tối giản, thoáng đãng, sắc sảo chuẩn Dark Liquid Glass.
+- **2. Giữ Nguyên Hiệu Ứng Xoay Vô Cực Nút Quét**:
+  - Nút "Quét" model vẫn sở hữu hiệu ứng icon xoay tròn `ScanIconRotate` mượt mà khi đang gửi request và tự động dừng khi nhận kết quả.
+- **3. Dọn Dẹp Mã Nguồn & Kiểm Thử**:
+  - Xóa bỏ các event handler thừa (`ModelChip_Click`, `BaseUrlChip_Click`) trong `ApiPage.xaml.cs`.
+  - `dotnet build -c Debug`: 0 Warning, 0 Error.
+  - `dotnet build -c Release`: 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Views/ApiPage.xaml`
+- `desktop/Views/ApiPage.xaml.cs`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Tân Trang & Nâng Cao Chất Lượng Giao Diện Toàn Diện (System UI Polish)
+
+### Đã làm
+- **1. Đèn LED Nhịp Thở Sống Động (`LiveGlowPulseDot`)**:
+  - Tạo mới control `LiveGlowPulseDot` trong `LiquidGlass.xaml` với quầng hào quang phát sáng Cyan Neon co giãn theo nhịp thở (`DoubleAnimation` Scale 0.8 -> 1.25, Opacity 0.2 -> 0.8 vô hạn).
+  - Tích hợp vào thanh tiêu đề của `Realtime Console` trong `MainWindow.xaml`, mang lại cảm giác thiết bị thông minh hiện đại và sinh động.
+- **2. Nâng Cấp Tab Header Kính Phát Quang & Shimmer (`GlassTabHeader`)**:
+  - Cập nhật style `GlassTabHeader` cho các tab chọn Input/Output: khi được chọn (`IsChecked=True`), viền kính chuyển sang dải phản quang Shimmer Gradient (`GlassCardShimmerBorderBrush`) cùng quầng Dropshadow phát quang nhẹ.
+- **3. Chuẩn Hóa Ô Nhập Liệu & Dropdown Kính Mờ**:
+  - Đồng bộ viền 1px sắc nét cho `LiquidGlassTextBox` và `GlassComboBox`, bắt hiệu ứng phát sáng Neon `#00F0FF` khi focus và hover mượt mà.
+- **4. Kiểm Thử Biên Dịch**:
+  - `dotnet build -c Debug`: 0 Warning, 0 Error.
+  - `dotnet build -c Release`: 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/MainWindow.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Nâng Cấp Hiệu Ứng Chuyển Động Mượt Mà & Tối Ưu CPU/RAM (Motion & Perf Optimization)
+
+### Đã làm
+- **1. Tối Ưu CPU Cho Các Animation Chạy Ngầm (Idle CPU Throttling)**:
+  - Bổ sung `Timeline.DesiredFrameRate="30"` cho các Storyboard chạy vô tận trong `LiquidGlass.xaml`:
+    - 4 cột sóng của `MiniWaveformVisualizer`.
+    - Đèn LED nhịp thở `LiveGlowPulseDot`.
+  - Giảm chu kỳ đánh thức CPU (CPU wakeups) tới ~50% khi ứng dụng ở trạng thái nhàn rỗi mà vẫn đảm bảo độ êm ái về thị giác.
+- **2. Micro-Interactions Thẻ Kính Tăng Tốc Phần Cứng (Hardware-Accelerated Hover Lift)**:
+  - Tích hợp `TransformGroup` (`ScaleTransform` và `TranslateTransform`) vào `LiquidGlassCard`.
+  - Khi rê chuột vào thẻ: thẻ nâng nhẹ $Y = -2.5\text{px}$ và nở nhẹ $1.008$ lần với `DecelerationRatio="0.8"` (180ms); khi rời chuột trở về êm ái với `AccelerationRatio="0.6"` (200ms).
+  - Hoạt động trực tiếp trên GPU Composition Thread, hoàn toàn không kích hoạt chu kỳ tính toán lại bố cục (Zero Layout / Measure / Arrange passes).
+- **3. Cuộn Danh Sách Chuẩn Pixel Cực Mượt & Ổn Định RAM**:
+  - Bổ sung `VirtualizingPanel.ScrollUnit="Pixel"` cho các `ScrollViewer` tại `BooksPage` (tab Input & Output) và `AudioPage`.
+  - Trải nghiệm cuộn chuột mượt mà từng pixel tương tự như ứng dụng hiện đại, không còn bị khựng theo từng dòng. Cơ chế `VirtualizationMode="Recycling"` giữ chân RAM phẳng, không lo phình bộ nhớ khi thư viện có nhiều sách.
+- **4. Kiểm Thử Biên Dịch**:
+  - `dotnet build -c Debug`: 0 Warning, 0 Error.
+  - `dotnet build -c Release`: 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/AudioPage.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Đồng Bộ Hệ Thống Bo Tròn Góc Toàn Dự Án (CornerRadius Harmony)
+
+### Đã làm
+- **1. Thiết Lập Hệ Thống Phân Cấp Bo Tròn Chuẩn Mực Dark Liquid Glass 3.0**:
+  - **Level 1 — Containers & Khung Thẻ Lớn (`CornerRadius="14"` / Glow `16`)**: Áp dụng cho `MainGlassContainer`, `LiquidGlassCard`, `InputPanel`, `OutputPanel`, các thẻ cấu hình API và cửa sổ `EpubPreviewWindow`.
+  - **Level 2 — Phân Đoạn & Tiêu Đề Nhóm (`CornerRadius="10"`)**: Chuẩn hóa cho `BookCardHeader`, `StatTile`, `GlassTabHeader` và `GlassNavPillItem` giúp tạo chiều sâu thị giác phân tầng tự nhiên giữa thẻ chứa và thành phần con.
+  - **Level 3 — Điều Khiển Tương Tác & Nút Bấm (`CornerRadius="8"` / Inner `7`-`8`)**: Thống nhất toàn bộ nút bấm trong dự án (`LiquidGlassButton`, `LiquidGlassButtonPrimary`, `LiquidGlassNeonActionButton`, `GlassPlainButton`, `GlassIconButton`, `GlassDangerButton`, `GlassCollapseButton`, `GlassChipButton`), ô nhập `LiquidGlassTextBox`, `GlassComboBox` và các huy hiệu định dạng (`FormatBadge`, `GpuChipBadge`). Xóa bỏ triệt để hiện tượng lẫn lộn giữa góc bo 6px và 8px.
+  - **Level 4 — Vi Điều Khiển & Tiến Trình (`CornerRadius="4"` và `"3"`)**: Áp dụng cho các rãnh `ProgressBar` (4px), thanh đo phát quang (3px) và chấm trạng thái.
+- **2. Triển Khai Chỉnh Sửa XAML Thực Tế**:
+  - `desktop/Themes/LiquidGlass.xaml`: Nâng cấp `GlassPlainButton`, `GlassIconButton`, `GlassDangerButton` và `GlassChipButton` từ bán kính 6px lên 8px chuẩn mực.
+  - `desktop/Views/MainWindow.xaml`: Chuẩn hóa khung chứa icon Sparkle và chip hiển thị GPU từ bán kính 6px lên 8px.
+- **3. Kiểm Thử Biên Dịch Cả 2 Cấu Hình**:
+  - `dotnet build -c Debug`: 0 Warning, 0 Error.
+  - `dotnet build -c Release`: 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/MainWindow.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.

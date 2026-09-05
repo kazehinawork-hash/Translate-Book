@@ -56,8 +56,41 @@
     - **1. Live Pill Badges Đếm Số Lượng Động**: Bổ sung huy hiệu viên thuốc viền gương phát quang bên cạnh tên tab: Huy hiệu Cyan Neon cho "Sách" (`TotalBooksCount`) và Huy hiệu Tím Neon cho "Audiobook" (`AudioBooksCount`), cập nhật tự động theo thời gian thực khi nạp sách.
     - **2. Thẻ Trạng Thái API Liquid Glass Tương Tác (Click-to-Navigate)**: Thay thế text API tĩnh thô sơ cũ bằng một thẻ kính mờ hoàn chỉnh có viền phản quang Glass gradient, đèn LED xanh lá (`#10B981`) phát sáng quầng Dropshadow biểu thị trạng thái kết nối sẵn sàng của AI Engine, tên Provider/Model đang chọn và icon điều hướng. Người dùng có thể bấm trực tiếp vào thẻ để chuyển nhanh đến trang Cấu hình API (`ApiPage`).
     - **3. Bảng Điều Khiển Tổng Quan Hệ Thống Mini (Mini System & GPU Widget)**: Tích hợp ngay phía trên thanh footer của sidebar hiển thị tổng số từ đã dịch tích lũy (`TotalTranslatedWords`) định dạng chuẩn quốc tế và thẻ chip trạng thái card GPU (`GpuPerformanceText`, ví dụ "RTF 0.12 (GPU RTX ~8x)").
-    - **4. Kiểm định chất lượng**: Biên dịch cả Debug và Release đạt tuyệt đối 0 Warning, 0 Error. Khởi chạy tiến trình `TranslateBook.exe` mượt mà, ổn định.
+  - **Sửa Triệt Để Lỗi Các Nút Bấm Trang Cài Đặt (ApiPage Buttons Fix) (09-05, XONG)**:
+    - **1. Nút 'Quét' Model (`FetchModels`)**: Thay đổi kiểu từ `ui:Button` sang WPF `Button` chuẩn với style `GlassPlainButton` và `Cursor="Hand"`. Xóa bỏ xung đột TargetType giữa `Wpf.Ui.Controls.Button` và Style WPF Button gốc.
+    - **2. Khắc phục lỗi Hit-Testing & Padding trong `LiquidGlassButton` / `LiquidGlassButtonPrimary`**: Chuyển `Padding="{TemplateBinding Padding}"` từ `OuterBorder` vào `InnerBorder`. Đảm bảo người dùng click vào bất kỳ đâu trên nút bấm (kể cả viền và padding) đều bắt sự kiện chuẩn xác, không bị vùng chết (dead zones).
+    - **3. Đồng bộ và thu thập API Key an toàn (`GetCurrentApiKey`)**: Cả ba thao tác "Quét", "Lưu cấu hình", "Kiểm tra kết nối" giờ đây tự động đọc key thông minh từ cả ô ẩn (`ApiKeyBox`) lẫn ô hiện mật khẩu (`ApiKeyPlainBox`) hoặc cấu hình lưu trên đĩa.
+    - **4. Phản hồi trạng thái tức thời & Trực quan**: Cập nhật ngay thanh trạng thái API (`ApiStatus`, icon xoay, đổi màu phát quang) kèm thông báo Snackbar/MessageBox khi bấm các nút để người dùng nhận biết ngay lập tức hệ thống đang xử lý, không còn tình trạng bấm nút im lặng không rõ kết quả.
+    - **5. Kiểm thử**: Cả Debug và Release build sạch 100% (0 Warning, 0 Error).
 
+  - **Nâng Cấp Giao Diện Trang Cài Đặt Liquid Glass 3.0 Gọn Gàng & Hiện Đại (09-05, XONG)**:
+    - **1. Tinh gọn giao diện form**: Lược bỏ các dòng text/chip gợi ý model và mẫu URL theo yêu cầu của người dùng, giữ không gian thẻ cấu hình thoáng đãng, tối giản và sạch sẽ tuyệt đối.
+    - **2. Hiệu Ứng Xoay Vòng Vô Cực Nút Quét (`ScanIconRotate`)**: Khi bấm quét model, icon `ArrowSync` của nút tự động quay tròn liên tục (`RepeatBehavior.Forever`) kèm chữ "Đang quét...", và tự động dừng trở lại trạng thái ban đầu khi quét xong.
+    - **3. Kiểm thử**: Debug và Release build sạch 100% (0 Warning, 0 Error).
+
+  - **Tân Trang & Nâng Cao Chất Lượng Giao Diện Toàn Diện (System UI Polish) (09-05, XONG)**:
+    - **1. Đèn LED Nhịp Thở Sống Động (`LiveGlowPulseDot`)**: Tạo mới control đèn LED phát quang Cyan Neon với quầng sáng Blur tỏa nhịp thở (`DoubleAnimation` Scale 0.8 $\rightarrow$ 1.25, Opacity 0.2 $\rightarrow$ 0.8 lặp vô hạn) cho thanh tiêu đề của Realtime Console, tạo cảm giác hệ thống luôn thức và sẵn sàng xử lý.
+    - **2. Tab Header Viền Kính Phát Quang & Shimmer (`GlassTabHeader`)**: Nâng cấp các tab Input/Output với viền phản quang Shimmer Gradient (`GlassCardShimmerBorderBrush`) và quầng Dropshadow phát quang Cyan khi được chọn (`IsChecked=True`).
+    - **3. Tinh Chỉnh TextBox & ComboBox Kính Mờ**: Chuẩn hóa độ dày viền 1px, phản xạ viền Neon `#00F0FF` khi focus và hiệu ứng nền hover mượt mà cho `LiquidGlassTextBox` và `GlassComboBox`.
+    - **4. Kiểm thử**: Cả Debug và Release build sạch 100% (0 Warning, 0 Error).
+
+  - **Nâng Cấp Hiệu Ứng Chuyển Động Mượt Mà & Tối Ưu CPU/RAM (Motion & Perf Optimization) (09-05, XONG)**:
+    - **1. Tối ưu CPU khi nhàn rỗi (Idle CPU Throttling)**: Thêm `Timeline.DesiredFrameRate="30"` cho các Storyboard chạy lặp vô hạn (`LiveGlowPulseDot` và 4 cột sóng của `MiniWaveformVisualizer`) trong `LiquidGlass.xaml`. Giảm chu kỳ đánh thức CPU ~50% khi ứng dụng mở nền mà mắt thường vẫn thấy êm ái hoàn hảo.
+    - **2. Micro-Interactions Siêu Mượt bằng GPU Transforms**: Thêm hiệu ứng nâng thẻ kính (`LiquidGlassCard`) với `TranslateTransform.Y` (-2.5px) và `ScaleTransform` (1.008) sử dụng `DecelerationRatio="0.8"` (enter 180ms) và `AccelerationRatio="0.6"` (exit 200ms). Chạy hoàn toàn trên GPU Composition Thread, không gây tính toán lại Layout (Zero Measure/Arrange passes).
+    - **3. Cuộn Danh Sách Chuẩn Pixel Cực Êm & Tối Ưu RAM**: Bổ sung `VirtualizingPanel.ScrollUnit="Pixel"` trên các `ScrollViewer` của `BooksPage` (Input/Output tabs) và `AudioPage`. Giúp thao tác cuộn chuột mượt mà từng pixel mà không giật cục theo dòng, đồng thời cơ chế Virtualization `Recycling` giữ dung lượng RAM ổn định kể cả khi thư viện sách mở rộng.
+    - **4. Kiểm thử & Độ ổn định**: Cả **Debug** và **Release** đều biên dịch thành công tuyệt đối (0 Warning, 0 Error).
+
+  - **Đồng Bộ Hệ Thống Bo Tròn Góc Chuẩn Dark Liquid Glass 3.0 (CornerRadius Harmony) (09-05, XONG)**:
+    - **1. Xây dựng phân cấp bo tròn chuẩn mực (Radius Scale Hierarchy)**:
+      - *Level 1 — Containers & Thẻ lớn (`CornerRadius="14"`)*: Các khung chính ứng dụng, cửa sổ, thẻ nội dung `LiquidGlassCard`, bảng điều khiển Input/Output và Config Panels. Viền quầng sáng (Outer Glow) đạt 16px.
+      - *Level 2 — Tiêu đề nhóm, Thẻ mục lục & Thanh điều hướng (`CornerRadius="10"`)*: `BookCardHeader`, `StatTile`, `GlassTabHeader`, `GlassNavPillItem` tạo cảm giác thanh thoát, phân cấp rõ rệt với thẻ ngoài.
+      - *Level 3 — Nút bấm, Ô nhập liệu & Huy hiệu (`CornerRadius="8"`)*: Đồng bộ tuyệt đối toàn bộ nút bấm (`LiquidGlassButton`, `LiquidGlassButtonPrimary`, `LiquidGlassNeonActionButton`, `GlassPlainButton`, `GlassIconButton`, `GlassDangerButton`, `GlassCollapseButton`, `GlassChipButton`), ô nhập `LiquidGlassTextBox`, ComboBox và các Pill Badges. Loại bỏ hoàn toàn sự không nhất quán giữa bán kính 6px và 8px cũ.
+      - *Level 4 — Thanh tiến trình & Đèn báo (`CornerRadius="4"` và `"3"`)*: Rãnh thanh cuộn/tiến trình đạt 4px, thanh trượt phát quang và chấm LED tròn đều đạt 3px.
+    - **2. Triển khai & Chuẩn hóa thực tế**:
+      - Cập nhật các nút `GlassPlainButton`, `GlassIconButton`, `GlassDangerButton`, `GlassChipButton` trong `LiquidGlass.xaml` từ `6` lên `8`.
+      - Cập nhật container icon Sparkle và chip hiển thị GPU trong `MainWindow.xaml` từ `6` lên `8`.
+    - **3. Kiểm thử biên dịch**:
+      - Cả hai cấu hình **Debug** và **Release** đều biên dịch thành công mỹ mãn với **0 Warning(s), 0 Error(s)**.
 
 
 

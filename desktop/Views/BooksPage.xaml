@@ -115,7 +115,8 @@
                     Background="{DynamicResource GlassElementBackground2Brush}"
                     BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
                     CornerRadius="12" Padding="8" Margin="0,0,0,8">
-                <ScrollViewer x:Name="InputScrollViewer" VerticalScrollBarVisibility="Auto" Background="Transparent">
+                <ScrollViewer x:Name="InputScrollViewer" VerticalScrollBarVisibility="Auto" Background="Transparent"
+                              VirtualizingPanel.ScrollUnit="Pixel">
                     <StackPanel>
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40">
                             <StackPanel.Style>
@@ -369,7 +370,8 @@
                     Background="{DynamicResource GlassElementBackground2Brush}"
                     BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
                     CornerRadius="12" Padding="8" Margin="0,0,0,8">
-                <ScrollViewer x:Name="OutputScrollViewer" VerticalScrollBarVisibility="Auto" Background="Transparent">
+                <ScrollViewer x:Name="OutputScrollViewer" VerticalScrollBarVisibility="Auto" Background="Transparent"
+                              VirtualizingPanel.ScrollUnit="Pixel">
                     <StackPanel>
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40">
                         <StackPanel.Style>

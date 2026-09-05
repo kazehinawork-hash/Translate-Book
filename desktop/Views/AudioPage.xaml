@@ -216,7 +216,8 @@
                                HorizontalAlignment="Center" FontSize="14"/>
                 </StackPanel>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent"
+                              VirtualizingPanel.ScrollUnit="Pixel">
                     <ItemsControl ItemsSource="{Binding OutputBooks}" Margin="4">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>

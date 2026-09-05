@@ -183,19 +183,23 @@
                                           Text="{Binding ModelInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           ToolTip="Chọn model từ danh sách hoặc nhập tên model tùy chỉnh"
                                           Style="{StaticResource GlassComboBox}"/>
-                                <ui:Button Grid.Column="1" Width="90" Height="36" Margin="8,0,0,0"
-                                           ToolTip="Quét lại danh sách Model hỗ trợ từ API key"
-                                           Style="{StaticResource GlassPlainButton}"
-                                           Click="FetchModels_Click">
+                                <Button Grid.Column="1" Width="90" Height="36" Margin="8,0,0,0"
+                                        ToolTip="Quét lại danh sách Model hỗ trợ từ API key"
+                                        Style="{StaticResource GlassPlainButton}"
+                                        Cursor="Hand"
+                                        Click="FetchModels_Click">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <ui:SymbolIcon Symbol="ArrowSync24" FontSize="13" Margin="0,0,5,0"
-                                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
-                                        <TextBlock Text="Quét" FontSize="12" VerticalAlignment="Center"/>
+                                        <ui:SymbolIcon x:Name="ScanSyncIcon" Symbol="ArrowSync24" FontSize="13" Margin="0,0,5,0"
+                                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                                                       RenderTransformOrigin="0.5,0.5">
+                                            <ui:SymbolIcon.RenderTransform>
+                                                <RotateTransform x:Name="ScanIconRotate" Angle="0"/>
+                                            </ui:SymbolIcon.RenderTransform>
+                                        </ui:SymbolIcon>
+                                        <TextBlock x:Name="ScanButtonText" Text="Quét" FontSize="12" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                </ui:Button>
+                                </Button>
                             </Grid>
-                            <TextBlock Text="Gợi ý: gemini-3.6-flash, deepseek-chat, gpt-4o-mini, qwen-2.5..." 
-                                       FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,5,0,0"/>
                         </StackPanel>
 
                         <!-- Địa chỉ Base URL -->
@@ -207,8 +211,6 @@
                                         PlaceholderText="Để trống nếu dùng mặc định của hãng"
                                         ToolTip="Địa chỉ endpoint API tùy chỉnh nếu sử dụng dịch vụ trung gian hoặc Proxy"
                                         Style="{StaticResource InteractiveTextBox}"/>
-                            <TextBlock Text="Chỉ cần điền khi dùng Proxy trung gian, OpenCode Zen, hoặc tự host Ollama/vLLM." 
-                                       FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,5,0,0"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

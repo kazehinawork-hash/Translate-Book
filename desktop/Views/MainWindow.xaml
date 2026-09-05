@@ -153,7 +153,7 @@
                                     <Run Text=" từ" FontSize="10.5" FontWeight="Normal" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
                                 </TextBlock>
                                 
-                                <Border Margin="0,6,0,0" Padding="6,3" CornerRadius="6"
+                                <Border Margin="0,6,0,0" Padding="6,3" CornerRadius="8"
                                         Background="#1034D399" BorderBrush="#3034D399" BorderThickness="1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -268,8 +268,7 @@
 
                                          <!-- Bên trái: Live Pulse + Tiêu đề Console -->
                                          <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                             <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,7,0"
-                                                     Background="#00F0FF" VerticalAlignment="Center"/>
+                                             <Control Style="{StaticResource LiveGlowPulseDot}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                              <TextBlock Text="Realtime Console" FontWeight="Bold" FontSize="12.5"
                                                         Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
                                          </StackPanel>
@@ -341,7 +340,7 @@
                                       </Grid.ColumnDefinitions>
                                      
                                      <!-- Thinking Sparkle Icon chuẩn kính mờ Liquid Glass -->
-                                     <Border Grid.Column="0" Width="22" Height="22" CornerRadius="6"
+                                     <Border Grid.Column="0" Width="22" Height="22" CornerRadius="8"
                                              Background="{DynamicResource GlassButtonNormalBrush}"
                                              BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
                                              Margin="0,0,9,0" VerticalAlignment="Center">

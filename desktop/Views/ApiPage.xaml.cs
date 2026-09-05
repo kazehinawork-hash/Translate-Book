@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using TranslateBook.Models;
 
 namespace TranslateBook.Views;
@@ -143,6 +144,16 @@ public partial class ApiPage : Page
         }
     }
 
+    private string GetCurrentApiKey()
+    {
+        var key = _isApiKeyPlainVisible ? ApiKeyPlainBox?.Text : ApiKeyBox?.Password;
+        if (string.IsNullOrWhiteSpace(key))
+            key = ApiKeyBox?.Password;
+        if (string.IsNullOrWhiteSpace(key))
+            key = ApiKeyPlainBox?.Text;
+        return key?.Trim() ?? "";
+    }
+
     private void FetchModels_Click(object sender, RoutedEventArgs e)
     {
         TriggerFetchModels(forceNotify: true);
@@ -151,20 +162,34 @@ public partial class ApiPage : Page
     private void TriggerFetchModels(bool forceNotify = false)
     {
         var provider = ProviderCombo.SelectedItem is ComboBoxItem item ? (item.Tag?.ToString() ?? item.Content?.ToString() ?? "gemini").ToLowerInvariant() : "gemini";
-        var key = ApiKeyBox.Password;
+        var key = GetCurrentApiKey();
         if (string.IsNullOrWhiteSpace(key))
         {
             var cfg = Services.ConfigService.GetProvider(provider);
-            key = cfg?.ApiKey ?? "";
+            key = cfg?.ApiKey?.Trim() ?? "";
         }
         if (string.IsNullOrWhiteSpace(key))
         {
-            if (forceNotify && Window.GetWindow(this) is MainWindow mw)
-                mw.ShowSnackbar("Vui lòng nhập API key trước khi quét danh sách Model!", true);
+            if (forceNotify)
+            {
+                if (Window.GetWindow(this) is MainWindow mw)
+                    mw.ShowSnackbar("Vui lòng nhập API key trước khi quét danh sách Model!", true);
+                else
+                    MessageBox.Show("Vui lòng nhập API key trước khi quét danh sách Model!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
             return;
         }
 
-        var baseUrl = BaseUrlBox.Text;
+        var baseUrl = BaseUrlBox.Text?.Trim() ?? "";
+
+        if (forceNotify)
+        {
+            ApiStatus.Text = "Đang quét danh sách Model...";
+            ApiStatus.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
+            ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowSync24;
+            ApiStatusIcon.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
+            StartScanAnimation();
+        }
 
         _ = Task.Run(async () =>
         {
@@ -174,6 +199,7 @@ public partial class ApiPage : Page
             {
                 Dispatcher.Invoke(() =>
                 {
+                    StopScanAnimation();
                     if (DataContext is ViewModels.MainViewModel vm)
                     {
                         var userSelected = ModelBox.Text?.Trim();
@@ -205,6 +231,11 @@ public partial class ApiPage : Page
                             ModelBox.Text = models[0];
                         }
 
+                        ApiStatus.Text = $"Đã tìm thấy {models.Count} model khả dụng";
+                        ApiStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xE6, 0x76));
+                        ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.CheckmarkCircle24;
+                        ApiStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xE6, 0x76));
+
                         if (forceNotify && Window.GetWindow(this) is MainWindow mw)
                             mw.ShowSnackbar($"Đã quét thành công {models.Count} model từ API!", false);
                     }
@@ -214,11 +245,48 @@ public partial class ApiPage : Page
             {
                 Dispatcher.Invoke(() =>
                 {
+                    StopScanAnimation();
+                    ApiStatus.Text = "Không quét được model từ API key này";
+                    ApiStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xB7, 0x4D));
+                    ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Warning24;
+                    ApiStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xB7, 0x4D));
+
                     if (Window.GetWindow(this) is MainWindow mw)
-                        mw.ShowSnackbar("Không thể lấy danh sách Model từ API key này.", true);
+                        mw.ShowSnackbar("Không thể lấy danh sách Model từ API key này (có thể thử nhập model thủ công).", true);
                 });
             }
         });
+    }
+
+    private void StartScanAnimation()
+    {
+        try
+        {
+            if (ScanIconRotate != null)
+            {
+                var anim = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromSeconds(1)))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever
+                };
+                ScanIconRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+            }
+            if (ScanButtonText != null) ScanButtonText.Text = "Đang quét...";
+        }
+        catch { }
+    }
+
+    private void StopScanAnimation()
+    {
+        try
+        {
+            if (ScanIconRotate != null)
+            {
+                ScanIconRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+                ScanIconRotate.Angle = 0;
+            }
+            if (ScanButtonText != null) ScanButtonText.Text = "Quét";
+        }
+        catch { }
     }
 
     private void SaveConfig_Click(object sender, RoutedEventArgs e)
@@ -229,8 +297,10 @@ public partial class ApiPage : Page
         if (!cfg.Providers.ContainsKey(provider))
             cfg.Providers[provider] = new ProviderConfig();
 
-        if (!string.IsNullOrEmpty(ApiKeyBox.Password))
-            cfg.Providers[provider].ApiKey = ApiKeyBox.Password;
+        var key = GetCurrentApiKey();
+        if (!string.IsNullOrEmpty(key))
+            cfg.Providers[provider].ApiKey = key;
+
         cfg.Providers[provider].Model = ModelBox.Text?.Trim() ?? "";
         cfg.Providers[provider].BaseUrl = BaseUrlBox.Text?.Trim() ?? "";
         cfg.ActiveProvider = provider;
@@ -246,6 +316,8 @@ public partial class ApiPage : Page
 
         if (Window.GetWindow(this) is MainWindow mw)
             mw.ShowSnackbar($"Đã lưu cấu hình API {provider.ToUpper()} thành công!", false);
+        else
+            MessageBox.Show($"Đã lưu cấu hình API {provider.ToUpper()} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
 
         TriggerFetchModels();
     }
@@ -258,8 +330,10 @@ public partial class ApiPage : Page
         if (!cfg.Providers.ContainsKey(provider))
             cfg.Providers[provider] = new ProviderConfig();
 
-        if (!string.IsNullOrEmpty(ApiKeyBox.Password))
-            cfg.Providers[provider].ApiKey = ApiKeyBox.Password;
+        var key = GetCurrentApiKey();
+        if (!string.IsNullOrEmpty(key))
+            cfg.Providers[provider].ApiKey = key;
+
         cfg.Providers[provider].Model = ModelBox.Text?.Trim() ?? "";
         cfg.Providers[provider].BaseUrl = BaseUrlBox.Text?.Trim() ?? "";
         cfg.ActiveProvider = provider;
@@ -273,8 +347,8 @@ public partial class ApiPage : Page
 
         LoadCurrentProviderKey();
 
-        ApiStatus.Text = "Đang kiểm tra...";
-        ApiStatus.Foreground = (Brush)FindResource("TextFillColorSecondaryBrush");
+        ApiStatus.Text = "Đang kiểm tra kết nối...";
+        ApiStatus.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
         ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowSync24;
         ApiStatusIcon.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
 
