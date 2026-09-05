@@ -52,6 +52,20 @@
         </Style.Triggers>
     </Style>
 
+    <!-- InteractiveButtonNeon — Windhawk Cyberpunk Glow Button for main actions -->
+    <Style x:Key="InteractiveButtonNeon" TargetType="ui:Button" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+           BasedOn="{StaticResource LiquidGlassNeonActionButton}">
+        <Style.Triggers>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <ScaleTransform ScaleX="0.97" ScaleY="0.97"/>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- InteractiveTextBox — Glass 3.0: gradient border + focus accent -->
     <Style x:Key="InteractiveTextBox" TargetType="ui:TextBox" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
            BasedOn="{StaticResource LiquidGlassTextBox}">
@@ -65,14 +79,14 @@
     <!-- StatTile — Glass 3.0 gradient border mini-card -->
     <Style x:Key="StatTile" TargetType="Border" BasedOn="{StaticResource LiquidGlassStatTile}"/>
 
-    <!-- Book card header (Glass 3.0: fully rounded inner capsule) -->
+    <!-- Book card header (Glass 3.0: fully rounded inner capsule with subtle glow border) -->
     <Style x:Key="BookCardHeader" TargetType="Border">
-        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="Padding" Value="10,8"/>
         <Setter Property="Margin" Value="0,0,0,10"/>
         <Setter Property="Background" Value="{DynamicResource GlassElementBackground2Brush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderThickness" Value="0.8"/>
     </Style>
 
     <!-- NavPaneToggleButton — nút 3 gạch sidebar: luôn nổi bật, viền gương phát sáng, không chìm vào nền -->

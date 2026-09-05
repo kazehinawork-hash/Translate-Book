@@ -1,90 +1,266 @@
 <Page x:Class="TranslateBook.Views.ApiPage"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-        Loaded="Page_Loaded"
-        TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
-        RenderOptions.ClearTypeHint="Enabled"
-        RenderOptions.BitmapScalingMode="HighQuality"
-        ScrollViewer.CanContentScroll="False">
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Loaded="Page_Loaded"
+      TextOptions.TextFormattingMode="Display"
+      TextOptions.TextRenderingMode="ClearType"
+      RenderOptions.ClearTypeHint="Enabled"
+      RenderOptions.BitmapScalingMode="HighQuality"
+      ScrollViewer.CanContentScroll="False">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="12,8,16,0">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="12,8,16,16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock Text="Cài đặt API" FontSize="26" FontWeight="Bold"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,24"/>
 
-            <ui:Card Grid.Row="1" Padding="24" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
-            <StackPanel>
-                <TextBlock Text="Nhà cung cấp (Provider)" FontSize="13" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
-                <ComboBox x:Name="ProviderCombo" Width="360" HorizontalAlignment="Left"
-                          SelectedValuePath="Tag"
-                          SelectedValue="{Binding SelectedProvider, Mode=TwoWay}" Margin="0,0,0,24"
-                          SelectionChanged="ProviderCombo_SelectionChanged"
-                          ToolTip="Chọn cấu hình API đang sử dụng để dịch"
-                          Style="{StaticResource GlassComboBox}">
-                    <ComboBoxItem Content="⚡ Cấu hình 1 (Tùy chỉnh: CommandCode / OpenAI / Proxy)" Tag="custom_1"/>
-                    <ComboBoxItem Content="✨ Cấu hình 2 (Tùy chỉnh: OpenCode Zen / opencode.ai)" Tag="custom_2"/>
-                    <ComboBoxItem Content="🚀 Cấu hình 3 (Tùy chỉnh: DeepSeek / Qwen / Claude)" Tag="custom_3"/>
-                    <ComboBoxItem Content="🌐 Cấu hình 4 (Tùy chỉnh: API Key dự phòng 1)" Tag="custom_4"/>
-                    <ComboBoxItem Content="🔮 Cấu hình 5 (Tùy chỉnh: API Key dự phòng 2)" Tag="custom_5"/>
-                    <ComboBoxItem Content="♊ Gemini Trực Tiếp (Google AI Studio)" Tag="gemini"/>
-                    <ComboBoxItem Content="🐳 DeepSeek Trực Tiếp (api.deepseek.com)" Tag="deepseek"/>
-                </ComboBox>
-
-                <TextBlock Text="Mã truy cập (API Key)" FontSize="13" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
-                <ui:PasswordBox x:Name="ApiKeyBox" Width="400" HorizontalAlignment="Left"
-                                PasswordChanged="ApiKeyBox_PasswordChanged"
-                                PlaceholderText="Nhập API key mới..."
-                                ToolTip="API key được lưu cục bộ trong cấu hình của ứng dụng"/>
-                <TextBlock x:Name="KeyStatusText" Text="Đang kiểm tra API key..." FontSize="11"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
-
-                <TextBlock Text="Mô hình (Model)" FontSize="13" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                    <ComboBox x:Name="ModelBox" Width="360" HorizontalAlignment="Left"
-                              IsEditable="True"
-                              ItemsSource="{Binding AvailableModels}"
-                              Text="{Binding ModelInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              ToolTip="Chọn model từ danh sách hoặc nhập tên model tùy chỉnh"
-                              Style="{StaticResource GlassComboBox}"/>
-                    <ui:Button Content="[↻] Quét" Width="80" Height="34" Margin="8,0,0,0"
-                               ToolTip="Quét lại danh sách Model hỗ trợ từ API key"
-                               Style="{StaticResource GlassPlainButton}"
-                               Click="FetchModels_Click"/>
+            <!-- Tiêu đề trang + Thanh trạng thái tổng quan -->
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Cài đặt API &amp; Nhà Cung Cấp" FontSize="22" FontWeight="Bold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                    <TextBlock Text="Quản lý các kết nối AI, mô hình dịch thuật thông minh và định tuyến endpoint" 
+                               FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
-                <TextBlock Text="Ví dụ: gemini-3.6-flash, deepseek-chat, gpt-4o-mini..." FontSize="11"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
 
-                <TextBlock Text="Địa chỉ máy chủ (Base URL)" FontSize="13" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8"/>
-                <ui:TextBox x:Name="BaseUrlBox" Width="400" HorizontalAlignment="Left"
-                            Text="{Binding BaseUrlInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                            PlaceholderText="Để trống nếu dùng mặc định" Margin="0,0,0,0"
-                            ToolTip="Địa chỉ endpoint API tùy chỉnh nếu sử dụng dịch vụ trung gian"/>
-                <TextBlock Text="Chỉ cần khi dùng API trung gian hoặc tự host (Local/Ollama)." FontSize="11"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,4,0,24"/>
+                <!-- Badge trạng thái kết nối tổng quan góc trên bên phải -->
+                <Border Grid.Column="1" x:Name="OverallStatusBadge" VerticalAlignment="Center"
+                        Padding="12,6" CornerRadius="12"
+                        Background="{DynamicResource GlassElementBackgroundBrush}"
+                        BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="StatusDot" Width="8" Height="8" CornerRadius="4" 
+                                Background="#00F0FF" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="OverallStatusText" Text="Chưa kiểm tra" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <ui:Button Style="{StaticResource InteractiveButtonPrimary}" Content="Lưu cấu hình" Height="36" Padding="18,0"
-                               Icon="{ui:SymbolIcon Save24}"
-                               Click="SaveConfig_Click"/>
-                    <ui:Button Style="{StaticResource InteractiveButton}" Content="Kiểm tra kết nối" Margin="12,0,0,0" Height="36" Padding="18,0"
-                               Icon="{ui:SymbolIcon CheckmarkCircle24}"
-                               Click="TestApi_Click"/>
+            <!-- THẺ 1: NHÀ CUNG CẤP & MẬT MÃ XÁC THỰC (PROVIDER & AUTHENTICATION) -->
+            <ui:Card Grid.Row="1" Margin="0,0,0,14" Padding="20" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,16">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0"
+                                    Background="{DynamicResource GlassButtonNormalBrush}"
+                                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
+                                <ui:SymbolIcon Symbol="Key24" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Nhà cung cấp &amp; Khóa truy cập (API Key)" FontSize="14.5" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                <TextBlock Text="Chọn hồ sơ dịch thuật và mã API key bí mật tương ứng" FontSize="11.5"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </DockPanel>
 
-                    <TextBlock x:Name="ApiStatus" FontSize="14" Margin="16,0,0,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Chọn Provider -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Nhà cung cấp (Provider Profile)" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
+                            <ComboBox x:Name="ProviderCombo" Height="36" HorizontalAlignment="Stretch"
+                                      SelectedValuePath="Tag"
+                                      SelectedValue="{Binding SelectedProvider, Mode=TwoWay}"
+                                      SelectionChanged="ProviderCombo_SelectionChanged"
+                                      ToolTip="Chọn cấu hình API đang sử dụng để dịch"
+                                      Style="{StaticResource GlassComboBox}">
+                                <ComboBoxItem Content="⚡ Cấu hình 1 (Tùy chỉnh: CommandCode / OpenAI / Proxy)" Tag="custom_1"/>
+                                <ComboBoxItem Content="✨ Cấu hình 2 (Tùy chỉnh: OpenCode Zen / opencode.ai)" Tag="custom_2"/>
+                                <ComboBoxItem Content="🚀 Cấu hình 3 (Tùy chỉnh: DeepSeek / Qwen / Claude)" Tag="custom_3"/>
+                                <ComboBoxItem Content="🌐 Cấu hình 4 (Tùy chỉnh: API Key dự phòng 1)" Tag="custom_4"/>
+                                <ComboBoxItem Content="🔮 Cấu hình 5 (Tùy chỉnh: API Key dự phòng 2)" Tag="custom_5"/>
+                                <ComboBoxItem Content="♊ Gemini Trực Tiếp (Google AI Studio)" Tag="gemini"/>
+                                <ComboBoxItem Content="🐳 DeepSeek Trực Tiếp (api.deepseek.com)" Tag="deepseek"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Nhập API Key + Nút ẩn/hiện mật khẩu -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Mã truy cập bí mật (API Key)" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- PasswordBox khi đang ẩn -->
+                                <ui:PasswordBox x:Name="ApiKeyBox" Grid.Column="0" Height="36"
+                                                PasswordChanged="ApiKeyBox_PasswordChanged"
+                                                PlaceholderText="Nhập API key mới..."
+                                                ToolTip="API key được bảo mật và lưu cục bộ trên máy tính"/>
+
+                                <!-- TextBox khi bấm hiện mắt kính -->
+                                <ui:TextBox x:Name="ApiKeyPlainBox" Grid.Column="0" Height="36"
+                                            Visibility="Collapsed"
+                                            TextChanged="ApiKeyPlainBox_TextChanged"
+                                            PlaceholderText="Nhập API key mới..."
+                                            ToolTip="API key được bảo mật và lưu cục bộ trên máy tính"
+                                            Style="{StaticResource InteractiveTextBox}"/>
+
+                                <!-- Nút con mắt kính mờ bật/tắt hiển thị key -->
+                                <Button Grid.Column="1" Width="36" Height="36" Margin="6,0,0,0"
+                                        Style="{StaticResource GlassIconButton}"
+                                        ToolTip="Hiển thị hoặc ẩn API Key"
+                                        Click="ToggleApiKeyVisibility_Click">
+                                    <ui:SymbolIcon x:Name="EyeIcon" Symbol="Eye24" FontSize="14"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Thông báo trạng thái Key dạng Capsule Chip -->
+                    <Border Padding="10,6" CornerRadius="8" Background="{DynamicResource GlassElementBackground2Brush}"
+                            BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0.8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="14" Margin="0,0,6,0"
+                                           Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            <TextBlock x:Name="KeyStatusText" Text="Đang kiểm tra API key..." FontSize="11"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-            </StackPanel>
-        </ui:Card>
+            </ui:Card>
+
+            <!-- THẺ 2: MÔ HÌNH DỊCH THUẬT & ĐỊNH TUYẾN MÁY CHỦ (MODEL & ENDPOINT CONFIG) -->
+            <ui:Card Grid.Row="2" Margin="0,0,0,16" Padding="20" VerticalAlignment="Top" Style="{StaticResource InteractiveCard}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,16">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="32" Height="32" CornerRadius="8" Margin="0,0,12,0"
+                                    Background="{DynamicResource GlassButtonNormalBrush}"
+                                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
+                                <ui:SymbolIcon Symbol="BrainCircuit24" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="#00F0FF"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Mô hình AI &amp; Đường truyền kết nối" FontSize="14.5" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                <TextBlock Text="Cấu hình Model LLM chuyên trách và địa chỉ Base URL tùy biến" FontSize="11.5"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Mô hình (Model) + Nút Quét Model -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Mô hình ngôn ngữ (Model Name)" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="ModelBox" Grid.Column="0" Height="36"
+                                          IsEditable="True"
+                                          ItemsSource="{Binding AvailableModels}"
+                                          Text="{Binding ModelInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          ToolTip="Chọn model từ danh sách hoặc nhập tên model tùy chỉnh"
+                                          Style="{StaticResource GlassComboBox}"/>
+                                <ui:Button Grid.Column="1" Width="90" Height="36" Margin="8,0,0,0"
+                                           ToolTip="Quét lại danh sách Model hỗ trợ từ API key"
+                                           Style="{StaticResource GlassPlainButton}"
+                                           Click="FetchModels_Click">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <ui:SymbolIcon Symbol="ArrowSync24" FontSize="13" Margin="0,0,5,0"
+                                                       Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                        <TextBlock Text="Quét" FontSize="12" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ui:Button>
+                            </Grid>
+                            <TextBlock Text="Gợi ý: gemini-3.6-flash, deepseek-chat, gpt-4o-mini, qwen-2.5..." 
+                                       FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <!-- Địa chỉ Base URL -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Địa chỉ máy chủ tùy biến (Base URL)" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
+                            <ui:TextBox x:Name="BaseUrlBox" Height="36"
+                                        Text="{Binding BaseUrlInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="Để trống nếu dùng mặc định của hãng"
+                                        ToolTip="Địa chỉ endpoint API tùy chỉnh nếu sử dụng dịch vụ trung gian hoặc Proxy"
+                                        Style="{StaticResource InteractiveTextBox}"/>
+                            <TextBlock Text="Chỉ cần điền khi dùng Proxy trung gian, OpenCode Zen, hoặc tự host Ollama/vLLM." 
+                                       FontSize="11" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ui:Card>
+
+            <!-- THẺ 3: THANH ĐIỀU KHIỂN THAO TÁC & KẾT QUẢ KIỂM TRA (ACTION BAR & REALTIME DIAGNOSTICS) -->
+            <Border Grid.Row="3" Padding="16,12" CornerRadius="12"
+                    Background="{DynamicResource GlassElementBackground2Brush}"
+                    BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Nút Lưu cấu hình Gradient Neon -->
+                    <ui:Button Grid.Column="0" Height="38" Padding="18,0" FontSize="12.5"
+                               Style="{StaticResource InteractiveButtonPrimary}"
+                               ToolTip="Lưu vĩnh viễn cấu hình này vào máy tính"
+                               Click="SaveConfig_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="Save24" FontSize="15" Margin="0,0,8,0"/>
+                            <TextBlock Text="Lưu cấu hình" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ui:Button>
+
+                    <!-- Nút Kiểm tra kết nối -->
+                    <ui:Button Grid.Column="1" Height="38" Margin="10,0,0,0" Padding="18,0" FontSize="12.5"
+                               Style="{StaticResource InteractiveButton}"
+                               ToolTip="Kiểm tra đường truyền tới server và đo độ trễ Ping"
+                               Click="TestApi_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="15" Margin="0,0,8,0" Foreground="#00F0FF"/>
+                            <TextBlock Text="Kiểm tra kết nối" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ui:Button>
+
+                    <!-- Kết quả kiểm tra hiển thị dạng Capsule Chip phát quang -->
+                    <Border Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Padding="12,6" CornerRadius="10"
+                            Background="{DynamicResource GlassElementBackgroundBrush}"
+                            BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0.8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon x:Name="ApiStatusIcon" Symbol="Info24" FontSize="14" Margin="0,0,6,0"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock x:Name="ApiStatus" Text="Sẵn sàng kiểm tra kết nối API" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
         </Grid>
     </ScrollViewer>
 </Page>

@@ -86,7 +86,7 @@ logs/
 # MinerU
 .magic_pdf/
 minerU_cache/
-models/
+/models/
 *.pdf.cache
 
 # Test files

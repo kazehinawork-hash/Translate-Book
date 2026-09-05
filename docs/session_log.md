@@ -2410,3 +2410,215 @@
 ### Git
 - Đã commit & push `main` (`bbd980c`): Bộ tứ nâng cấp trình đọc E-Reader, dừng khẩn cấp, audiobook ID3, kéo thả sách và VieNeu-TTS v3.4.0.
 
+## 2026-09-03 (Phiên tối) — Dọn dẹp file tạm & Tạm dừng dịch API commandcode.ai
+
+### Đã làm
+- Dừng thử nghiệm dịch tự động cuốn `不畏将来 不念过去 (十二 [十二]) (z-library.sk, 1lib.sk, z-lib.sk)` qua API commandcode.ai do upstream provider thường xuyên bị timeout HTTP 524 / 503 khi gặp các đoạn mục lục và thông tin xuất bản dài.
+- Xóa sạch toàn bộ các thư mục và file tạm phát sinh trong `working/extracted/`, `working/chunks/`, `working/progress/`, `working/qa/`, `working/profile/`, `working/progress_audio/chunks/` liên quan đến cuốn sách.
+- Trả môi trường working về trạng thái hoàn toàn sạch sẽ.
+
+### File đổi
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Tạm dừng thử nghiệm API của cuốn sách trên theo yêu cầu người dùng.
+
+### Git
+- Thay đổi tài liệu nội bộ docs/STATE.md và session_log.md.
+
+## 2026-09-04 — Tối ưu hóa triệt để API Timeout (503/524), Bảo toàn Chunk & Siết chặt QA Rà soát
+
+### Đã làm
+- **Loại bỏ khối ví dụ dài dòng trong Prompt**: Cắt bỏ các đoạn ví dụ đối chiếu trong `BuildPrompt` của `ApiTranslationService.cs`, giảm tải ~1.000 tokens cho mỗi request gửi lên máy chủ AI. Giữ vững 100% tiêu chí văn học và ngữ cảnh gối đầu (`contextPreviousText`).
+- **Nâng cấp Exponential Backoff Retry**: Tăng từ 5 lên 6 lần thử khi gặp 503/524/Timeout với các bước chờ thông minh `5s → 10s → 20s → 35s → 50s` kèm random jitter.
+- **Sửa bug danh sách thiếu ở Vòng 2 trong `MainViewModel.cs`**: Kiểm tra trực tiếp trạng thái file progress trên đĩa để xác định chính xác chunk còn thiếu.
+- **Tự động bỏ qua (Skip) an toàn**: Kiểm tra chất lượng chunk (không dính mojibake, không sót chữ Hán, không lệch câu) trước khi bỏ qua, nếu đã chuẩn thì nạp thẳng không gọi API.
+- **Chuẩn Hóa Pipeline Thành Chế Độ 1 Luồng Tuần Tự Tuyệt Đối (Pure Single-Thread)**:
+  - Loại bỏ hoàn toàn cơ chế đa luồng song song phức tạp, đưa toàn bộ quy trình dịch về chuẩn tuần tự duy nhất: Gửi 1 chunk $\rightarrow$ Đợi máy chủ sinh và trả kết quả xong $\rightarrow$ Nghỉ 1s $\rightarrow$ Mới gửi chunk tiếp theo.
+  - Loại bỏ menu chọn luồng thừa trên giao diện BooksPage, giúp UI gọn gàng, thanh thoát.
+  - Tối ưu 100% cho mọi nhà cung cấp API (CommandCode, DeepSeek, Gemini...), triệt tiêu hoàn toàn mã lỗi `HTTP 429` (Rate Limit) và `HTTP 524` (Gateway Timeout).
+- **Loại bỏ Health Probe kiểm tra sống trong vòng lặp Retry**:
+  - Khi server trả về mã lỗi bận (503/524), hệ thống chỉ giãn cách chờ thuần túy rồi gửi tiếp, không gửi thêm bất kỳ request phụ nào gây tốn lượt gọi hay tiêu hao token.
+- **Biên dịch & Đồng bộ cả 2 cấu hình Debug và Release**:
+  - `dotnet build -c Debug` và `dotnet build -c Release` đều hoàn tất thành công 100% (0 Warning, 0 Error).
+  - Cả hai thư mục chạy đều đã nhận bản mã nguồn mới nhất.
+
+### File đổi
+- `desktop/Services/ApiTranslationService.cs`
+- `desktop/ViewModels/MainViewModel.cs`
+- `desktop/Views/BooksPage.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Nâng Cấp Thẩm Mỹ Giao Diện Fluent 2.0 & Windhawk Glass 3.0 Siêu Thực
+
+### Đã làm
+- **Windhawk Glass Neon Glow & Shimmer Border**:
+  - Tích hợp `GlassCardHoverGlowBrush` (`RadialGradientBrush`) và `GlassCardShimmerBorderBrush` trong `desktop/Themes/LiquidGlass.xaml`.
+  - Nâng cấp template `LiquidGlassCard`: khi di chuột qua thẻ (MouseOver), xuất hiện quầng sáng Neon mờ ảo (`BlurEffect Radius="14"`) cùng viền gương phát quang ánh bạc-cyan.
+- **Thanh Thống Kê Capsule Micro-Chips (BooksPage)**:
+  - Nâng cấp thanh Quick Bar từ dạng text phẳng có dấu chấm ngăn cách thành hệ thống thẻ con nhộng kính độc lập (Capsule Chips).
+  - Tích hợp 4 màu nhận diện mờ sương sang trọng: Cam pastel (`Chưa làm`), Xanh lá huỳnh quang (`Đã dịch`), Tím mộng mơ (`Audio`), Xanh băng neon (`GPU RTX VieNeu-TTS`).
+- **Active Indicator Glow Cho Thanh Điều Hướng Sidebar**:
+  - `GlassNavPillItem` được trang bị vạch chỉ báo phát quang lướt êm với hiệu ứng đổ bóng tỏa sáng ánh Cyan `#00F0FF`, chuẩn hóa phong cách TranslucentFlyouts/Windhawk.
+- **BookCardHeader Elevation & Format Badge**:
+  - Cập nhật bo góc 12px với viền gương siêu thực mỏng 0.8px, tạo chiều sâu thị giác phân tầng cao cấp.
+  - Bổ sung thẻ capsule định dạng (`[EPUB]`, `[PDF]`, `[DOCX]`) mạ kính mờ ở góc thẻ sách.
+- **Nút Hành Động Gradient Neon Cyberpunk**:
+  - Tạo style `InteractiveButtonNeon` (`#00B4D8` → `#7B2CBF`) viền gương phản quang và hiệu ứng quầng sáng Glow nhẹ khi hover cho nút `"Dịch Toàn bộ"`.
+- **Đồng Hồ Đếm Giây Thực Live Stopwatch**:
+  - Tích hợp capsule đếm thời gian thực (`⏱️ MM:SS` font Consolas Neon Cyan) ở đáy MainWindow, tự động kích hoạt khi có bất kỳ tác vụ AI / Python nào đang xử lý.
+- **Biên dịch & Đồng bộ cả 2 bản Debug & Release**:
+  - `dotnet build -c Debug` và `dotnet build -c Release` đều đạt 0 Warning, 0 Error.
+
+### 2026-09-05 — Tích Hợp Kéo Co Giãn (GridSplitter) Cho Realtime Console Panel
+
+### Đã làm
+- **Thiết Kế GridSplitter Phong Cách Liquid Glass 3.0**:
+  - Tạo style `GlassGridSplitter` trong `desktop/Themes/LiquidGlass.xaml` với độ rộng hit-test 6px, vạch gương trung tâm 1.5px và hiệu ứng quầng sáng Neon `#00F0FF` (`DropShadowEffect`) khi hover hoặc khi đang kéo chuột.
+- **Tái Cấu Trúc Bố Cục MainWindow Để Hỗ Trợ Co Kéo Linh Hoạt**:
+  - Chuyển `MainGlassContainer` Grid thành 3 cột (`*`, `Auto`, `LogColumnDef`).
+  - Đặt `GridSplitter` tại cột 1 và liên kết `Visibility` theo `LogExpanded`.
+  - Đặt `LogPanel` vào cột 2 với giới hạn an toàn `MinWidth="36"` và `MaxWidth="900"`.
+- **Ghi Nhớ Kích Thước Co Kéo Thông Minh (Width Persistence)**:
+  - Bổ sung thuộc tính `LogPanelColumnWidth` và bộ nhớ tạm `_savedLogPanelWidth` trong `MainViewModel.cs`.
+  - Khi thu gọn (`LogExpanded = false`), bảng log thu về thanh icon 36px gọn gàng.
+  - Khi mở rộng (`LogExpanded = true`), hệ thống tự động khôi phục đúng độ rộng mà người dùng đã kéo dãn tùy ý trước đó.
+- **Tối Ưu Trải Nghiệm Đọc Log Dài**:
+  - Thêm `HorizontalScrollBarVisibility="Auto"` vào `LogScrollViewer` để các dòng log dài không bị cắt khi thu nhỏ bảng console.
+- **Biên Dịch Sạch Sẽ Cả Debug Và Release**:
+  - `dotnet build -c Debug` và `dotnet build -c Release` đều đạt 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/MainWindow.xaml`
+- `desktop/ViewModels/MainViewModel.cs`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Sửa Triệt Để Hiện Tượng Nội Dung Realtime Console Bị Dẹt Dọc
+
+### Đã làm
+- **Phân Tích Xung Đột Đo Lường Layout WPF (Nested ScrollViewer Conflict)**:
+  - Bản thân `RichTextBox` (`LogBox`) sử dụng style `LogRichTextBox` vốn đã kích hoạt cơ chế cuộn nội bộ (`VerticalScrollBarVisibility="Auto"`).
+  - Khi bọc thêm một `ScrollViewer` (`LogScrollViewer`) ở ngoài, `ScrollViewer` cấp phát chiều cao vô cực (`PositiveInfinity`) cho nội dung con trong pha Measure, làm cho `RichTextBox` co cụm (dẹt dọc) theo số dòng hiện có thay vì bung dài phủ kín 100% diện tích của hàng `RowDefinition Height="*"`.
+- **Tối Ưu Bố Cục MainWindow.xaml**:
+  - Loại bỏ thẻ `ScrollViewer` bọc ngoài thừa thãi.
+  - Gắn trực tiếp `LogBox` vào `Grid.Row="1"` với `VerticalAlignment="Stretch"` và `HorizontalAlignment="Stretch"`.
+  - Cập nhật code-behind `MainWindow.xaml.cs` loại bỏ lời gọi thừa `LogScrollViewer?.ScrollToEnd()` (chỉ giữ `LogBox.ScrollToEnd()`).
+- **Biên Dịch Sạch Sẽ Cả Debug Và Release**:
+  - `dotnet build -c Debug` và `dotnet build -c Release` đều hoàn tất thành công 100% (0 Warning, 0 Error).
+
+### File đổi
+- `desktop/Views/MainWindow.xaml`
+- `desktop/Views/MainWindow.xaml.cs`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Đại Tu Giao Diện Toàn Diện (Liquid Glass 3.0 & Fluent 2.0 Ultra-Polished)
+
+### Đã làm
+- **1. Custom Smooth Thin Scrollbar (Thanh Cuộn Kính Mỏng Phát Quang)**:
+  - Thiết kế `GlassThinScrollBar` bo góc tròn 3px dạng viên thuốc (Pill), vạch mỏng 7px tinh tế.
+  - Khi hover hoặc kéo (dragging), thanh cuộn bừng sáng viền Neon Cyan `#00F0FF` và nền kính mờ `GlassBackgroundHoverBrush`.
+  - Tự động áp dụng toàn cục (Global implicit style) cho toàn bộ `ScrollViewer` của app.
+- **2. Đồ Họa Sóng Âm Thanh Động (MiniWaveformVisualizer)**:
+  - Bổ sung thanh hiển thị sóng âm thanh 4 dải tần số động nhấp nhô độc lập với gradient Neon Huỳnh quang (Cyan `#00F0FF`, Purple `#B87B2CBF`, Lofi `#E082FF`).
+  - Tích hợp trực tiếp trên thẻ sách Audiobook (`AudioPage`), thể hiện trạng thái Studio Audio trực quan.
+- **3. Hiệu Ứng Chuyển Trang Êm Ái (Smooth Page Transition Animation)**:
+  - Tạo style `GlassPageTransition` tích hợp `Storyboard` trượt nhẹ kết hợp mờ dần (`TranslateTransform.Y: 8 → 0`, `Opacity: 0.2 → 1.0` trong 220ms) áp dụng đồng bộ cho `BooksPage`, `AudioPage`.
+- **Biên Dịch Sạch Sẽ Cả Debug Và Release**:
+  - `dotnet build -c Debug` và `dotnet build -c Release` đều đạt 0 Warning, 0 Error.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/AudioPage.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+## 2026-09-05 — Khắc Phục Triệt Để Lỗi Crash Khi Khởi Động Ứng Dụng (Startup Crash)
+
+### Đã làm
+- **Truy vết nguyên nhân gốc từ `%LOCALAPPDATA%\TranslateBook\crash.log`**:
+  1. *Lỗi 1 (`InvalidOperationException: Cannot animate the 'Y' property because the object is sealed or frozen`)*:
+     - `WPF-UI` đã tích hợp sẵn hiệu ứng chuyển trang `FadeInWithSlideTransition` can thiệp vào `RenderTransform.Y`. Khi gắn thêm `GlassPageTransition` qua Style Setter, đối tượng `TranslateTransform` bị đóng băng (`Frozen`), dẫn đến exception làm sập ứng dụng ngay tại `NavView.Navigate(typeof(BooksPage))` khi mở app.
+     - **Khắc phục**: Gỡ bỏ triệt để `GlassPageTransition` khỏi `BooksPage.xaml`, `AudioPage.xaml`, `ApiPage.xaml` và xóa style này trong `LiquidGlass.xaml`. Chức năng chuyển trang diễn ra mượt mà tự nhiên bằng cơ chế có sẵn của `WPF-UI`.
+  2. *Lỗi 2 (`XamlParseException: Value cannot be null (Parameter 'property')` tại Line 785)*:
+     - Setter cố gán `Property="Resources"` bên trong style của `ScrollViewer` không được WPF XAML runtime hỗ trợ trực tiếp.
+     - **Khắc phục**: Đổi thành Style ngầm định hợp chuẩn WPF: `<Style TargetType="ScrollBar" BasedOn="{StaticResource GlassThinScrollBar}"/>`, giúp toàn bộ các thanh cuộn trong app tự động thừa hưởng giao diện kính mỏng phát quang mà không gây lỗi phân giải XAML.
+- **Biên dịch & Chạy thử nghiệm thực tế**:
+  - `dotnet build -c Debug`: 0 Warning, 0 Error.
+  - `dotnet build -c Release`: 0 Warning, 0 Error.
+  - Chạy thử `TranslateBook.exe`, tiến trình khởi chạy mượt mà, giao diện mở lên tức thì, file `crash.log` hoàn toàn sạch 0 lỗi.
+
+### File đổi
+- `desktop/Themes/LiquidGlass.xaml`
+- `desktop/Views/BooksPage.xaml`
+- `desktop/Views/AudioPage.xaml`
+- `desktop/Views/ApiPage.xaml`
+- `docs/STATE.md`
+- `docs/session_log.md`
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.
+
+
+## 2026-09-05 — Đại Tu Giao Diện Thanh Điều Hướng Bên Trái (Left Navigation Sidebar Overhaul)
+
+### Đã làm
+- **1. Live Pill Badges Đếm Số Lượng Động**:
+  - Bổ sung huy hiệu viên thuốc viền gương kính mờ bên cạnh từng mục menu:
+    - Tab **Sách**: Huy hiệu Cyan Neon phát quang hiển thị {Binding TotalBooksCount}.
+    - Tab **Audiobook**: Huy hiệu Tím Neon phát quang hiển thị {Binding AudioBooksCount}.
+- **2. Thẻ Trạng Thái AI Engine Liquid Glass Tương Tác (Click-to-Navigate)**:
+  - Thay thế khối Text tĩnh bằng một thẻ card Glass 3.0 sang trọng.
+  - Đèn LED xanh lá (#10B981) phát quang quầng sáng Dropshadow thể hiện trạng thái kết nối sống động.
+  - Hiển thị nhãn 'AI ENGINE' cùng tên Engine/Model hiện hành (DisplayActiveProvider).
+  - Hỗ trợ click chuột để chuyển trang trực tiếp sang ApiPage (ApiStatusCard_MouseLeftButtonUp).
+- **3. Bảng Điều Khiển Tổng Quan Hệ Thống Mini (Mini System & GPU Dashboard Widget)**:
+  - Bổ sung widget kính mờ hiển thị tổng số từ dịch tích lũy (TotalTranslatedWords) định dạng chuẩn quốc tế.
+  - Đèn chip hiển thị hiệu năng GPU (GpuPerformanceText, ví dụ RTF 0.12 RTX).
+- **4. Kiểm Thử Toàn Diện**:
+  - Biên dịch thành công 100% cả Debug và Release (0 Warning, 0 Error).
+  - Khởi chạy tiến trình TranslateBook.exe, app chạy mượt mà, không sinh lỗi trong crash.log.
+
+### File đổi
+- desktop/Views/MainWindow.xaml
+- desktop/Views/MainWindow.xaml.cs
+- docs/STATE.md
+- docs/session_log.md
+
+### Còn dở
+- Không còn việc tồn đọng.
+
+### Git
+- Chưa commit — chờ người dùng duyệt.

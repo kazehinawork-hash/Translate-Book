@@ -14,6 +14,7 @@ public partial class ApiPage : Page
     }
 
     private bool _isUpdatingKeyProgrammatically = false;
+    private bool _isApiKeyPlainVisible = false;
 
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
@@ -37,15 +38,14 @@ public partial class ApiPage : Page
         _isUpdatingKeyProgrammatically = true;
         try
         {
-            if (ApiKeyBox != null)
-            {
-                ApiKeyBox.Password = key;
-            }
+            if (ApiKeyBox != null) ApiKeyBox.Password = key;
+            if (ApiKeyPlainBox != null) ApiKeyPlainBox.Text = key;
+
             if (KeyStatusText != null)
             {
                 if (!string.IsNullOrWhiteSpace(key))
                 {
-                    KeyStatusText.Text = "● Đã lưu API key (đang được bảo mật). Nhập key mới nếu muốn thay đổi.";
+                    KeyStatusText.Text = "● Đã lưu API key (đang được mã hóa bảo mật). Nhập key mới nếu muốn thay đổi.";
                     KeyStatusText.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
                 }
                 else
@@ -61,14 +61,68 @@ public partial class ApiPage : Page
         }
     }
 
+    private void ToggleApiKeyVisibility_Click(object sender, RoutedEventArgs e)
+    {
+        _isApiKeyPlainVisible = !_isApiKeyPlainVisible;
+        if (_isApiKeyPlainVisible)
+        {
+            ApiKeyPlainBox.Text = ApiKeyBox.Password;
+            ApiKeyPlainBox.Visibility = Visibility.Visible;
+            ApiKeyBox.Visibility = Visibility.Collapsed;
+            EyeIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.EyeOff24;
+            ApiKeyPlainBox.Focus();
+            ApiKeyPlainBox.CaretIndex = ApiKeyPlainBox.Text.Length;
+        }
+        else
+        {
+            ApiKeyBox.Password = ApiKeyPlainBox.Text;
+            ApiKeyBox.Visibility = Visibility.Visible;
+            ApiKeyPlainBox.Visibility = Visibility.Collapsed;
+            EyeIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Eye24;
+            ApiKeyBox.Focus();
+        }
+    }
+
+    private void ApiKeyPlainBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isUpdatingKeyProgrammatically) return;
+
+        _isUpdatingKeyProgrammatically = true;
+        try
+        {
+            ApiKeyBox.Password = ApiKeyPlainBox.Text;
+        }
+        finally
+        {
+            _isUpdatingKeyProgrammatically = false;
+        }
+
+        OnApiKeyUpdated(ApiKeyPlainBox.Text);
+    }
+
     private void ApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
     {
         if (_isUpdatingKeyProgrammatically) return;
 
+        _isUpdatingKeyProgrammatically = true;
+        try
+        {
+            ApiKeyPlainBox.Text = ApiKeyBox.Password;
+        }
+        finally
+        {
+            _isUpdatingKeyProgrammatically = false;
+        }
+
+        OnApiKeyUpdated(ApiKeyBox.Password);
+    }
+
+    private void OnApiKeyUpdated(string key)
+    {
         if (DataContext is ViewModels.MainViewModel vm)
         {
-            vm.ApiKeyInput = ApiKeyBox.Password;
-            if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password) && ApiKeyBox.Password.Length > 10)
+            vm.ApiKeyInput = key;
+            if (!string.IsNullOrWhiteSpace(key) && key.Length > 10)
             {
                 TriggerFetchModels();
             }
@@ -76,9 +130,9 @@ public partial class ApiPage : Page
 
         if (KeyStatusText != null)
         {
-            if (!string.IsNullOrWhiteSpace(ApiKeyBox.Password))
+            if (!string.IsNullOrWhiteSpace(key))
             {
-                KeyStatusText.Text = "● Đã nhập API key. Bấm 'Lưu Cài Đặt' hoặc 'Kiểm Tra Kết Nối' để lưu.";
+                KeyStatusText.Text = "● Đã nhập API key. Bấm 'Lưu Cài Đặt' hoặc 'Kiểm Tra Kết Nối' để áp dụng.";
                 KeyStatusText.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
             }
             else
@@ -220,21 +274,51 @@ public partial class ApiPage : Page
         LoadCurrentProviderKey();
 
         ApiStatus.Text = "Đang kiểm tra...";
-        ApiStatus.Foreground = Brushes.Yellow;
+        ApiStatus.Foreground = (Brush)FindResource("TextFillColorSecondaryBrush");
+        ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowSync24;
+        ApiStatusIcon.Foreground = (Brush)FindResource("AccentFillColorDefaultBrush");
+
+        StatusDot.Background = (Brush)FindResource("AccentFillColorDefaultBrush");
+        OverallStatusText.Text = "Đang kiểm tra...";
 
         // Quét cập nhật danh sách model
         TriggerFetchModels();
 
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         _ = Task.Run(async () =>
         {
             var service = new Services.ApiTranslationService();
             var (ok, msg) = await service.TestConnectionAsync(provider);
+            sw.Stop();
+            var elapsedMs = sw.ElapsedMilliseconds;
+
             Dispatcher.Invoke(() =>
             {
-                ApiStatus.Text = ok ? $"OK: {msg}" : $"Lỗi: {msg}";
-                ApiStatus.Foreground = ok ? Brushes.LightGreen : Brushes.LightCoral;
+                if (ok)
+                {
+                    ApiStatus.Text = $"Kết nối tốt ({elapsedMs}ms) • {msg}";
+                    ApiStatus.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xE6, 0x76));
+                    ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.CheckmarkCircle24;
+                    ApiStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xE6, 0x76));
+
+                    StatusDot.Background = new SolidColorBrush(Color.FromRgb(0x00, 0xE6, 0x76));
+                    OverallStatusText.Text = $"Sẵn sàng ({elapsedMs}ms)";
+                    OverallStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xE6, 0x76));
+                }
+                else
+                {
+                    ApiStatus.Text = $"Lỗi ({elapsedMs}ms): {msg}";
+                    ApiStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x52, 0x52));
+                    ApiStatusIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.DismissCircle24;
+                    ApiStatusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x52, 0x52));
+
+                    StatusDot.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0x52, 0x52));
+                    OverallStatusText.Text = "Không khả dụng";
+                    OverallStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x52, 0x52));
+                }
+
                 if (Window.GetWindow(this) is MainWindow mw)
-                    mw.ShowSnackbar(ok ? "Kiểm tra kết nối thành công!" : msg, !ok);
+                    mw.ShowSnackbar(ok ? $"Kiểm tra kết nối thành công ({elapsedMs}ms)!" : msg, !ok);
             });
         });
     }

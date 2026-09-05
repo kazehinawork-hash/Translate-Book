@@ -31,40 +31,55 @@
             <TextBlock Text="Danh sách sách" FontSize="24" FontWeight="Bold"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
 
-            <!-- Dashboard Analytics Quick Bar -->
-            <Border Grid.Column="1" Margin="20,0,16,0" Padding="12,4" HorizontalAlignment="Left"
-                    Background="{DynamicResource GlassElementBackground2Brush}"
-                    BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
-                    CornerRadius="10" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Sách chưa làm -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0" ToolTip="Số lượng sách trong input/chua-lam/">
-                        <ui:SymbolIcon Symbol="BookClock24" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,4,0"/>
+            <!-- Dashboard Analytics Quick Bar: Windhawk Glass Capsule Chips -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,16,0">
+                <!-- Chip 1: Chưa làm -->
+                <Border Padding="10,5" Margin="0,0,8,0" CornerRadius="12"
+                        Background="{DynamicResource ChipPendingBg}"
+                        BorderBrush="{DynamicResource ChipPendingBorder}" BorderThickness="1"
+                        ToolTip="Số lượng sách trong input/chua-lam/">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="BookClock24" FontSize="13" Foreground="#FFA726" Margin="0,0,5,0"/>
                         <TextBlock Text="Chưa làm: " FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                        <TextBlock Text="{Binding PendingBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        <TextBlock Text="{Binding PendingBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="#FFA726"/>
                     </StackPanel>
-                    <TextBlock Text="•" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,12,0"/>
-                    <!-- Sách đã dịch -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0" ToolTip="Tổng số sách đã dịch hoàn tất">
-                        <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,4,0"/>
+                </Border>
+
+                <!-- Chip 2: Đã dịch -->
+                <Border Padding="10,5" Margin="0,0,8,0" CornerRadius="12"
+                        Background="{DynamicResource ChipTranslatedBg}"
+                        BorderBrush="{DynamicResource ChipTranslatedBorder}" BorderThickness="1"
+                        ToolTip="Tổng số sách đã dịch hoàn tất">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="13" Foreground="#00E676" Margin="0,0,5,0"/>
                         <TextBlock Text="Đã dịch: " FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                        <TextBlock Text="{Binding TranslatedBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentFillColorDefaultBrush}"/>
+                        <TextBlock Text="{Binding TranslatedBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="#00E676"/>
                     </StackPanel>
-                    <TextBlock Text="•" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,12,0"/>
-                    <!-- Sách có Audio -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0" ToolTip="Số sách đã có Audiobook hoàn tất">
-                        <ui:SymbolIcon Symbol="Headphones24" FontSize="14" Foreground="#e082ff" Margin="0,0,4,0"/>
+                </Border>
+
+                <!-- Chip 3: Audio -->
+                <Border Padding="10,5" Margin="0,0,8,0" CornerRadius="12"
+                        Background="{DynamicResource ChipAudioBg}"
+                        BorderBrush="{DynamicResource ChipAudioBorder}" BorderThickness="1"
+                        ToolTip="Số sách đã có Audiobook hoàn tất">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Headphones24" FontSize="13" Foreground="#E082FF" Margin="0,0,5,0"/>
                         <TextBlock Text="Audio: " FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                        <TextBlock Text="{Binding AudioBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="#e082ff"/>
+                        <TextBlock Text="{Binding AudioBooksCount}" FontSize="11.5" FontWeight="Bold" Foreground="#E082FF"/>
                     </StackPanel>
-                    <TextBlock Text="•" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,12,0"/>
-                    <!-- Tốc độ GPU TTS -->
-                    <StackPanel Orientation="Horizontal" ToolTip="Tốc độ xử lý của engine VieNeu-TTS v3 Turbo với GPU RTX">
-                        <ui:SymbolIcon Symbol="Flash24" FontSize="14" Foreground="#40c4ff" Margin="0,0,4,0"/>
-                        <TextBlock Text="{Binding GpuPerformanceText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#40c4ff"/>
+                </Border>
+
+                <!-- Chip 4: GPU VieNeu-TTS -->
+                <Border Padding="10,5" CornerRadius="12"
+                        Background="{DynamicResource ChipGpuBg}"
+                        BorderBrush="{DynamicResource ChipGpuBorder}" BorderThickness="1"
+                        ToolTip="Tốc độ xử lý của engine VieNeu-TTS v3 Turbo với GPU RTX">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Flash24" FontSize="13" Foreground="#00F0FF" Margin="0,0,5,0"/>
+                        <TextBlock Text="{Binding GpuPerformanceText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#00F0FF"/>
                     </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
+            </StackPanel>
 
             <ui:Button Grid.Column="2" Width="36" Height="36"
                        Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Làm mới danh sách sách" Cursor="Hand"
@@ -91,28 +106,6 @@
                         <RadioButton x:Name="TabOutput" Content="Output (Đã dịch)"
                                      Click="TabOutput_Click" GroupName="BookTabs"
                                      Style="{StaticResource GlassTabHeader}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Bộ điều chỉnh tốc độ dịch đa luồng thông minh -->
-                <Border DockPanel.Dock="Right" Padding="10,4"
-                        Background="{DynamicResource GlassElementBackground2Brush}"
-                        BorderBrush="{DynamicResource GlassElementBorderBrush}" BorderThickness="0.3,0.3,0.3,1"
-                        CornerRadius="14" VerticalAlignment="Center"
-                        ToolTip="Cơ chế Dịch Song Song Thông Minh: Tự động trích xuất Ngữ cảnh Gối đầu (Sliding Window Context) &amp; Hồ sơ văn chương để bản dịch luôn liền mạch 100%">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="Flash24" FontSize="14" Foreground="{DynamicResource AccentFillColorDefaultBrush}" Margin="0,0,6,0"/>
-                        <TextBlock Text="Luồng dịch:" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ComboBox Width="160" Height="28" FontSize="11.5"
-                                  SelectedValuePath="Tag"
-                                  SelectedValue="{Binding TranslateConcurrency, Mode=TwoWay}"
-                                  Style="{StaticResource GlassComboBox}">
-                            <ComboBoxItem Content="1 Luồng (Mặc định - Ổn định)" Tag="1"/>
-                            <ComboBoxItem Content="2 Luồng (Nhanh - Proxy mạnh)" Tag="2"/>
-                            <ComboBoxItem Content="3 Luồng (Cực nhanh)" Tag="3"/>
-                            <ComboBoxItem Content="4 Luồng (Key trả phí cao)" Tag="4"/>
-                        </ComboBox>
                     </StackPanel>
                 </Border>
             </DockPanel>
@@ -197,6 +190,7 @@
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Border Width="42" Height="42" CornerRadius="21"
                                                         Background="{DynamicResource AccentFillColorDefaultBrush}"
@@ -205,7 +199,7 @@
                                                                Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
                                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
-                                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                <StackPanel Grid.Column="1" Margin="10,0,6,0" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="Bold"
                                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                                TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
@@ -213,6 +207,14 @@
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                                Margin="0,3,0,0"/>
                                                 </StackPanel>
+
+                                                <!-- Format Pill Badge (EPUB / PDF / DOCX) -->
+                                                <Border Grid.Column="2" VerticalAlignment="Top" Padding="7,2" CornerRadius="8"
+                                                        Background="{DynamicResource GlassButtonNormalBrush}"
+                                                        BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="0.8">
+                                                    <TextBlock Text="{Binding FileExtension}" FontSize="10" FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                </Border>
                                             </Grid>
                                         </Border>
 
@@ -257,7 +259,7 @@
                                                ToolTip="Chạy toàn bộ quy trình dịch từ đầu: Trích xuất → Chia chunk → Tạo khung → Dịch mới → Merge → EPUB"
                                                Click="RunPipeline_Click">
                                         <ui:Button.Style>
-                                            <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButton}">
+                                            <Style TargetType="ui:Button" BasedOn="{StaticResource InteractiveButtonNeon}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsBusy}" Value="True">
                                                         <Setter Property="Content" Value="Đang chạy toàn bộ..."/>

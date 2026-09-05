@@ -76,6 +76,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition x:Name="LogColumnDef" Width="{Binding LogPanelColumnWidth, Mode=TwoWay, FallbackValue=320, TargetNullValue=320}" MinWidth="36" MaxWidth="900"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Left Nav + Main Page Content (Menu dạng viên thuốc viền gương Glass 3.0 - Cố định) -->
@@ -87,23 +88,134 @@
                                    Background="Transparent">
 
                     <ui:NavigationView.MenuItems>
-                        <ui:NavigationViewItem Content="Sách" IsActive="True"
+                        <!-- Menu Sách kèm Pill Badge đếm số sách sống động -->
+                        <ui:NavigationViewItem IsActive="True"
                                                TargetPageType="{x:Type views:BooksPage}"
                                                Icon="{ui:SymbolIcon BookOpen24}"
-                                               Style="{StaticResource GlassNavPillItem}"/>
-                        <ui:NavigationViewItem Content="Audiobook" TargetPageType="{x:Type views:AudioPage}"
+                                               Style="{StaticResource GlassNavPillItem}">
+                            <ui:NavigationViewItem.Content>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Sách" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    <Border Grid.Column="1" Margin="0,0,4,0" Padding="6,1.5" CornerRadius="8"
+                                            Background="#1500F0FF" BorderBrush="#4000F0FF" BorderThickness="1"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding TotalBooksCount, FallbackValue=0}" FontSize="11" FontWeight="Bold"
+                                                   Foreground="#00F0FF"/>
+                                    </Border>
+                                </Grid>
+                            </ui:NavigationViewItem.Content>
+                        </ui:NavigationViewItem>
+
+                        <!-- Menu Audiobook kèm Pill Badge đếm audio sống động -->
+                        <ui:NavigationViewItem TargetPageType="{x:Type views:AudioPage}"
                                                Icon="{ui:SymbolIcon Headphones24}"
-                                               Style="{StaticResource GlassNavPillItem}"/>
+                                               Style="{StaticResource GlassNavPillItem}">
+                            <ui:NavigationViewItem.Content>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Audiobook" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    <Border Grid.Column="1" Margin="0,0,4,0" Padding="6,1.5" CornerRadius="8"
+                                            Background="#15A855F7" BorderBrush="#40A855F7" BorderThickness="1"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AudioBooksCount, FallbackValue=0}" FontSize="11" FontWeight="Bold"
+                                                   Foreground="#C084FC"/>
+                                    </Border>
+                                </Grid>
+                            </ui:NavigationViewItem.Content>
+                        </ui:NavigationViewItem>
                     </ui:NavigationView.MenuItems>
 
                     <ui:NavigationView.FooterMenuItems>
-                        <ui:NavigationViewItem IsHitTestVisible="False">
-                            <StackPanel Margin="0,6">
-                                <TextBlock Text="API" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Opacity="0.8"/>
-                                <TextBlock Text="{Binding DisplayActiveProvider, Mode=OneWay}" FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontWeight="SemiBold"/>
+                        <!-- Mini System Dashboard & GPU Status Card -->
+                        <Border Margin="4,4,4,6" Padding="10,8" CornerRadius="10"
+                                Background="{DynamicResource GlassElementBackground2Brush}"
+                                BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ui:SymbolIcon Grid.Column="0" Symbol="DocumentText20" FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,5,0"/>
+                                    <TextBlock Grid.Column="1" Text="ĐÃ DỊCH" FontSize="9.5" FontWeight="Bold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Opacity="0.8" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+                                    <Run Text="{Binding TotalTranslatedWords, StringFormat={}{0:N0}, FallbackValue=0}"/>
+                                    <Run Text=" từ" FontSize="10.5" FontWeight="Normal" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                </TextBlock>
+                                
+                                <Border Margin="0,6,0,0" Padding="6,3" CornerRadius="6"
+                                        Background="#1034D399" BorderBrush="#3034D399" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Width="6" Height="6" CornerRadius="3" Background="#10B981"
+                                                VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding GpuPerformanceText, FallbackValue='RTF 0.12 (GPU)'}"
+                                                   FontSize="10" FontWeight="SemiBold" Foreground="#34D399"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
-                        </ui:NavigationViewItem>
+                        </Border>
+
+                        <!-- Thẻ trạng thái API Glass tương tác với đèn LED xanh phát quang (Click chuyển sang ApiPage) -->
+                        <Border Margin="4,2,4,4" Padding="10,8" CornerRadius="10" Cursor="Hand"
+                                Background="{DynamicResource GlassTabNormalBrush}"
+                                BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1"
+                                MouseLeftButtonUp="ApiStatusCard_MouseLeftButtonUp">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource GlassTabHoverBrush}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource GlassGradientBorderHoverBrush}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <!-- Đèn LED xanh phát quang (Live API Indicator) -->
+                                <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4" Background="#10B981"
+                                        VerticalAlignment="Center" Margin="0,0,8,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#10B981" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
+                                    </Border.Effect>
+                                </Border>
+
+                                <!-- API Info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="AI ENGINE" FontSize="9" FontWeight="Bold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Opacity="0.85"/>
+                                    <TextBlock Text="{Binding DisplayActiveProvider, Mode=OneWay, FallbackValue='Sẵn sàng'}"
+                                               FontSize="11.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+
+                                <!-- Icon mũi tên hoặc link nhỏ -->
+                                <ui:SymbolIcon Grid.Column="2" Symbol="ChevronRight16" FontSize="11"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
 
                         <ui:NavigationViewItem Content="Cài đặt" TargetPageType="{x:Type views:ApiPage}"
                                                Icon="{ui:SymbolIcon Settings24}"
@@ -111,34 +223,17 @@
                     </ui:NavigationView.FooterMenuItems>
                 </ui:NavigationView>
 
-                <!-- Realtime Log — right docked panel with Smooth Expand/Collapse Animation -->
-                <Border Grid.Column="1" x:Name="LogPanel" Margin="0"
+                <!-- GridSplitter kéo co giãn Realtime Console (Liquid Glass 3.0) -->
+                <GridSplitter Grid.Column="1" Style="{StaticResource GlassGridSplitter}"
+                              HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                              ShowsPreview="False"
+                              Visibility="{Binding LogExpanded, Converter={StaticResource BoolToVisibility}}"/>
+
+                <!-- Realtime Log — right docked panel with Smooth Expand/Collapse & Drag Resizing -->
+                <Border Grid.Column="2" x:Name="LogPanel" Margin="0"
                         BorderBrush="{DynamicResource GlassGradientBorderBrush}" BorderThickness="1,0,0,0"
                         Background="{DynamicResource GlassBackgroundBrush}"
                         ClipToBounds="True">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Width" Value="300"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding LogExpanded}" Value="False">
-                                    <DataTrigger.EnterActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="36" Duration="0:0:0.25" DecelerationRatio="0.8"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.EnterActions>
-                                    <DataTrigger.ExitActions>
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="300" Duration="0:0:0.25" DecelerationRatio="0.8"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </DataTrigger.ExitActions>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
                     <Grid>
                         <!-- Expanded View -->
                         <Grid x:Name="LogExpandedArea">
@@ -217,12 +312,11 @@
                                  </StackPanel>
                              </Border>
 
-                             <!-- Khu vực hiển thị dòng Log Console -->
-                             <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1"
-                                           VerticalScrollBarVisibility="Auto">
-                                 <RichTextBox x:Name="LogBox" Style="{StaticResource LogRichTextBox}"
-                                               FontFamily="Consolas" FontSize="11"/>
-                             </ScrollViewer>
+                             <!-- Khu vực hiển thị dòng Log Console (RichTextBox tự cuộn nội dung, phủ kín toàn bộ chiều cao Row 1) -->
+                             <RichTextBox x:Name="LogBox" Grid.Row="1"
+                                          Style="{StaticResource LogRichTextBox}"
+                                          FontFamily="Consolas" FontSize="11"
+                                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
 
                              <!-- AI Thinking & Processing Live Status Bar (Hiệu ứng AI đang suy nghĩ - Đồng bộ Liquid Glass 3.0) -->
                              <Border Grid.Row="2" Background="{DynamicResource GlassElementBackground2Brush}" Padding="12,7"
@@ -238,12 +332,13 @@
                                      </Style>
                                  </Border.Style>
                                  <Grid>
-                                     <Grid.ColumnDefinitions>
-                                         <ColumnDefinition Width="Auto"/>
-                                         <ColumnDefinition Width="*"/>
-                                         <ColumnDefinition Width="Auto"/>
-                                         <ColumnDefinition Width="Auto"/>
-                                     </Grid.ColumnDefinitions>
+                                      <Grid.ColumnDefinitions>
+                                          <ColumnDefinition Width="Auto"/>
+                                          <ColumnDefinition Width="*"/>
+                                          <ColumnDefinition Width="Auto"/>
+                                          <ColumnDefinition Width="Auto"/>
+                                          <ColumnDefinition Width="Auto"/>
+                                      </Grid.ColumnDefinitions>
                                      
                                      <!-- Thinking Sparkle Icon chuẩn kính mờ Liquid Glass -->
                                      <Border Grid.Column="0" Width="22" Height="22" CornerRadius="6"
@@ -262,13 +357,25 @@
                                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
                                      </StackPanel>
 
-                                     <!-- Wave Pulse Progress (Chuẩn GlassProgressBar lướt mượt đồng bộ) -->
-                                     <ProgressBar Grid.Column="2" Width="80" Height="6" IsIndeterminate="True"
-                                                  Style="{StaticResource RealtimePulseProgressBar}"
-                                                  VerticalAlignment="Center" Margin="8,0,8,0"/>
+                                      <!-- Live Stopwatch Capsule Chip (Đồng hồ đếm giây thực khi AI suy nghĩ) -->
+                                      <Border Grid.Column="2" Padding="8,2" Margin="6,0,8,0" CornerRadius="8"
+                                              Background="{DynamicResource ChipGpuBg}"
+                                              BorderBrush="{DynamicResource ChipGpuBorder}" BorderThickness="1"
+                                              VerticalAlignment="Center">
+                                          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                              <ui:SymbolIcon Symbol="Timer24" FontSize="11" Foreground="#00F0FF" Margin="0,0,4,0"/>
+                                              <TextBlock Text="{Binding LiveElapsedText, TargetNullValue='00:00'}" FontSize="11" FontWeight="Bold"
+                                                         FontFamily="Consolas" Foreground="#00F0FF"/>
+                                          </StackPanel>
+                                      </Border>
+
+                                      <!-- Wave Pulse Progress (Chuẩn GlassProgressBar lướt mượt đồng bộ) -->
+                                      <ProgressBar Grid.Column="3" Width="70" Height="6" IsIndeterminate="True"
+                                                   Style="{StaticResource RealtimePulseProgressBar}"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
 
                                      <!-- Nút Dừng khẩn cấp (Cancel / Abort Process) -->
-                                     <Button Grid.Column="3" Height="24" Padding="6,1" FontSize="11"
+                                     <Button Grid.Column="4" Height="24" Padding="6,1" FontSize="11"
                                              Style="{StaticResource GlassDangerButton}"
                                              ToolTip="Dừng khẩn cấp tiến trình đang chạy"
                                              Command="{Binding CancelCommand}">

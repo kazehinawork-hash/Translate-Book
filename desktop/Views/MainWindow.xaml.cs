@@ -10,7 +10,8 @@ using System.Windows.Threading;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
-namespace TranslateBook.Views;
+namespace TranslateBook.Views
+{
 
     public partial class MainWindow : FluentWindow
     {
@@ -177,7 +178,6 @@ namespace TranslateBook.Views;
 
             LogBox.Document.Blocks.Add(para);
             LogBox.ScrollToEnd();
-            LogScrollViewer?.ScrollToEnd();
         }
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -328,6 +328,12 @@ namespace TranslateBook.Views;
             {
                 ShowSnackbar("Vui lòng thả file sách định dạng .epub, .pdf hoặc .docx", true);
             }
+        }
+    }
+
+    private void ApiStatusCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+            NavView.Navigate(typeof(ApiPage));
         }
     }
 }

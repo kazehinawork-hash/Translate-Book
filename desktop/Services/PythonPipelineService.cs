@@ -202,9 +202,10 @@ public class PythonPipelineService
     }
 
     public async Task<bool> RunChunkAsync(string rawMdPath, string outputDir,
-        CancellationToken ct = default)
+        CancellationToken ct = default, int minChars = 800, int maxChars = 1600, string lang = "zh")
     {
-        var args = $"--input \"{rawMdPath}\" --output-dir \"{outputDir}\" --strategy smart --min-chars 800 --max-chars 1600";
+        // Lưu ý: chunk_text.py mặc định --lang en (đếm theo từ). Sách ZH phải truyền --lang zh (đếm chữ Hán)
+        var args = $"--input \"{rawMdPath}\" --output-dir \"{outputDir}\" --strategy smart --lang {lang} --min-chars {minChars} --max-chars {maxChars}";
         return await RunScriptAsync("process/chunk_text.py", args, ct);
     }
 
